@@ -1,0 +1,19 @@
+# Herramientas de Automatización - Dependencias
+
+# Interfaz y Menú
+rich
+questionary
+
+# Web Scraping (Monitor de Precios)
+requests
+beautifulsoup4
+schedule
+plyer
+
+# Procesamiento de Documentos e IA (Resumidor)
+google-genai
+pypdf
+python-dotenv
+
+# Manipulación de Imágenes (Renombrador)
+Pillow
