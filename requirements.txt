@@ -16,4 +16,4 @@ pypdf
 python-dotenv
 
 # Manipulación de Imágenes (Renombrador)
-Pillow
+#Pillow

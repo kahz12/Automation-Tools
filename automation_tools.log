@@ -1,0 +1,1 @@
+2026-02-18 11:17:15 [INFO] Ejecutando: /data/data/com.termux/files/usr/bin/python3 /data/data/com.termux/files/home/-Automation-Tools/tools/renombrador_masivo.py /data/data/com.termux/files/home/storage/downloads/.Videos --mode patron --pattern sofi_johansson_{:001d} --aplicar
