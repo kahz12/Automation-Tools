@@ -2,13 +2,17 @@
     "settings": {
         "currency_code": "COP",
         "decimal_separator": ".",
-        "thousands_separator": "75.490"
+        "thousands_separator": ",",
+        "telegram_token": "",
+        "telegram_chat_id": "",
+        "ml_access_token": ""
     },
     "products": [
         {
             "name": "Botas Mujer",
             "url": "https://articulo.mercadolibre.com.co/MCO-886072080-bota-de-caucho-impermeable-dama-moto-mujer-color-_JM?matt_tool=15401541#origin=share&sid=share",
-            "target_price": 75000
+            "target_price": 74490,
+            "alert_drop_percent": 5
         }
     ]
 }

@@ -1,7 +1,9 @@
+# ─── Imports ───
 import argparse
 import os
 from PIL import Image
 
+# ─── Funciones ───
 def convert_single_file(input_path, output_format):
     """Convierte un único archivo de imagen."""
     # Mapeo de extensiones comunes a nombres de formato de Pillow

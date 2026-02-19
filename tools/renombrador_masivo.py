@@ -1,3 +1,4 @@
+# ─── Imports ───
 import os
 import sys
 import argparse
@@ -11,6 +12,7 @@ try:
 except ImportError:
     HAS_PILLOW = False
 
+# ─── Funciones ───
 def get_file_date(filepath):
     """
     Obtiene la fecha de creación original del archivo.

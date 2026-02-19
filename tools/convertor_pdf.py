@@ -1,7 +1,9 @@
+# ─── Imports ───
 import subprocess
 import os
 import sys
 
+# ─── Funciones ───
 def convert_to_pdf(input_path):
     # Comprobar si el archivo existe
     if not os.path.exists(input_path):

@@ -1,7 +1,8 @@
+# ─── Imports ───
 import os
 import shutil
 
-# --- Configuración ---
+# ─── Configuración ───
 # Define la carpeta de Descargas (se expandirá a la ruta completa del usuario)
 DOWNLOADS_PATH = os.path.expanduser('~/Descargas')
 
@@ -18,6 +19,7 @@ CATEGORIES = {
     'Otros': [] # Para archivos que no coincidan con ninguna categoría
 }
 
+# ─── Funciones ───
 def organize_downloads():
     print(f"Organizando la carpeta: {DOWNLOADS_PATH}")
 

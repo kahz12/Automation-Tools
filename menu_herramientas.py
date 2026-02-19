@@ -1,3 +1,4 @@
+# ─── Imports ───
 import os
 import sys
 import subprocess
@@ -7,7 +8,7 @@ from rich.panel import Panel
 from rich.text import Text
 import questionary
 
-# ─── Logging ──────────────────────────────────────────────────────────────────
+# ─── Logging ───
 logging.basicConfig(
     filename="automation_tools.log",
     level=logging.INFO,
@@ -15,7 +16,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-# ─── Rutas ────────────────────────────────────────────────────────────────────
+# ─── Rutas ───
 ROOT_DIR  = os.path.dirname(os.path.abspath(__file__))
 TOOLS_DIR = os.path.join(ROOT_DIR, "tools")
 CONFIG_FILE = os.path.join(ROOT_DIR, "productos_a_monitorear.json")
@@ -23,7 +24,7 @@ CONFIG_FILE = os.path.join(ROOT_DIR, "productos_a_monitorear.json")
 console = Console()
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# ─── Helpers ───
 def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
 
@@ -35,8 +36,9 @@ def print_banner():
     console.print(Panel(title, subtitle=subtitle, border_style="blue", padding=(1, 2)))
 
 
-def run_script(script_name: str, args: list = []):
+def run_script(script_name: str, args: list = None):
     """Lanza un script desde la carpeta /tools via subprocess."""
+    args = args or []
     script_path = os.path.join(TOOLS_DIR, script_name)
 
     if not os.path.exists(script_path):
@@ -64,7 +66,7 @@ def run_script(script_name: str, args: list = []):
     questionary.press_any_key_to_continue().ask()
 
 
-# ─── Submenús ─────────────────────────────────────────────────────────────────
+# ─── Submenús ───
 def menu_renombrador():
     print_banner()
     console.print("[bold green]Renombrador Masivo[/bold green]")
@@ -178,7 +180,58 @@ def menu_convertir():
         run_script("convertir_imagen.py", [img_path, fmt])
 
 
-# ─── Menú principal ───────────────────────────────────────────────────────────
+def menu_convertir_pdf():
+    print_banner()
+    console.print("[bold green]Convertir a PDF[/bold green]")
+
+    filepath = questionary.path("Selecciona el archivo a convertir (ej: .docx, .odt, .pptx):").ask()
+    if not filepath:
+        return
+
+    run_script("convertor_pdf.py", [filepath])
+
+
+def menu_traductor():
+    print_banner()
+    console.print("[bold green]Traductor de Archivos[/bold green]")
+
+    filepath = questionary.path("Selecciona el archivo a traducir:").ask()
+    if not filepath:
+        return
+
+    lang = questionary.select(
+        "Idioma destino:",
+        choices=["Ingles", "Espanol", "Frances", "Portugues", "Aleman", "Italiano", "Otro"],
+    ).ask()
+    if not lang:
+        return
+
+    if lang == "Otro":
+        lang = questionary.text("Escribe el idioma destino:").ask()
+        if not lang:
+            return
+
+    args = [filepath, "--lang", lang.lower()]
+
+    if not os.environ.get("GOOGLE_API_KEY"):
+        console.print("[yellow]No se detecto GOOGLE_API_KEY en variables de entorno.[/yellow]")
+        key_input = questionary.password(
+            "Ingresa tu Google API Key (opcional si la configuras en .env):"
+        ).ask()
+        if key_input:
+            args.extend(["--key", key_input])
+
+    if questionary.confirm("Guardar traduccion en archivo?").ask():
+        base = os.path.splitext(filepath)[0]
+        ext = os.path.splitext(filepath)[1]
+        out_path = f"{base}_{lang.lower()}{ext}"
+        args.extend(["--out", out_path])
+        console.print(f"[dim]Se guardara en: {out_path}[/dim]")
+
+    run_script("traductor.py", args)
+
+
+# ─── Menú principal ───
 def main_menu():
     while True:
         print_banner()
@@ -191,7 +244,9 @@ def main_menu():
                 "3. Resumidor con IA",
                 "4. Organizar Descargas",
                 "5. Convertir Imagen",
-                "6. Salir",
+                "6. Convertir a PDF",
+                "7. Traductor de Archivos",
+                "8. Salir",
             ],
             use_indicator=True,
         ).ask()
@@ -204,8 +259,10 @@ def main_menu():
             "Renombrador": menu_renombrador,
             "Monitor":     menu_monitor,
             "Resumidor":   menu_resumidor,
-            "Convertir":   menu_convertir,
-            "Organizar":   lambda: run_script("organizar_descargas.py"),
+            "Convertir Imagen": menu_convertir,
+            "Convertir a PDF":  menu_convertir_pdf,
+            "Traductor":        menu_traductor,
+            "Organizar":        lambda: run_script("organizar_descargas.py"),
         }
 
         for key, action in actions.items():
@@ -214,7 +271,7 @@ def main_menu():
                 break
 
 
-# ─── Entry point ──────────────────────────────────────────────────────────────
+# ─── Entry point ───
 if __name__ == "__main__":
     try:
         main_menu()
