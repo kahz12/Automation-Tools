@@ -1,9 +1,7 @@
 import os
-import argparse
 from typing import Optional
 
 import questionary
-from rich.console import Console
 
 from automation_tools.core.logger import console, print_banner, print_error, print_success, print_warning
 from automation_tools.core.config import load_environment, get_env_var, get_project_root
@@ -19,7 +17,8 @@ from automation_tools.tools import (
     youtube_downloader,
     readme_generator,
     metadata,
-    organizer
+    organizer,
+    password_generator
 )
 
 def clear_screen():
@@ -244,6 +243,81 @@ def menu_organizar_descargas():
     if questionary.confirm("¿Organizar la carpeta de descargas del sistema ahora?").ask():
         organizer.run_download_organizer()
 
+@error_boundary
+def menu_password_generator():
+    print_banner()
+    console.print("[bold green]Gestor de Contraseñas[/bold green]")
+
+    action = questionary.select(
+        "¿Qué quieres hacer?",
+        choices=[
+            "Generar contraseña segura",
+            "Generar frase memorable",
+            "Evaluar fortaleza de contraseña",
+        ],
+    ).ask()
+    if not action:
+        return
+
+    if "segura" in action:
+        length_str = questionary.text("Longitud de la contraseña:", default="16").ask()
+        if not length_str:
+            return
+        try:
+            length = int(length_str)
+            if length < 4:
+                print_warning("Longitud minima ajustada a 4.")
+                length = 4
+            elif length > 128:
+                print_warning("Longitud maxima ajustada a 128.")
+                length = 128
+        except ValueError:
+            print_error("Longitud no valida.")
+            return
+
+        use_special = questionary.confirm("¿Incluir simbolos (!@#$%...)?", default=True).ask()
+        exclude_ambiguous = questionary.confirm("¿Excluir ambiguos (I/l/1, O/0)?", default=False).ask()
+
+        count_str = questionary.text("¿Cuántas generar?", default="5").ask()
+        count = min(max(int(count_str or "5"), 1), 20)
+
+        password_generator.run_generate_password(
+            length=length,
+            use_special=use_special,
+            exclude_ambiguous=exclude_ambiguous,
+            count=count,
+        )
+
+    elif "memorable" in action:
+        words_str = questionary.text("¿Cuántas palabras?", default="4").ask()
+        num_words = min(max(int(words_str or "4"), 2), 10)
+
+        separator = questionary.select(
+            "Separador:",
+            choices=["-", ".", "_", " "],
+        ).ask() or "-"
+
+        capitalize = questionary.confirm("¿Capitalizar palabras?", default=True).ask()
+        add_number = questionary.confirm("¿Agregar numero al final?", default=True).ask()
+        add_special = questionary.confirm("¿Agregar simbolo al final?", default=False).ask()
+
+        count_str = questionary.text("¿Cuántas generar?", default="5").ask()
+        count = min(max(int(count_str or "5"), 1), 20)
+
+        password_generator.run_generate_passphrase(
+            num_words=num_words,
+            separator=separator,
+            capitalize=capitalize,
+            add_number=add_number,
+            add_special=add_special,
+            count=count,
+        )
+
+    elif "fortaleza" in action:
+        pwd = questionary.password("Ingresa la contraseña a evaluar:").ask()
+        if pwd:
+            password_generator.run_evaluate_strength(pwd)
+
 def main_menu():
     load_environment()
     
@@ -264,7 +338,8 @@ def main_menu():
                 "9. Descargar de YouTube",
                 "10. Generador de README (IA)",
                 "11. Extractor de Metadata",
-                "12. Salir",
+                "12. Gestor de Contraseñas",
+                "13. Salir",
             ],
             use_indicator=True,
         ).ask()
@@ -285,6 +360,7 @@ def main_menu():
             "Generador":        menu_generador_readme,
             "Extractor":        menu_extractor_metadata,
             "Organizar":        menu_organizar_descargas,
+            "Contraseñas":      menu_password_generator,
         }
 
         for key, action in actions.items():

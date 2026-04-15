@@ -53,7 +53,7 @@ def run_duplicate_finder(directory: str, auto_delete: bool = False) -> None:
     console.print(f"\n[bold yellow]¡Se encontraron {len(duplicates)} grupos de duplicados![/bold yellow]\n")
 
     for h, paths in duplicates.items():
-        paths.sort(key=lambda x: os.path.getctime(x))
+        paths.sort(key=lambda x: os.path.getmtime(x))
         
         console.print(f"[cyan]Grupo Hash: {h[:8]}...[/cyan]")
         console.print(f"  [green](Original)[/green] {paths[0]}")

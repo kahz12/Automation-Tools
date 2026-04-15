@@ -9,7 +9,7 @@ def get_gemini_client(api_key: Optional[str] = None) -> Optional[genai.Client]:
     """Inicializa y devuelve el cliente de Gemini."""
     key = api_key or get_env_var("GOOGLE_API_KEY")
     if not key:
-        print_error("No se encontró la API Key de Google. Proporciona una válidad o define GOOGLE_API_KEY.")
+        print_error("No se encontró la API Key de Google. Proporciona una válida o define GOOGLE_API_KEY.")
         return None
     try:
         return genai.Client(api_key=key)

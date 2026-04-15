@@ -33,6 +33,11 @@ def get_downloads_folder() -> str:
             location = winreg.QueryValueEx(key, downloads_guid)[0]
         return location
     else:
+        # Android/Termux: shared storage Downloads folder
+        android_downloads = '/storage/emulated/0/Download'
+        if os.path.isdir(android_downloads):
+            return android_downloads
+
         downloads_path = os.path.join(os.path.expanduser('~'), 'Descargas')
         if not os.path.exists(downloads_path):
             downloads_path = os.path.join(os.path.expanduser('~'), 'Downloads')

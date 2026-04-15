@@ -54,9 +54,6 @@ def run_download_organizer() -> None:
             if filename not in CATEGORIES:
                 ignored_count += 1
             continue
-            
-        if filename == os.path.basename(__file__):
-            continue
 
         category = get_target_category(filename)
         destination_path = os.path.join(downloads_path, category, filename)

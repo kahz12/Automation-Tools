@@ -1,87 +1,87 @@
-# Kit de Automatizacion de Tareas
+# Automation Tools
 
-Coleccion de scripts en Python para automatizar tareas cotidianas: organizacion de archivos, monitoreo de precios, resumen de documentos con IA, conversion de imagenes y generacion de PDFs.
+A collection of Python scripts to automate everyday tasks: file organization, price monitoring, AI-powered document summarization, image conversion, PDF generation, password management, and more.
 
-## Instalacion
+## Installation
 
-1. Asegurate de tener Python 3 instalado.
-2. Crea y activa un entorno virtual (recomendado):
+1. Make sure you have Python 3 installed.
+2. Create and activate a virtual environment (recommended):
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    ```
-3. Instala las dependencias:
+3. Install the dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-## Menu Principal
+## Main Menu
 
-La forma recomendada de usar estas herramientas es a traves del menu interactivo:
+The recommended way to use these tools is through the interactive menu:
 
 ```bash
 python3 run.py
 ```
 
-El menu permite navegar con las flechas del teclado y ejecutar cualquier herramienta sin necesidad de recordar comandos.
+Navigate with your keyboard arrows and run any tool without needing to remember commands.
 
 ---
 
-## Herramientas
+## Tools
 
-Cada script tambien puede ejecutarse de forma independiente desde la terminal. A continuacion se documenta cada herramienta con sus opciones y ejemplos de uso.
+Each tool can also be executed independently from the terminal. Below is the full documentation for each one.
 
 ---
 
-### 1. Renombrador Masivo
+### 1. Bulk Renamer
 
 **Script:** `src/automation_tools/tools/renamer.py`
 
-Renombra multiples archivos en una carpeta usando tres modos: patron secuencial, fecha de creacion o reemplazo de texto.
+Renames multiple files in a directory using three modes: sequential pattern, creation date, or text replacement.
 
 > [!NOTE]
-> Por defecto se ejecuta en modo simulacion (dry-run) para previsualizar los cambios. Agrega `--aplicar` para confirmar los cambios.
+> Runs in dry-run (simulation) mode by default to preview changes. Add `--aplicar` to apply them.
 
-**Opciones:**
+**Options:**
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `directory` | Carpeta donde estan los archivos (obligatorio) |
-| `--mode` | Modo de renombrado: `patron`, `fecha` o `reemplazo` (obligatorio) |
-| `--ext` | Filtrar archivos por extension (ej: `.jpg`) |
-| `--aplicar` | Aplicar los cambios realmente |
+| `directory` | Target directory containing the files (required) |
+| `--mode` | Rename mode: `patron`, `fecha`, or `reemplazo` (required) |
+| `--ext` | Filter files by extension (e.g., `.jpg`) |
+| `--aplicar` | Apply the changes for real |
 
-**Ejemplos:**
+**Examples:**
 
-- **Modo patron** -- Renombra archivos secuencialmente:
+- **Pattern mode** -- Rename files sequentially:
   ```bash
-  python3 src/automation_tools/tools/renamer.py /ruta/fotos --mode patron --pattern "viaje_{:03d}" --ext .jpg
-  python3 src/automation_tools/tools/renamer.py /ruta/fotos --mode patron --pattern "viaje_{:03d}" --ext .jpg --aplicar
+  python3 src/automation_tools/tools/renamer.py /path/to/photos --mode patron --pattern "trip_{:03d}" --ext .jpg
+  python3 src/automation_tools/tools/renamer.py /path/to/photos --mode patron --pattern "trip_{:03d}" --ext .jpg --aplicar
   ```
-  Resultado: `viaje_001.jpg`, `viaje_002.jpg`, `viaje_003.jpg`...
+  Result: `trip_001.jpg`, `trip_002.jpg`, `trip_003.jpg`...
 
-- **Modo fecha** -- Agrega la fecha de creacion (EXIF o del sistema) al nombre:
+- **Date mode** -- Prepend the creation date (EXIF or filesystem) to the filename:
   ```bash
-  python3 src/automation_tools/tools/renamer.py /ruta/docs --mode fecha --keep-name --aplicar
-  python3 src/automation_tools/tools/renamer.py /ruta/docs --mode fecha --aplicar
+  python3 src/automation_tools/tools/renamer.py /path/to/docs --mode fecha --keep-name --aplicar
+  python3 src/automation_tools/tools/renamer.py /path/to/docs --mode fecha --aplicar
   ```
-  Con `--keep-name`: `2024-02-17_documento.pdf`
-  Sin `--keep-name`: `2024-02-17_001.pdf`
+  With `--keep-name`: `2024-02-17_document.pdf`
+  Without: `2024-02-17_001.pdf`
 
-- **Modo reemplazo** -- Busca y reemplaza texto en nombres de archivos:
+- **Replacement mode** -- Find and replace text in filenames:
   ```bash
-  python3 src/automation_tools/tools/renamer.py /ruta/archivos --mode reemplazo --old-text "Copia de " --new-text "" --aplicar
+  python3 src/automation_tools/tools/renamer.py /path/to/files --mode reemplazo --old-text "Copy of " --new-text "" --aplicar
   ```
 
 ---
 
-### 2. Monitor de Precios
+### 2. Price Monitor
 
 **Script:** `src/automation_tools/tools/monitor.py`
 
-Rastrea precios en MercadoLibre y Amazon. Cuando el precio alcanza el objetivo configurado o registra una caida porcentual, envia una alerta por consola y opcionalmente por Telegram.
+Tracks prices on MercadoLibre and Amazon. Sends alerts via console (and optionally Telegram) when the price hits your target or drops by a configured percentage.
 
-**Configuracion:** Edita el archivo `productos_a_monitorear.json`:
+**Configuration:** Edit `productos_a_monitorear.json` (see [GUIDE_CONFIG.md](GUIDE_CONFIG.md) for full details):
 
 ```json
 {
@@ -100,289 +100,355 @@ Rastrea precios en MercadoLibre y Amazon. Cuando el precio alcanza el objetivo c
 }
 ```
 
-**Ejemplos:**
+**Examples:**
 
 ```bash
-# Chequeo unico inmediato
+# Single immediate check
 python3 src/automation_tools/tools/monitor.py --now
 
-# Monitoreo continuo (verifica cada hora por defecto)
+# Continuous monitoring (checks every hour by default)
 python3 src/automation_tools/tools/monitor.py
 
-# Monitoreo con intervalo personalizado (cada 30 minutos)
+# Custom interval (every 30 minutes)
 python3 src/automation_tools/tools/monitor.py --interval 30
 
-# Ver historial de precios registrados
+# View recorded price history
 python3 src/automation_tools/tools/monitor.py --historial
 ```
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `--now` | Ejecutar un solo chequeo y terminar |
-| `--interval` | Intervalo en minutos entre chequeos (default: 60) |
-| `--historial` | Mostrar el historial de precios registrados |
+| `--now` | Run a single check and exit |
+| `--interval` | Minutes between checks (default: 60) |
+| `--historial` | Display the recorded price history |
 
 ---
 
-### 3. Resumidor con IA
+### 3. AI Summarizer
 
 **Script:** `src/automation_tools/tools/summarizer.py`
 
-Utiliza la API de Google Gemini para leer archivos PDF o de texto plano y generar un resumen ejecutivo con puntos clave.
+Uses the Google Gemini API to read PDF or plain text files and generate an executive summary with key bullet points.
 
-**Requisito:** Se necesita una API Key de Google, configurable de dos formas:
-- Variable de entorno: `export GOOGLE_API_KEY=tu_clave`
-- Archivo `.env` en la raiz del proyecto con `GOOGLE_API_KEY=tu_clave`
+**Requirement:** A Google API Key, configurable in two ways:
+- Environment variable: `export GOOGLE_API_KEY=your_key`
+- `.env` file in the project root: `GOOGLE_API_KEY=your_key`
 
-**Formatos soportados:** `.pdf`, `.txt`, `.md`, `.py`, `.json`
+**Supported formats:** `.pdf`, `.txt`, `.md`, `.py`, `.json`
 
-**Ejemplos:**
+**Examples:**
 
 ```bash
-# Resumir un PDF (la API Key se toma del entorno)
-python3 src/automation_tools/tools/summarizer.py documento.pdf
+# Summarize a PDF (API key taken from environment)
+python3 src/automation_tools/tools/summarizer.py document.pdf
 
-# Guardar el resumen en un archivo
-python3 src/automation_tools/tools/summarizer.py reporte.pdf --out resumen.txt
+# Save the summary to a file
+python3 src/automation_tools/tools/summarizer.py report.pdf --out summary.txt
 
-# Pasar la API Key directamente
-python3 src/automation_tools/tools/summarizer.py contrato.pdf --key TU_API_KEY
+# Pass the API key directly
+python3 src/automation_tools/tools/summarizer.py contract.pdf --key YOUR_API_KEY
 ```
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `filepath` | Ruta al archivo PDF o TXT (obligatorio) |
-| `--key` | API Key de Google (opcional si esta en el entorno) |
-| `--out` | Guardar el resumen en un archivo de salida |
+| `filepath` | Path to the PDF or TXT file (required) |
+| `--key` | Google API Key (optional if set in environment) |
+| `--out` | Save the summary to an output file |
 
 ---
 
-### 4. Organizador de Descargas
+### 4. Downloads Organizer
 
 **Script:** `src/automation_tools/tools/organizer.py`
 
-Mueve automaticamente los archivos de la carpeta `~/Descargas` a subcarpetas organizadas por tipo segun su extension. No requiere argumentos.
+Automatically moves files from your Downloads folder into organized subfolders by type based on file extension. No arguments required.
 
-**Categorias predeterminadas:**
+**Default categories:**
 
-| Categoria | Extensiones |
+| Category | Extensions |
 |---|---|
-| Imagenes | `.jpg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.webp` |
-| Documentos | `.pdf`, `.doc`, `.docx`, `.txt`, `.xls`, `.xlsx`, `.ppt`, `.pptx` |
+| Images | `.jpg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.webp` |
+| Documents | `.pdf`, `.doc`, `.docx`, `.txt`, `.xls`, `.xlsx`, `.ppt`, `.pptx` |
 | Videos | `.mp4`, `.mov`, `.avi`, `.mkv`, `.flv`, `.wmv` |
 | Audio | `.mp3`, `.wav`, `.aac`, `.flac`, `.ogg` |
-| Comprimidos | `.zip`, `.rar`, `.7z`, `.tar`, `.gz` |
-| Ejecutables | `.exe`, `.dmg`, `.app`, `.deb`, `.rpm` |
-| Programacion | `.py`, `.js`, `.html`, `.css`, `.json`, `.xml` |
-| Otros | Cualquier otra extension |
+| Archives | `.zip`, `.rar`, `.7z`, `.tar`, `.gz` |
+| Executables | `.exe`, `.dmg`, `.app`, `.deb`, `.rpm` |
+| Code | `.py`, `.js`, `.html`, `.css`, `.json`, `.xml` |
+| Other | Any other extension |
 
 ```bash
 python3 src/automation_tools/tools/organizer.py
 ```
 
 > [!TIP]
-> Las categorias y extensiones se pueden personalizar editando el diccionario `CATEGORIES` dentro del script.
+> Categories and extensions can be customized by editing the `CATEGORIES` dictionary in the script.
 
 ---
 
-### 5. Convertidor de Imagenes
+### 5. Image Converter
 
 **Script:** `src/automation_tools/tools/converter.py`
 
-Convierte imagenes entre diferentes formatos. Funciona con archivos individuales y con carpetas completas (conversion masiva).
+Converts images between formats. Works with individual files and entire directories (batch conversion).
 
-**Formatos soportados:** `jpg`, `png`, `webp`, `bmp`, `tiff`, `gif`
+**Supported formats:** `jpg`, `png`, `webp`, `bmp`, `tiff`, `gif`
 
-**Ejemplos:**
+**Examples:**
 
 ```bash
-# Convertir una imagen individual a JPG
-python3 src/automation_tools/tools/converter.py /ruta/imagen.png jpg
+# Convert a single image to JPG
+python3 src/automation_tools/tools/converter.py /path/to/image.png jpg
 
-# Convertir una imagen a WebP
-python3 src/automation_tools/tools/converter.py /ruta/foto.jpg webp
+# Convert an image to WebP
+python3 src/automation_tools/tools/converter.py /path/to/photo.jpg webp
 
-# Convertir todas las imagenes de una carpeta a PNG
-python3 src/automation_tools/tools/converter.py /ruta/carpeta/ png
+# Batch convert all images in a directory to PNG
+python3 src/automation_tools/tools/converter.py /path/to/folder/ png
 ```
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `input_path` | Ruta al archivo de imagen o carpeta (obligatorio) |
-| `output_format` | Formato de salida: `jpg`, `png`, `webp`, `bmp`, `tiff`, `gif` (obligatorio) |
+| `input_path` | Path to the image file or directory (required) |
+| `output_format` | Output format: `jpg`, `png`, `webp`, `bmp`, `tiff`, `gif` (required) |
 
 > [!NOTE]
-> Las imagenes con transparencia (PNG con canal alfa) se convierten automaticamente a RGB al exportar como JPG.
+> Images with transparency (RGBA/P mode) are automatically converted to RGB when exporting as JPG.
 
 ---
 
-### 6. Convertir a PDF
+### 6. PDF Converter
 
 **Script:** `src/automation_tools/tools/converter.py`
 
-Convierte documentos de oficina (`.docx`, `.odt`, `.pptx`, entre otros) a formato PDF utilizando LibreOffice en modo headless.
+Converts office documents (`.docx`, `.odt`, `.pptx`, etc.) to PDF using LibreOffice in headless mode.
 
-**Requisito:** LibreOffice debe estar instalado en el sistema.
+**Requirement:** LibreOffice must be installed on the system.
 
-**Ejemplo:**
+**Example:**
 
 ```bash
-python3 src/automation_tools/tools/converter.py /ruta/documento.docx
+python3 src/automation_tools/tools/converter.py /path/to/document.docx
 ```
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `input_path` | Ruta al archivo a convertir (obligatorio) |
+| `input_path` | Path to the file to convert (required) |
 
-El archivo PDF resultante se guarda en la misma carpeta que el archivo de entrada.
+The resulting PDF is saved in the same directory as the input file.
 
 ---
 
-### 7. Traductor de Archivos
+### 7. File Translator
 
 **Script:** `src/automation_tools/tools/translator.py`
 
-Traduce archivos de texto completos a otro idioma usando la API de Google Gemini. Preserva el formato original del archivo: para codigo fuente traduce solo comentarios y cadenas de texto, para subtitulos (.srt) solo el texto, para JSON solo los valores.
+Translates entire text files to another language using the Google Gemini API. Preserves original formatting: for source code it translates only comments and strings, for subtitles (`.srt`) only the text, for JSON only the values.
 
-**Requisito:** API Key de Google (misma configuracion que el Resumidor).
+**Requirement:** Google API Key (same setup as the Summarizer).
 
-**Formatos soportados:** `.txt`, `.md`, `.srt`, `.py`, `.json`, `.csv`, `.xml`, `.html`, `.css`, `.js`
+**Supported formats:** `.txt`, `.md`, `.srt`, `.py`, `.json`, `.csv`, `.xml`, `.html`, `.css`, `.js`
 
-**Ejemplos:**
+**Examples:**
 
 ```bash
-# Traducir un archivo de texto a ingles
-python3 src/automation_tools/tools/translator.py documento.txt --lang ingles
+# Translate a text file to English
+python3 src/automation_tools/tools/translator.py document.txt --lang english
 
-# Traducir subtitulos a portugues y guardar resultado
-python3 src/automation_tools/tools/translator.py pelicula.srt --lang portugues --out pelicula_pt.srt
+# Translate subtitles to Portuguese and save the result
+python3 src/automation_tools/tools/translator.py movie.srt --lang portuguese --out movie_pt.srt
 
-# Traducir un archivo Markdown a frances con API Key explicita
-python3 src/automation_tools/tools/translator.py notas.md --lang frances --key TU_API_KEY
+# Translate a Markdown file to French with explicit API key
+python3 src/automation_tools/tools/translator.py notes.md --lang french --key YOUR_API_KEY
 ```
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `filepath` | Ruta al archivo a traducir (obligatorio) |
-| `--lang` | Idioma destino (obligatorio, ej: `ingles`, `frances`) |
-| `--key` | API Key de Google (opcional si esta en el entorno) |
-| `--out` | Guardar la traduccion en un archivo de salida |
+| `filepath` | Path to the file to translate (required) |
+| `--lang` | Target language (required, e.g., `english`, `french`) |
+| `--key` | Google API Key (optional if set in environment) |
+| `--out` | Save the translation to an output file |
 
 ---
 
-### 8. Detector de Duplicados
+### 8. Duplicate Finder
 
 **Script:** `src/automation_tools/tools/duplicate_finder.py`
 
-Escanea un directorio en profundidad y encuentra archivos que sean exactamente iguales comparando su contenido (hash MD5), sin importar si tienen nombres diferentes.
+Recursively scans a directory and finds files that are exactly identical by comparing their content (MD5 hash), regardless of filename.
 
-**Ejemplo:**
+**Examples:**
 
 ```bash
-# Buscar duplicados y preguntar antes de borrar
-python3 src/automation_tools/tools/duplicate_finder.py /ruta/a/escanear
+# Find duplicates and prompt before deleting
+python3 src/automation_tools/tools/duplicate_finder.py /path/to/scan
 
-# Buscar y eliminar duplicados automaticamente (conservando el mas antiguo)
-python3 src/automation_tools/tools/duplicate_finder.py /ruta/a/escanear --delete
+# Find and auto-delete duplicates (keeping the oldest)
+python3 src/automation_tools/tools/duplicate_finder.py /path/to/scan --delete
 ```
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `directory` | Ruta del directorio a escanear (obligatorio) |
-| `--delete` | Eliminar copias de forma automatica, sin preguntar |
+| `directory` | Path to the directory to scan (required) |
+| `--delete` | Automatically delete copies without prompting |
 
 ---
 
-### 9. Descargador de YouTube
+### 9. YouTube Downloader
 
 **Script:** `src/automation_tools/tools/youtube_downloader.py`
 
-Descarga videos de YouTube en maxima calidad (Video MP4 o Audio MP3) directamente a tu carpeta de Descargas.
+Downloads YouTube videos in maximum quality (MP4 video or MP3 audio) directly to your Downloads folder.
 
-**Requisito:** Depende de `yt-dlp` (incluido en el `requirements.txt`).
+**Requirement:** Depends on `yt-dlp` (included in `requirements.txt`).
 
-**Ejemplo:**
+**Examples:**
 
 ```bash
-# Descargar como video (MP4)
-python3 src/automation_tools/tools/youtube_downloader.py "https://www.youtube.com/watch?v=Ejemplo"
+# Download as video (MP4)
+python3 src/automation_tools/tools/youtube_downloader.py "https://www.youtube.com/watch?v=Example"
 
-# Descargar solo el audio (MP3)
-python3 src/automation_tools/tools/youtube_downloader.py "https://www.youtube.com/watch?v=Ejemplo" --mode audio
+# Download audio only (MP3)
+python3 src/automation_tools/tools/youtube_downloader.py "https://www.youtube.com/watch?v=Example" --mode audio
 ```
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `url` | Enlace del video de YouTube (obligatorio) |
-| `--mode` | Formato a descargar: `video` (default) o `audio` |
+| `url` | YouTube video URL (required) |
+| `--mode` | Download format: `video` (default) or `audio` |
 
 ---
 
-### 10. Generador de README (IA)
+### 10. README Generator (AI)
 
 **Script:** `src/automation_tools/tools/readme_generator.py`
 
-Usa la API de Google Gemini para leer la estructura y el codigo fuente clave de un proyecto local y generar un archivo `README.md` completo, profesional y estructurado.
+Uses the Google Gemini API to analyze the structure and key source code of a local project and generate a complete, professional `README.md` file.
 
-**Requisito:** API Key de Google (misma configuracion que el Resumidor).
+**Requirement:** Google API Key (same setup as the Summarizer).
 
-**Ejemplo:**
+**Examples:**
 
 ```bash
-# Generar README de un proyecto (se guarda por defecto como README_generado.md)
-python3 src/automation_tools/tools/readme_generator.py /ruta/a/mi_proyecto
+# Generate a README (saved as README_generado.md by default)
+python3 src/automation_tools/tools/readme_generator.py /path/to/my_project
 
-# Generar y especificar la salida y la API Key
-python3 src/automation_tools/tools/readme_generator.py /ruta/a/mi_proyecto --out README_final.md --key TU_API_KEY
+# Specify output file and API key
+python3 src/automation_tools/tools/readme_generator.py /path/to/my_project --out README_final.md --key YOUR_API_KEY
 ```
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `directory` | Carpeta raiz del proyecto a documentar (obligatorio) |
-| `--key` | API Key de Google (opcional si esta en el entorno) |
-| `--out` | Archivo de salida (default: `README_generado.md`) |
+| `directory` | Root folder of the project to document (required) |
+| `--key` | Google API Key (optional if set in environment) |
+| `--out` | Output file (default: `README_generado.md`) |
 
 ---
 
-### 11. Extractor de Metadata
+### 11. Metadata Extractor
 
 **Script:** `src/automation_tools/tools/metadata.py`
 
-Herramienta forense para extraer y visualizar metadatos ocultos.
-- **Para imagenes:** Extrae la informacion EXIF (modelo de camara, lente, datos GPS, resolucion, fecha de toma). Compatible con JPG, PNG, TIFF, WebP, etc.
-- **Para PDFs:** Extrae informacion del documento (autor, creador, productor, estado de encriptacion, numero de paginas).
-- **Para otros archivos:** Muestra informacion basica del sistema (tamaño exacto, fechas de creacion y modificacion).
+Forensic tool to extract and display hidden metadata from files.
+- **Images:** Extracts EXIF data (camera model, lens, GPS data, resolution, date taken). Supports JPG, PNG, TIFF, WebP, etc.
+- **PDFs:** Extracts document info (author, creator, producer, encryption status, page count).
+- **Other files:** Displays basic filesystem info (exact size, creation and modification dates).
 
-**Ejemplo:**
+**Examples:**
 
 ```bash
-python3 src/automation_tools/tools/metadata.py /ruta/a/foto.jpg
-python3 src/automation_tools/tools/metadata.py /ruta/a/documento.pdf
+python3 src/automation_tools/tools/metadata.py /path/to/photo.jpg
+python3 src/automation_tools/tools/metadata.py /path/to/document.pdf
 ```
 
-| Opcion | Descripcion |
+| Option | Description |
 |---|---|
-| `filepath` | Ruta al archivo a analizar (obligatorio) |
+| `filepath` | Path to the file to analyze (required) |
 
 ---
 
-## Estructura del Proyecto
+### 12. Password Manager
+
+**Script:** `src/automation_tools/tools/password_generator.py`
+
+Generates secure passwords and memorable passphrases with customizable parameters. Also evaluates the strength of existing passwords with a detailed report. Uses Python's `secrets` module for cryptographically secure generation. No external dependencies required.
+
+**Three modes of operation:**
+
+#### Generate Secure Passwords
+
+Creates random passwords with configurable character sets.
+
+| Parameter | Default | Description |
+|---|---|---|
+| Length | 16 | Number of characters (4-128) |
+| Symbols | Yes | Include special characters (`!@#$%^&*`...) |
+| Ambiguous exclusion | No | Exclude visually similar characters (`I/l/1`, `O/0`) |
+| Count | 5 | Number of passwords to generate (1-20) |
+
+```
+         Passwords (16 characters)
+┏━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ # ┃ Password         ┃ Strength   ┃ Entropy  ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ 1 │ @%8cUst52T:Uh*Kp │ Very strong│  105 bits│
+│ 2 │ K5#)I2asq4mo_(Rv │ Very strong│  105 bits│
+└───┴──────────────────┴────────────┴──────────┘
+```
+
+#### Generate Memorable Passphrases
+
+Creates easy-to-remember passphrases from a curated 391-word Spanish dictionary.
+
+| Parameter | Default | Description |
+|---|---|---|
+| Words | 4 | Number of words (2-10) |
+| Separator | `-` | Word separator (`-`, `.`, `_`, or space) |
+| Capitalize | Yes | Capitalize each word |
+| Add number | Yes | Append a random 3-digit number |
+| Add symbol | No | Append a random special character |
+
+Example output: `Canal-Norte-Plaza-869`, `Arbol.Selva.Tigre.214!`
+
+#### Evaluate Password Strength
+
+Analyzes an existing password and returns a detailed report:
+- **Score:** 0-100 with a visual progress bar
+- **Levels:** Very weak, Weak, Moderate, Strong, Very strong
+- **Analysis:** Length, character variety, entropy (bits)
+- **Penalties:** Repeated characters, sequential patterns, common passwords
+- **Recommendations:** Actionable tips to improve strength
+
+```
+╭───────────── Strength ──────────────╮
+│  ████████████████████████████░░  95 │
+╰─────────────────────────────────────╯
+  Length            14 characters
+  Character types   lowercase, UPPERCASE, numbers, symbols
+  Entropy           91.8 bits
+
+  [+] Good password
+```
+
+---
+
+## Project Structure
 
 ```
 Automation-Tools/
 ├── requirements.txt
 ├── README.md
+├── GUIDE_CONFIG.md
 ├── productos_a_monitorear.json
-├── run.py                        (Punto de entrada simple para el usuario)
+├── run.py                           (User entry point)
 └── src/
     └── automation_tools/
         ├── __init__.py
-        ├── core/                 (Logica transversal)
-        │   ├── logger.py         (Logging unificado)
-        │   └── config.py         (Ajustes y paths)
-        ├── cli/                  (Capa de presentacion)
-        │   └── menu.py           (Menu interactivo)
-        └── tools/                (Capa de negocio - scripts refactorizados)
+        ├── core/                    (Cross-cutting concerns)
+        │   ├── logger.py            (Unified logging & Rich output)
+        │   └── config.py            (Settings & path resolution)
+        ├── cli/                     (Presentation layer)
+        │   └── menu.py              (Interactive menu)
+        └── tools/                   (Business logic)
             ├── renamer.py
             ├── monitor.py
             ├── gemini_utils.py
@@ -393,11 +459,12 @@ Automation-Tools/
             ├── readme_generator.py
             ├── converter.py
             ├── organizer.py
-            └── metadata.py
+            ├── metadata.py
+            └── password_generator.py
 ```
 
 ---
 
-## Licencia
+## License
 
-Desarrollado con ❤️ por Ale.
+Made with love by Ale.
