@@ -2,7 +2,27 @@
 
 A collection of Python scripts to automate everyday tasks: file organization, price monitoring, AI-powered document summarization, image conversion, PDF generation, password management, and more.
 
-## Installation
+## Quick Install
+
+One-liner (Linux and Termux):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kahz12/Automation-Tools/main/install.sh | bash
+```
+
+The script creates a global `automation-tools` command that launches the interactive menu from any directory.
+
+### Safe install (recommended)
+
+Inspect the script before running it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kahz12/Automation-Tools/main/install.sh -o install.sh
+less install.sh
+bash install.sh
+```
+
+## Manual Installation
 
 1. Make sure you have Python 3 installed.
 2. Create and activate a virtual environment (recommended):
