@@ -1,7 +1,8 @@
 import os
+import re
 import datetime
 import argparse
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from automation_tools.core.logger import console, print_error, print_success, print_warning, print_step
 
@@ -32,6 +33,39 @@ def get_file_date(filepath: str) -> datetime.datetime:
         date_taken = datetime.datetime.fromtimestamp(timestamp)
     
     return date_taken
+
+
+def _build_pattern_regex(pattern: str) -> Optional[re.Pattern]:
+    """Build a regex from a format pattern like 'viaje_{:03d}' that captures the numeric index."""
+    placeholder_re = re.compile(r'\{[^}]*\}')
+    if not placeholder_re.search(pattern):
+        return None
+    parts = placeholder_re.split(pattern)
+    escaped = [re.escape(p) for p in parts]
+    return re.compile(r'^' + r'(\d+)'.join(escaped) + r'$')
+
+
+def _split_pattern_files(files: List[str], pattern: str) -> Tuple[List[str], List[str], int]:
+    """Split files into (already_matching, to_rename) and return the max existing index."""
+    regex = _build_pattern_regex(pattern)
+    if regex is None:
+        return [], files, 0
+
+    matching: List[str] = []
+    pending: List[str] = []
+    max_index = 0
+    for f in files:
+        name, _ = os.path.splitext(f)
+        m = regex.match(name)
+        if m:
+            try:
+                max_index = max(max_index, int(m.group(1)))
+                matching.append(f)
+                continue
+            except (ValueError, IndexError):
+                pass
+        pending.append(f)
+    return matching, pending, max_index
 
 
 def generate_new_name(
@@ -103,13 +137,28 @@ def run_massive_rename(
         print_warning("No se encontraron archivos para procesar.")
         return
 
+    count_start = 1
+    if mode == 'patron' and pattern:
+        matching, pending, max_index = _split_pattern_files(files, pattern)
+        if matching:
+            console.print(
+                f"[dim]Detectados {len(matching)} archivo(s) ya en secuencia "
+                f"(índice máx: {max_index}). Continuando desde {max_index + 1}.[/dim]"
+            )
+            files = pending
+            count_start = max_index + 1
+
+    if not files:
+        print_warning("No hay archivos nuevos para renombrar.")
+        return
+
     print_step(f"Procesando {len(files)} archivos en '{directory}'...")
     print_step(f"Modo: {mode}")
-    
+
     if not apply_changes:
         console.print("[yellow]MODO SIMULACIÓN (DRY-RUN): No se harán cambios reales.[/yellow]\n")
 
-    count = 1
+    count = count_start
     for filename in files:
         new_name = generate_new_name(
             filename=filename, 
