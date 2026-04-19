@@ -11,8 +11,8 @@ CATEGORIES = {
     'Videos': ['.mp4', '.mov', '.avi', '.mkv', '.flv', '.wmv'],
     'Audio': ['.mp3', '.wav', '.aac', '.flac', '.ogg'],
     'Comprimidos': ['.zip', '.rar', '.7z', '.tar', '.gz'],
-    'Ejecutables': ['.exe', '.dmg', '.app', '.deb', '.rpm', '.AppImage'],
-    'Programación': ['.py', '.js', '.html', '.css', '.json', '.xml', '.java', '.c', '.cpp', '.ts', '.go', '.rs'],
+    'Ejecutables': ['.exe', '.dmg', '.app', '.deb', '.rpm', '.AppImage', '.apk'],
+    'Programación': ['.py', '.js', '.html', '.css', '.json', '.xml', '.java', '.c', '.cpp', '.ts', '.go', '.rs', '.md'],
     'Otros': []
 }
 
