@@ -451,6 +451,44 @@ Analyzes an existing password and returns a detailed report:
 
 ---
 
+### 13. Space Cleaner
+
+**Script:** `src/automation_tools/tools/space_cleaner.py`
+
+Scans a directory and reports three kinds of reclaimable space: cache/junk folders (`__pycache__`, `node_modules`, `.DS_Store`, `.mypy_cache`, `.pytest_cache`, `build`, `dist`, `target`...), files larger than a threshold, and files older than N days. Runs in **dry-run by default** — nothing is deleted unless you explicitly pass `--apply`.
+
+**Examples:**
+
+```bash
+# Dry-run scan (default thresholds: >100 MB and >365 days)
+python3 src/automation_tools/tools/space_cleaner.py /path/to/project
+
+# Custom thresholds
+python3 src/automation_tools/tools/space_cleaner.py ~/Downloads --large 50 --old 180
+
+# Actually delete cache/junk (with confirmation prompt)
+python3 src/automation_tools/tools/space_cleaner.py ~/code --apply
+
+# Also delete large/old files, not just cache
+python3 src/automation_tools/tools/space_cleaner.py ~/code --apply --all
+```
+
+| Option | Description |
+|---|---|
+| `directory` | Target directory to scan (required) |
+| `--large` | Large-file threshold in MB (default: 100) |
+| `--old` | Old-file threshold in days since last modification (default: 365) |
+| `--no-junk` | Skip the cache/junk scan |
+| `--no-large` | Skip the large-file scan |
+| `--no-old` | Skip the old-file scan |
+| `--apply` | Actually delete findings (default is dry-run) |
+| `--all` | When applying, also delete large/old files (not just cache) |
+
+> [!WARNING]
+> Large and old files are flagged conservatively — review the list before using `--all`. The tool never follows symlinks.
+
+---
+
 ## Project Structure
 
 ```
@@ -480,7 +518,8 @@ Automation-Tools/
             ├── converter.py
             ├── organizer.py
             ├── metadata.py
-            └── password_generator.py
+            ├── password_generator.py
+            └── space_cleaner.py
 ```
 
 ---
