@@ -1,4 +1,7 @@
+import hashlib
+import shutil
 import string
+import subprocess
 import secrets
 import math
 import re
@@ -10,6 +13,63 @@ from rich.text import Text
 from rich.progress_bar import ProgressBar
 
 from automation_tools.core.logger import console, print_error, print_success, print_step, print_warning
+
+
+def check_pwned(password: str, timeout: float = 5.0) -> Optional[int]:
+    """Check a password against Have I Been Pwned (k-anonymity).
+
+    Returns the number of times the password was seen in breaches,
+    0 if not seen, None if the check could not be performed.
+    Only the first 5 chars of the SHA-1 hash are sent — the password
+    itself never leaves the machine.
+    """
+    try:
+        import requests
+    except ImportError:
+        return None
+
+    sha1 = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
+    prefix, suffix = sha1[:5], sha1[5:]
+    try:
+        resp = requests.get(
+            f"https://api.pwnedpasswords.com/range/{prefix}",
+            timeout=timeout,
+            headers={"Add-Padding": "true"},
+        )
+        if resp.status_code != 200:
+            return None
+        for line in resp.text.splitlines():
+            tail, _, count = line.partition(":")
+            if tail.strip().upper() == suffix:
+                try:
+                    return int(count.strip())
+                except ValueError:
+                    return None
+        return 0
+    except Exception:
+        return None
+
+
+def copy_to_clipboard(text: str) -> bool:
+    """Best-effort copy to clipboard across platforms (Termux, Linux, macOS, Windows)."""
+    candidates = [
+        ["termux-clipboard-set"],
+        ["wl-copy"],
+        ["xclip", "-selection", "clipboard"],
+        ["xsel", "--clipboard", "--input"],
+        ["pbcopy"],  # macOS
+        ["clip"],    # Windows
+    ]
+    for cmd in candidates:
+        if not shutil.which(cmd[0]):
+            continue
+        try:
+            p = subprocess.run(cmd, input=text.encode("utf-8"), check=True, timeout=3)
+            if p.returncode == 0:
+                return True
+        except Exception:
+            continue
+    return False
 
 # ─── Lista de palabras para frases memorables ───
 
@@ -409,11 +469,33 @@ def run_generate_passphrase(
         print_success(f"{len(phrases)} frases generadas.")
 
 
-def run_evaluate_strength(password: str) -> None:
-    """Evalua y muestra la fortaleza de una contraseña."""
+def run_evaluate_strength(password: str, check_breach: bool = True) -> None:
+    """Evalua y muestra la fortaleza de una contraseña, opcionalmente consulta HIBP."""
     if not password:
         print_error("No se proporciono ninguna contraseña.")
         return
 
     result = evaluate_strength(password)
     display_strength(result)
+
+    if check_breach:
+        console.print("[dim]🔍 Consultando HaveIBeenPwned (k-anonymity, no se envía tu contraseña)…[/dim]")
+        count = check_pwned(password)
+        if count is None:
+            print_warning("No se pudo verificar contra HaveIBeenPwned (sin red / sin requests).")
+        elif count == 0:
+            print_success("✓ No aparece en filtraciones conocidas.")
+        else:
+            print_error(
+                f"⚠ Apareció en {count:,} filtraciones. ¡No uses esta contraseña!"
+            )
+
+
+def run_copy_password(password: str) -> None:
+    """Copy a generated password to the clipboard."""
+    if copy_to_clipboard(password):
+        print_success("Contraseña copiada al portapapeles.")
+    else:
+        print_warning(
+            "No se pudo copiar al portapapeles (instala 'termux-api', 'xclip', 'wl-copy', 'pbcopy' o 'clip')."
+        )

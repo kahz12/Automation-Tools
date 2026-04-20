@@ -7,6 +7,7 @@ import re
 import argparse
 from datetime import datetime
 from typing import Optional, Dict, List, Any
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -20,6 +21,22 @@ logger = setup_logger()
 # ─── Rutas ───
 DB_FILE = os.path.join(get_project_root(), "historial_precios.db")
 
+# ─── Rate limiting por dominio ───
+# Tiempo mínimo entre requests al mismo host (segundos).
+MIN_INTERVAL_PER_HOST = 3.5
+_LAST_REQUEST: Dict[str, float] = {}
+
+
+def _throttle(url: str) -> None:
+    """Ensure at least MIN_INTERVAL_PER_HOST seconds between requests per host."""
+    host = urlparse(url).netloc.lower()
+    now = time.monotonic()
+    last = _LAST_REQUEST.get(host, 0.0)
+    wait = MIN_INTERVAL_PER_HOST - (now - last)
+    if wait > 0:
+        time.sleep(wait + random.uniform(0.1, 0.5))
+    _LAST_REQUEST[host] = time.monotonic()
+
 # ─── User-Agents para rotación ───
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -32,7 +49,7 @@ USER_AGENTS = [
 # ─── Base de Datos — SQLite ───
 
 def init_db() -> None:
-    """Inicializa la base de datos y crea la tabla si no existe."""
+    """Inicializa la base de datos y crea las tablas si no existen."""
     conn = sqlite3.connect(DB_FILE)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS historial (
@@ -44,6 +61,30 @@ def init_db() -> None:
             fecha       TEXT    NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS stock (
+            url         TEXT    PRIMARY KEY,
+            disponible  INTEGER NOT NULL,
+            fecha       TEXT    NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def get_last_stock(url: str) -> Optional[bool]:
+    conn = sqlite3.connect(DB_FILE)
+    row = conn.execute("SELECT disponible FROM stock WHERE url = ?", (url,)).fetchone()
+    conn.close()
+    return bool(row[0]) if row else None
+
+
+def save_stock(url: str, available: bool) -> None:
+    conn = sqlite3.connect(DB_FILE)
+    conn.execute(
+        "INSERT OR REPLACE INTO stock (url, disponible, fecha) VALUES (?, ?, ?)",
+        (url, 1 if available else 0, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+    )
     conn.commit()
     conn.close()
 
@@ -246,6 +287,42 @@ def evaluar_alertas(product: Dict[str, Any], precio_actual: float, settings: Dic
 
 # ─── Check Principal ───
 
+def detect_stock(url: str, soup: BeautifulSoup, price: Optional[float]) -> bool:
+    """Heurística simple para disponibilidad: precio presente + sin señales de agotado."""
+    page_text = soup.get_text(" ", strip=True).lower()
+    signals_out = [
+        "out of stock", "sin stock", "agotado", "no disponible",
+        "currently unavailable", "producto no disponible", "sin existencias",
+    ]
+    if any(s in page_text for s in signals_out):
+        return False
+    return price is not None
+
+
+def evaluar_stock(product: Dict[str, Any], disponible: bool, settings: Dict[str, Any]) -> None:
+    """Notifica cambios de stock (disponible ↔ agotado) y persiste el estado."""
+    url = product.get("url", "")
+    nombre = product.get("name", "Producto")
+    anterior = get_last_stock(url)
+    if anterior is None:
+        save_stock(url, disponible)
+        return
+    if anterior != disponible:
+        if disponible:
+            send_notification(
+                "🟢 ¡Volvió a estar disponible!",
+                f"{nombre}\n🔗 {url}",
+                settings,
+            )
+        else:
+            send_notification(
+                "🔴 Se agotó",
+                f"{nombre}\n🔗 {url}",
+                settings,
+            )
+        save_stock(url, disponible)
+
+
 def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
     url    = product.get("url", "")
     nombre = product.get("name", "Producto")
@@ -254,7 +331,7 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
     console.print(f"  [dim]🔍 Verificando:[/dim] {nombre}...")
 
     try:
-        time.sleep(random.uniform(1.5, 4.0))
+        _throttle(url)
 
         response = requests.get(url, headers=get_headers(), timeout=15)
         if response.status_code != 200:
@@ -271,8 +348,14 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
         elif "amazon" in url:
             price = check_amazon(soup, settings)
 
+        disponible = detect_stock(url, soup, price)
+        evaluar_stock(product, disponible, settings)
+
         if price is None:
-            console.print(f"     [red]❌ No se pudo detectar el precio.[/red]")
+            if not disponible:
+                console.print(f"     [yellow]🚫 Producto no disponible[/yellow]")
+            else:
+                console.print(f"     [red]❌ No se pudo detectar el precio.[/red]")
             logger.warning(f"{nombre}: precio no detectado en {url}")
             return
 

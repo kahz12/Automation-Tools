@@ -1,8 +1,11 @@
 import os
 import argparse
+import csv
+import json
 import shutil
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Iterable, List, Optional, Tuple
 
 import questionary
@@ -50,8 +53,42 @@ JUNK_EXTENSIONS = {
     ".swp",
 }
 
+# Nombres de carpeta/archivo que JAMÁS deben eliminarse aunque coincidan
+# con algún patrón de basura. Protege configs y fuentes de verdad.
+PROTECTED_NAMES = {
+    ".git",
+    ".gitignore",
+    ".env",
+    ".env.local",
+    ".venv",
+    "venv",
+    "env",
+    "config",
+    "configs",
+    ".ssh",
+    ".gnupg",
+    ".aws",
+    ".kube",
+    "id_rsa",
+    "id_ed25519",
+}
+
 DEFAULT_LARGE_MB = 100
 DEFAULT_OLD_DAYS = 365
+
+
+def _is_protected(path: str) -> bool:
+    """True if any path segment matches a protected name."""
+    parts = set(os.path.normpath(path).split(os.sep))
+    return bool(parts & PROTECTED_NAMES)
+
+
+def _disk_free(path: str) -> int:
+    """Available bytes on the filesystem containing `path`."""
+    try:
+        return shutil.disk_usage(path).free
+    except Exception:
+        return 0
 
 
 @dataclass
@@ -122,10 +159,15 @@ def scan(
     print_step(f"Escaneando: [bold]{directory}[/bold]")
 
     for root, dirs, files in os.walk(directory, topdown=True, onerror=lambda _: None):
+        # Never descend into protected dirs.
+        dirs[:] = [d for d in dirs if d not in PROTECTED_NAMES]
+
         if find_junk:
             matched = [d for d in dirs if d in JUNK_DIRS]
             for d in matched:
                 full = os.path.join(root, d)
+                if _is_protected(full):
+                    continue
                 size = dir_size(full)
                 report.junk.append(CleanItem(full, size, "junk", is_dir=True))
                 junk_paths.append(full + os.sep)
@@ -135,6 +177,8 @@ def scan(
         for filename in files:
             fp = os.path.join(root, filename)
             if os.path.islink(fp):
+                continue
+            if _is_protected(fp):
                 continue
 
             if find_junk and (
@@ -230,6 +274,36 @@ def delete_items(items: Iterable[CleanItem]) -> int:
     return deleted
 
 
+def export_report(report: ScanReport, out_path: str) -> None:
+    """Export scan report to JSON or CSV based on extension."""
+    items = [
+        {"path": i.path, "size_bytes": i.size, "reason": i.reason, "is_dir": i.is_dir}
+        for i in report.all_items()
+    ]
+    try:
+        ext = os.path.splitext(out_path)[1].lower()
+        if ext == ".csv":
+            with open(out_path, "w", encoding="utf-8", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["path", "size_bytes", "reason", "is_dir"])
+                writer.writeheader()
+                writer.writerows(items)
+        else:
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "timestamp": datetime.now().isoformat(timespec="seconds"),
+                        "total_bytes": report.total_bytes(),
+                        "items": items,
+                    },
+                    f,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+        print_success(f"Reporte exportado a: {out_path}")
+    except Exception as e:
+        print_error(f"No se pudo exportar el reporte: {e}")
+
+
 def run_space_cleaner(
     directory: str,
     large_mb: int = DEFAULT_LARGE_MB,
@@ -239,6 +313,7 @@ def run_space_cleaner(
     find_old: bool = True,
     apply: bool = False,
     delete_large_and_old: bool = False,
+    export_path: Optional[str] = None,
 ) -> None:
     """Core function: scans the directory and optionally deletes findings.
 
@@ -248,6 +323,8 @@ def run_space_cleaner(
     if not os.path.isdir(directory):
         print_error(f"El directorio '{directory}' no existe.")
         return
+
+    free_before = _disk_free(directory)
 
     report = scan(
         directory,
@@ -260,9 +337,14 @@ def run_space_cleaner(
 
     if not report.all_items():
         print_success("Nada que limpiar. Todo se ve bien.")
+        if export_path:
+            export_report(report, export_path)
         return
 
     print_report(report)
+
+    if export_path:
+        export_report(report, export_path)
 
     if not apply:
         print_warning("Modo simulación (dry-run). No se eliminó nada.")
@@ -286,6 +368,15 @@ def run_space_cleaner(
         return
 
     delete_items(to_delete)
+
+    free_after = _disk_free(directory)
+    if free_before and free_after:
+        real_freed = max(0, free_after - free_before)
+        console.print(
+            f"[bold]📊 Espacio libre antes:[/bold] {human_size(free_before)}  →  "
+            f"[bold]después:[/bold] {human_size(free_after)}  "
+            f"([green]+{human_size(real_freed)} liberados[/green])"
+        )
 
 
 def main():
@@ -324,6 +415,10 @@ def main():
         action="store_true",
         help="Al aplicar, también eliminar archivos grandes y antiguos (no solo caché)",
     )
+    parser.add_argument(
+        "--export",
+        help="Exportar reporte de escaneo a JSON o CSV (según extensión)",
+    )
     args = parser.parse_args()
 
     run_space_cleaner(
@@ -335,6 +430,7 @@ def main():
         find_old=not args.no_old,
         apply=args.apply,
         delete_large_and_old=args.all,
+        export_path=args.export,
     )
 
 

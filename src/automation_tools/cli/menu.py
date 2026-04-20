@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Optional
 
@@ -16,6 +17,34 @@ from automation_tools.core.logger import (
     question_style,
 )
 from automation_tools.core.config import load_environment, get_env_var, get_project_root
+
+# ---------------------------------------------------------------------------
+# History of recently-used tools (persisted across runs).
+# ---------------------------------------------------------------------------
+HISTORY_FILE = os.path.join(get_project_root(), ".menu_history.json")
+HISTORY_MAX = 5
+
+
+def _load_history() -> list:
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def _save_history(names: list) -> None:
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(names[:HISTORY_MAX], f)
+    except Exception:
+        pass
+
+
+def _record_use(name: str) -> None:
+    history = [n for n in _load_history() if n != name]
+    history.insert(0, name)
+    _save_history(history)
 
 from automation_tools.tools import (
     renamer,
@@ -104,10 +133,27 @@ def menu_renombrador():
     keep = False
 
     if mode == "patron":
-        print_footer_tip("Usa '{:03d}' para numeración con ceros a la izquierda (001, 002...)")
-        pattern = ask_text("Ingresa el patrón (ej: 'viaje_{:03d}'):")
-        if not pattern:
-            return
+        detected, count, max_index = renamer.detect_dominant_pattern(directory)
+        if detected:
+            console.print(
+                f"[dim]Se detectó el patrón existente '{detected}' "
+                f"({count} archivo(s), índice máx: {max_index}).[/dim]"
+            )
+            if ask_confirm(
+                f"¿Continuar con este patrón desde {max_index + 1}? (No = usar un patrón nuevo)",
+                default=True,
+            ):
+                pattern = detected
+            else:
+                print_footer_tip("Usa '{:03d}' para numeración con ceros a la izquierda (001, 002...)")
+                pattern = ask_text("Ingresa el nuevo patrón (ej: 'viaje_{:03d}'):")
+                if not pattern:
+                    return
+        else:
+            print_footer_tip("Usa '{:03d}' para numeración con ceros a la izquierda (001, 002...)")
+            pattern = ask_text("Ingresa el patrón (ej: 'viaje_{:03d}'):")
+            if not pattern:
+                return
     elif mode == "fecha":
         keep = ask_confirm("¿Mantener nombre original como sufijo?")
     elif mode == "reemplazo":
@@ -118,6 +164,9 @@ def menu_renombrador():
 
     ext = ask_text("Filtrar por extensión (opcional, ej: .jpg):")
     apply_changes = ask_confirm("¿Aplicar cambios reales? (No = solo simulación)")
+    preview = False
+    if apply_changes:
+        preview = ask_confirm("¿Confirmar cambios antes de aplicar (preview)?", default=True)
 
     renamer.run_massive_rename(
         directory=directory,
@@ -128,6 +177,7 @@ def menu_renombrador():
         keep_name=keep,
         old_text=old_text,
         new_text=new_text,
+        preview=preview,
     )
 
 
@@ -185,7 +235,30 @@ def menu_resumidor():
 
 @error_boundary
 def menu_convertir():
-    print_section("Convertidor de Imágenes", "Cambia de formato (png, jpg, webp, …)", "🖼️")
+    print_section("Convertidor de Imágenes", "Cambia de formato (png, jpg, webp, …) o PDF→imagen", "🖼️")
+
+    action = ask_select(
+        "¿Qué quieres hacer?",
+        choices=[
+            Choice("🖼️   Convertir imagen o carpeta", "img"),
+            Choice("📄  Renderizar PDF a imágenes", "pdf"),
+        ],
+    )
+    if not action:
+        return
+
+    if action == "pdf":
+        pdf_path = ask_path("Selecciona el PDF a renderizar:")
+        if not pdf_path:
+            return
+        fmt = ask_select("Formato de salida:", choices=["png", "jpg", "webp"]) or "png"
+        dpi_raw = ask_text("DPI:", default="200")
+        try:
+            dpi = max(50, min(600, int(dpi_raw or "200")))
+        except ValueError:
+            dpi = 200
+        converter.run_pdf_to_image(pdf_path, fmt, dpi=dpi)
+        return
 
     img_path = ask_path("Selecciona la imagen o carpeta a convertir:")
     if not img_path:
@@ -195,8 +268,18 @@ def menu_convertir():
         "Selecciona el formato de salida:",
         choices=["png", "jpg", "webp", "tiff", "bmp", "gif"],
     )
-    if fmt:
-        converter.run_image_converter(img_path, fmt)
+    if not fmt:
+        return
+
+    quality = 85
+    if fmt in ("jpg", "jpeg", "webp"):
+        raw = ask_text("Calidad (1-100):", default="85")
+        try:
+            quality = max(1, min(100, int(raw or "85")))
+        except ValueError:
+            quality = 85
+
+    converter.run_image_converter(img_path, fmt, quality=quality)
 
 
 @error_boundary
@@ -249,14 +332,25 @@ def menu_detector_duplicados():
     if not directory:
         return
 
+    exclude_raw = ask_text(
+        "Patrones glob a excluir (coma-separados, opcional, ej: '*.tmp,backup_*'):"
+    )
+    excludes = [p.strip() for p in exclude_raw.split(",") if p.strip()] if exclude_raw else None
+
+    export_path = None
+    if ask_confirm("¿Exportar reporte CSV de duplicados?", default=False):
+        export_path = ask_text("Ruta del archivo CSV:", default="duplicados.csv") or "duplicados.csv"
+
     delete = ask_confirm("¿Eliminar duplicados automáticamente (conservando el original)?")
-    duplicate_finder.run_duplicate_finder(directory, auto_delete=delete)
+    duplicate_finder.run_duplicate_finder(
+        directory, auto_delete=delete, excludes=excludes, export_path=export_path
+    )
 
 
 @error_boundary
 def menu_descargador_youtube():
     print_section("Descargador de YouTube", "Descarga videos y audios en máxima calidad", "📺")
-    url = ask_text("URL del video:")
+    url = ask_text("URL del video o playlist:")
     if not url:
         return
 
@@ -270,7 +364,13 @@ def menu_descargador_youtube():
     if not mode:
         return
 
-    youtube_downloader.run_youtube_downloader(url, mode)
+    # Auto-detect playlist URL and offer to enable playlist mode.
+    is_playlist = "list=" in url or "playlist" in url.lower()
+    playlist = False
+    if is_playlist:
+        playlist = ask_confirm("Detectamos una playlist. ¿Descargar todos los videos?", default=True)
+
+    youtube_downloader.run_youtube_downloader(url, mode, playlist=playlist)
 
 
 @error_boundary
@@ -291,15 +391,57 @@ def menu_generador_readme():
 def menu_extractor_metadata():
     print_section("Extractor de Metadatos", "Revela EXIF de imágenes e info de PDFs", "🔎")
     filepath = ask_path("¿Archivo a escrutar (PDF, JPG, PNG, etc)?")
-    if filepath:
-        metadata.run_metadata_extractor(filepath)
+    if not filepath:
+        return
+
+    export_path = None
+    if ask_confirm("¿Exportar metadatos a archivo (JSON/CSV)?", default=False):
+        export_path = ask_text("Ruta de salida (usa .json o .csv):", default="metadata.json")
+
+    clean = False
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext in (".jpg", ".jpeg", ".png", ".tiff", ".webp", ".bmp"):
+        clean = ask_confirm(
+            "¿Crear una copia sin EXIF (sin GPS ni datos de cámara)?", default=False
+        )
+
+    metadata.run_metadata_extractor(filepath, export_path=export_path, clean_exif=clean)
 
 
 @error_boundary
 def menu_organizar_descargas():
     print_section("Organizar Descargas", "Mueve archivos de Downloads en subcarpetas por tipo", "📦")
-    if ask_confirm("¿Organizar la carpeta de descargas del sistema ahora?", default=True):
-        organizer.run_download_organizer()
+
+    action = ask_select(
+        "¿Qué quieres hacer?",
+        choices=[
+            Choice("📦  Organizar ahora", "run"),
+            Choice("↩️   Revertir última organización", "undo"),
+            Choice("🗂️   Listar historial", "list"),
+        ],
+    )
+    if not action:
+        return
+
+    if action == "run":
+        policy = ask_select(
+            "Si un archivo ya existe en la carpeta destino:",
+            choices=[
+                Choice("📝  Renombrar (archivo_1.ext)", "rename"),
+                Choice("⏭️   Saltar", "skip"),
+                Choice("⚠️   Sobrescribir", "overwrite"),
+            ],
+        ) or "rename"
+        organizer.run_download_organizer(collision_policy=policy)
+    elif action == "undo":
+        organizer.undo_last()
+    elif action == "list":
+        files = organizer.list_history()
+        if not files:
+            print_warning("No hay historial.")
+        else:
+            for f in files:
+                console.print(f"  [dim]•[/dim] {f}")
 
 
 @error_boundary
@@ -346,6 +488,13 @@ def menu_password_generator():
             count=count,
         )
 
+        if ask_confirm("¿Copiar la primera contraseña al portapapeles?", default=False):
+            pwd = password_generator.generate_password(
+                length=length, use_special=use_special, exclude_ambiguous=exclude_ambiguous
+            )
+            if pwd:
+                password_generator.run_copy_password(pwd)
+
     elif action == "passphrase":
         words_str = ask_text("¿Cuántas palabras?", default="4")
         num_words = min(max(int(words_str or "4"), 2), 10)
@@ -371,7 +520,10 @@ def menu_password_generator():
     elif action == "strength":
         pwd = ask_password("Ingresa la contraseña a evaluar:")
         if pwd:
-            password_generator.run_evaluate_strength(pwd)
+            check_breach = ask_confirm(
+                "¿Consultar HaveIBeenPwned? (k-anonymity, seguro)", default=True
+            )
+            password_generator.run_evaluate_strength(pwd, check_breach=check_breach)
 
 
 @error_boundary
@@ -416,6 +568,10 @@ def menu_limpiador_espacio():
             default=False,
         )
 
+    export_path = None
+    if ask_confirm("¿Exportar reporte de escaneo a archivo?", default=False):
+        export_path = ask_text("Ruta (.json o .csv):", default="limpieza_reporte.json")
+
     space_cleaner.run_space_cleaner(
         directory=directory,
         large_mb=large_mb,
@@ -425,6 +581,7 @@ def menu_limpiador_espacio():
         find_old=find_old,
         apply=apply,
         delete_large_and_old=delete_all,
+        export_path=export_path,
     )
 
 
@@ -458,8 +615,28 @@ MENU_ENTRIES = [
 ]
 
 
+def _label_to_action():
+    """Flat map {label → action} across all menu groups."""
+    flat = {}
+    for _, entries in MENU_ENTRIES:
+        for label, action in entries:
+            flat[label.strip()] = (label, action)
+    return flat
+
+
 def _build_menu_choices():
     choices = []
+
+    # Recientes: top of menu, if history exists.
+    flat = _label_to_action()
+    recents = _load_history()
+    visible_recents = [r for r in recents if r in flat]
+    if visible_recents:
+        choices.append(Separator("── 🕘  Recientes ──"))
+        for label_key in visible_recents[:HISTORY_MAX]:
+            label, action = flat[label_key]
+            choices.append(Choice(f"  {label}", value=action))
+
     for group_label, entries in MENU_ENTRIES:
         choices.append(Separator(f"── {group_label} ──"))
         for label, action in entries:
@@ -474,20 +651,31 @@ def main_menu():
 
     while True:
         print_banner()
-        print_footer_tip("Usa ↑/↓ para navegar, Enter para seleccionar, Ctrl+C para cancelar.")
+        print_footer_tip("Escribe para filtrar · ↑/↓ navegar · Enter elegir · Ctrl+C cancelar.")
         console.print()
 
-        selection = ask_select(
+        # `use_search_filter=True` enables typing-to-filter in questionary.
+        selection = questionary.select(
             "¿Qué quieres hacer hoy?",
             choices=_build_menu_choices(),
+            style=QSTYLE,
             use_indicator=True,
+            use_search_filter=True,
+            use_jk_keys=False,
             qmark="▸",
-        )
+        ).ask()
 
         if selection is None or selection == "exit":
             console.print()
             console.print("[bold #a78bfa]¡Hasta luego![/] 👋")
             break
+
+        # Record which entry was picked (by its displayed label), then run.
+        flat = _label_to_action()
+        for label_key, (_, action) in flat.items():
+            if action is selection:
+                _record_use(label_key)
+                break
 
         selection()
 
