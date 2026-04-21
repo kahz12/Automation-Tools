@@ -10,27 +10,32 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
+# --- Logging & UI Utilities Module ---
+# This module provides stylized terminal output using the 'rich' library.
+# It handles the visual layout, banners, section headers, and consistent styling for the CLI.
+
 try:
     from questionary import Style as QuestionaryStyle
-except ImportError:  # questionary is always present but keep it defensive
+except ImportError:
     QuestionaryStyle = None
 
-# Global console instance shared across the package.
+# Global console instance for rendering all project output.
 console = Console()
 
-# Visual palette (single source of truth for colors across the CLI).
+# Visual palette: Centralized color scheme for a consistent look and feel.
 PALETTE = {
-    "primary": "#7c3aed",     # purple 600
-    "primary_soft": "#a78bfa",  # purple 400
-    "accent": "#22d3ee",      # cyan 400
-    "accent_soft": "#67e8f9",  # cyan 300
-    "success": "#22c55e",     # green 500
-    "warning": "#f59e0b",     # amber 500
-    "danger": "#ef4444",      # red 500
-    "muted": "#94a3b8",       # slate 400
-    "text": "#e2e8f0",        # slate 200
+    "primary": "#7c3aed",      # Purple: Main theme color.
+    "primary_soft": "#a78bfa",  # Soft Purple: Used for dividers and secondary UI.
+    "accent": "#22d3ee",       # Cyan: Highlights and primary actions.
+    "accent_soft": "#67e8f9",   # Soft Cyan: Secondary highlights.
+    "success": "#22c55e",      # Green: Success messages and indicators.
+    "warning": "#f59e0b",      # Amber: Warnings and cautions.
+    "danger": "#ef4444",       # Red: Error messages.
+    "muted": "#94a3b8",        # Slate: Secondary text and metadata.
+    "text": "#e2e8f0",         # Light Slate: Primary text color.
 }
 
+# ASCII Art banner displayed at startup.
 ASCII_TITLE = r"""
    _____          __                        __  _
   /  _  \  __ ___/  |_  ____   _____ _____ _/  |_(_)____   ____
@@ -42,7 +47,10 @@ ASCII_TITLE = r"""
 
 
 def setup_logger(log_file: str = "automation_tools.log", level: int = logging.INFO) -> logging.Logger:
-    """Configures and returns the central logger for the application."""
+    """
+    Configures and returns the application's central logger.
+    Logs are saved to a file in the project root.
+    """
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(current_dir, "..", "..", ".."))
     log_path = os.path.join(project_root, log_file)
@@ -57,12 +65,15 @@ def setup_logger(log_file: str = "automation_tools.log", level: int = logging.IN
 
 
 def _gradient_text(text: str, start: str, end: str) -> Text:
-    """Returns Text with a two-color vertical gradient across lines."""
+    """
+    Creates a vertical color gradient effect for ASCII art.
+    Interpolates between two hex colors across lines.
+    """
     from rich.color import Color
     from rich.color_triplet import ColorTriplet
 
     lines = text.strip("\n").splitlines()
-    if not lines:
+    if not :
         return Text(text)
 
     def _parse(hex_color: str) -> ColorTriplet:
@@ -82,13 +93,16 @@ def _gradient_text(text: str, start: str, end: str) -> Text:
 
 
 def print_banner(clear: bool = True) -> None:
-    """Renders the main application banner with gradient ASCII art."""
+    """
+    Renders the main application banner with a gradient title and subtitle.
+    Optionally clears the terminal screen before rendering.
+    """
     if clear:
         os.system("cls" if os.name == "nt" else "clear")
 
     title = _gradient_text(ASCII_TITLE, PALETTE["primary"], PALETTE["accent"])
     subtitle = Text(
-        "Kit de Automatización  •  Tu caja de herramientas en la terminal",
+        "Automation Kit  •  Your terminal toolbox",
         style=f"italic {PALETTE['accent_soft']}",
         justify="center",
     )
@@ -109,7 +123,10 @@ def print_banner(clear: bool = True) -> None:
 
 
 def print_section(title: str, subtitle: str = "", icon: str = "🛠️") -> None:
-    """Header shown at the top of each tool screen — replaces ad-hoc titles."""
+    """
+    Standardized header for individual tool screens.
+    Clears the screen and displays the tool's name and description.
+    """
     os.system("cls" if os.name == "nt" else "clear")
     print_banner(clear=False)
 
@@ -124,36 +141,39 @@ def print_section(title: str, subtitle: str = "", icon: str = "🛠️") -> None
 
 
 def print_footer_tip(text: str) -> None:
-    """Small helper hint, usually shown near prompts."""
+    """Displays a helpful tip or hint at the bottom of the screen."""
     console.print(f"[dim {PALETTE['muted']}]💡 {text}[/]")
 
 
 def print_rule(label: str = "") -> None:
-    """Thin horizontal divider for visual rhythm."""
+    """Draws a horizontal line to separate visual sections."""
     console.print(Rule(label, style=PALETTE["primary_soft"]))
 
 
 def print_error(msg: str) -> None:
+    """Displays an error message with a consistent style."""
     console.print(f"[bold {PALETTE['danger']}]✗ Error:[/] {msg}")
 
 
 def print_success(msg: str) -> None:
-    console.print(f"[bold {PALETTE['success']}]✓ Éxito:[/] {msg}")
+    """Displays a success message with a consistent style."""
+    console.print(f"[bold {PALETTE['success']}]✓ Success:[/] {msg}")
 
 
 def print_warning(msg: str) -> None:
-    console.print(f"[bold {PALETTE['warning']}]⚠ Aviso:[/] {msg}")
+    """Displays a warning message with a consistent style."""
+    console.print(f"[bold {PALETTE['warning']}]⚠ Warning:[/] {msg}")
 
 
 def print_step(msg: str) -> None:
+    """Displays an progress step indicator."""
     console.print(f"[bold {PALETTE['accent']}]➜[/] {msg}")
 
 
 def question_style():
-    """Shared prompt_toolkit style for questionary prompts.
-
-    Applied via `questionary.xxx(..., style=question_style())` so every
-    interactive prompt matches the palette.
+    """
+    Defines the theme for 'questionary' interactive prompts.
+    Ensures that input fields, selections, and menus align with the project palette.
     """
     if QuestionaryStyle is None:
         return None

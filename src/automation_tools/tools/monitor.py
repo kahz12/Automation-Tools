@@ -18,17 +18,22 @@ from automation_tools.core.config import load_json_config, get_project_root
 # Get logger specific to this tool
 logger = setup_logger()
 
-# ─── Rutas ───
+# ─── Paths ───
 DB_FILE = os.path.join(get_project_root(), "historial_precios.db")
 
-# ─── Rate limiting por dominio ───
-# Tiempo mínimo entre requests al mismo host (segundos).
+# ─── Rate limiting by domain ───
+# Minimum time between requests to the same host (seconds).
 MIN_INTERVAL_PER_HOST = 3.5
 _LAST_REQUEST: Dict[str, float] = {}
 
 
 def _throttle(url: str) -> None:
-    """Ensure at least MIN_INTERVAL_PER_HOST seconds between requests per host."""
+    """
+    Ensures at least MIN_INTERVAL_PER_HOST seconds between requests per host.
+    
+    Args:
+        url (str): The URL being accessed.
+    """
     host = urlparse(url).netloc.lower()
     now = time.monotonic()
     last = _LAST_REQUEST.get(host, 0.0)
@@ -37,7 +42,7 @@ def _throttle(url: str) -> None:
         time.sleep(wait + random.uniform(0.1, 0.5))
     _LAST_REQUEST[host] = time.monotonic()
 
-# ─── User-Agents para rotación ───
+# ─── User-Agents for rotation ───
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -46,11 +51,14 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
 ]
 
-# ─── Base de Datos — SQLite ───
+# ─── Database — SQLite ───
 
 def init_db() -> None:
-    """Inicializa la base de datos y crea las tablas si no existen."""
+    """
+    Initializes the database and creates the tables if they do not exist.
+    """
     conn = sqlite3.connect(DB_FILE)
+    # Price history table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS historial (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,6 +69,7 @@ def init_db() -> None:
             fecha       TEXT    NOT NULL
         )
     """)
+    # Stock status table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS stock (
             url         TEXT    PRIMARY KEY,
@@ -73,6 +82,15 @@ def init_db() -> None:
 
 
 def get_last_stock(url: str) -> Optional[bool]:
+    """
+    Retrieves the last known stock status for a given URL.
+    
+    Args:
+        url (str): The product URL.
+        
+    Returns:
+        Optional[bool]: True if in stock, False if out of stock, None if no record exists.
+    """
     conn = sqlite3.connect(DB_FILE)
     row = conn.execute("SELECT disponible FROM stock WHERE url = ?", (url,)).fetchone()
     conn.close()
@@ -80,6 +98,13 @@ def get_last_stock(url: str) -> Optional[bool]:
 
 
 def save_stock(url: str, available: bool) -> None:
+    """
+    Updates the stock status for a given URL in the database.
+    
+    Args:
+        url (str): The product URL.
+        available (bool): Current stock availability.
+    """
     conn = sqlite3.connect(DB_FILE)
     conn.execute(
         "INSERT OR REPLACE INTO stock (url, disponible, fecha) VALUES (?, ?, ?)",
@@ -90,7 +115,15 @@ def save_stock(url: str, available: bool) -> None:
 
 
 def guardar_precio(nombre: str, url: str, precio: float, moneda: str) -> None:
-    """Guarda una lectura de precio en el historial."""
+    """
+    Saves a price reading into the history table.
+    
+    Args:
+        nombre (str): Product name.
+        url (str): Product URL.
+        precio (float): Current price.
+        moneda (str): Currency code.
+    """
     conn = sqlite3.connect(DB_FILE)
     conn.execute(
         "INSERT INTO historial (nombre, url, precio, moneda, fecha) VALUES (?, ?, ?, ?, ?)",
@@ -98,11 +131,19 @@ def guardar_precio(nombre: str, url: str, precio: float, moneda: str) -> None:
     )
     conn.commit()
     conn.close()
-    logger.info(f"Precio guardado: {nombre} → {precio} {moneda}")
+    logger.info(f"Price saved: {nombre} → {precio} {moneda}")
 
 
 def obtener_ultimo_precio(url: str) -> Optional[float]:
-    """Devuelve el precio más reciente registrado para una URL."""
+    """
+    Returns the most recent price recorded for a specific URL.
+    
+    Args:
+        url (str): The product URL.
+        
+    Returns:
+        Optional[float]: The last recorded price or None.
+    """
     conn = sqlite3.connect(DB_FILE)
     row = conn.execute(
         "SELECT precio FROM historial WHERE url = ? ORDER BY fecha DESC LIMIT 1",
@@ -113,7 +154,9 @@ def obtener_ultimo_precio(url: str) -> Optional[float]:
 
 
 def mostrar_historial() -> None:
-    """Imprime el historial completo en consola."""
+    """
+    Prints the complete price history (last 50 entries) to the console.
+    """
     init_db()
     conn = sqlite3.connect(DB_FILE)
     rows = conn.execute(
@@ -122,11 +165,11 @@ def mostrar_historial() -> None:
     conn.close()
 
     if not rows:
-        print_warning("No hay historial registrado aún.")
+        print_warning("No history recorded yet.")
         return
 
     console.print(f"\n[cyan]{'─'*60}[/cyan]")
-    console.print(f"[bold]{'PRODUCTO':<25} {'PRECIO':>12}  {'FECHA'}[/bold]")
+    console.print(f"[bold]{'PRODUCT':<25} {'PRICE':>12}  {'DATE'}[/bold]")
     console.print(f"[cyan]{'─'*60}[/cyan]")
     for nombre, precio, moneda, fecha in rows:
         precio_str = f"{precio:.2f} {moneda or ''}"
@@ -134,22 +177,36 @@ def mostrar_historial() -> None:
     console.print(f"[cyan]{'─'*60}[/cyan]\n")
 
 
-# ─── Notificaciones — Telegram ───
+# ─── Notifications — Telegram ───
 
 def send_telegram(token: str, chat_id: str, message: str) -> None:
-    """Envía un mensaje por Telegram."""
+    """
+    Sends a message via Telegram Bot API.
+    
+    Args:
+        token (str): Telegram Bot API token.
+        chat_id (str): Chat ID to send to.
+        message (str): HTML formatted message.
+    """
     if not token or not chat_id:
         return
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         requests.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"}, timeout=10)
-        logger.info(f"Telegram enviado: {message[:60]}...")
+        logger.info(f"Telegram sent: {message[:60]}...")
     except Exception as e:
-        logger.error(f"Error Telegram: {e}")
+        logger.error(f"Telegram error: {e}")
 
 
 def send_notification(title: str, message: str, settings: Dict[str, Any]) -> None:
-    """Notificación por Telegram + consola."""
+    """
+    Utility to send a notification via Telegram and print to console.
+    
+    Args:
+        title (str): Notification title.
+        message (str): Notification body.
+        settings (Dict[str, Any]): Global settings containing Telegram credentials.
+    """
     full_msg = f"<b>{title}</b>\n{message}"
     console.print(f"\n[bold yellow]🔔 {title}:[/bold yellow] {message}")
 
@@ -158,14 +215,26 @@ def send_notification(title: str, message: str, settings: Dict[str, Any]) -> Non
     send_telegram(token, chat_id, full_msg)
 
 
-# ─── Utilidades de Precio ───
+# ─── Price Utilities ───
 
 def clean_price(price_str: str, settings: Dict[str, Any]) -> Optional[float]:
+    """
+    Parses a price string into a float, considering decimal and thousand separators.
+    
+    Args:
+        price_str (str): The raw price string from the web page.
+        settings (Dict[str, Any]): Settings with separator definitions.
+        
+    Returns:
+        Optional[float]: The numeric price or None.
+    """
     if not price_str:
         return None
     dec_sep = settings.get("decimal_separator", ".")
     tho_sep = settings.get("thousands_separator", ",")
+    # Remove everything except digits and separators
     clean = re.sub(r"[^\d" + re.escape(dec_sep) + re.escape(tho_sep) + r"-]", "", price_str)
+    # Convert to standard float format (using '.' as decimal separator)
     clean = clean.replace(tho_sep, "").replace(dec_sep, ".")
     try:
         return float(clean)
@@ -174,12 +243,17 @@ def clean_price(price_str: str, settings: Dict[str, Any]) -> Optional[float]:
 
 
 def format_price(value: float, settings: Dict[str, Any]) -> str:
+    """
+    Formats a numeric price value into a string with the currency code.
+    """
     currency = settings.get("currency_code", "$")
     return f"{value:,.2f} {currency}"
 
 
 def get_headers() -> Dict[str, str]:
-    """Headers con User-Agent rotativo para evitar bloqueos."""
+    """
+    Returns HTTP headers with a random User-Agent to help avoid anti-scraping blocks.
+    """
     return {
         "User-Agent": random.choice(USER_AGENTS),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -193,7 +267,16 @@ def get_headers() -> Dict[str, str]:
 # ─── Scrapers ───
 
 def check_mercadolibre_api(item_id: str, access_token: str) -> Optional[float]:
-    """Consulta el precio vía API oficial de MercadoLibre."""
+    """
+    Queries the official MercadoLibre API for an item's price.
+    
+    Args:
+        item_id (str): The ML item ID (e.g., MLA12345).
+        access_token (str): OAuth access token.
+        
+    Returns:
+        Optional[float]: Item price or None.
+    """
     try:
         headers = {"Authorization": f"Bearer {access_token}"} if access_token else {}
         url = f"https://api.mercadolibre.com/items/{item_id}"
@@ -203,27 +286,33 @@ def check_mercadolibre_api(item_id: str, access_token: str) -> Optional[float]:
             price = data.get("price") or data.get("sale_price", {}).get("amount")
             return float(price) if price else None
     except Exception as e:
-        logger.warning(f"ML API falló para {item_id}: {e}")
+        logger.warning(f"ML API failed for {item_id}: {e}")
     return None
 
 
 def extract_ml_item_id(url: str) -> Optional[str]:
-    """Extrae el ID del item de una URL de MercadoLibre."""
+    """
+    Extracts the item ID from a MercadoLibre URL.
+    """
     match = re.search(r"/(MC[A-Z]-\d+)", url, re.IGNORECASE)
     return match.group(1).replace("-", "") if match else None
 
 
 def check_mercadolibre(url: str, soup: BeautifulSoup, settings: Dict[str, Any], access_token: str = "") -> Optional[float]:
+    """
+    Scrapes or API-queries MercadoLibre for a product price.
+    """
     item_id = extract_ml_item_id(url)
     if item_id and access_token:
         price = check_mercadolibre_api(item_id, access_token)
         if price:
-            logger.info(f"ML precio via API: {price}")
+            logger.info(f"ML price via API: {price}")
             return price
 
     selectors = [
         ("meta", {"itemprop": "price"}, "content"),
         ("span", {"class": "andes-money-amount__fraction"}, "text"),
+        ("span", {"class": " Andean-money-amount__fraction"}, "text"), # Potential typo fix
         ("span", {"class": "price-tag-fraction"}, "text"),
     ]
     for tag, attrs, prop in selectors:
@@ -237,6 +326,9 @@ def check_mercadolibre(url: str, soup: BeautifulSoup, settings: Dict[str, Any], 
 
 
 def check_amazon(soup: BeautifulSoup, settings: Dict[str, Any]) -> Optional[float]:
+    """
+    Scrapes Amazon for a product price using common CSS selectors.
+    """
     selectors = [
         "span.a-price-whole",
         ".a-offscreen",
@@ -253,42 +345,57 @@ def check_amazon(soup: BeautifulSoup, settings: Dict[str, Any]) -> Optional[floa
     return None
 
 
-# ─── Logica de Alertas ───
+# ─── Alert Logic ───
 
 def evaluar_alertas(product: Dict[str, Any], precio_actual: float, settings: Dict[str, Any]) -> None:
-    nombre       = product.get("name", "Producto")
+    """
+    Evaluates if current price triggers any target price or price drop alerts.
+    """
+    nombre       = product.get("name", "Product")
     url          = product.get("url", "")
     target_price = product.get("target_price")
     alert_drop   = product.get("alert_drop_percent")
     
     precio_fmt = format_price(precio_actual, settings)
 
+    # Check for target price
     if target_price and precio_actual <= target_price:
         target_fmt = format_price(target_price, settings)
         send_notification(
-            "🎯 ¡Precio objetivo alcanzado!",
-            f"{nombre}\nPrecio actual: {precio_fmt}\nObjetivo: {target_fmt}\n🔗 {url}",
+            "🎯 Target price reached!",
+            f"{nombre}\nCurrent price: {precio_fmt}\nTarget: {target_fmt}\n🔗 {url}",
             settings,
         )
 
+    # Check for price drop percentage
     if alert_drop:
         ultimo = obtener_ultimo_precio(url)
         if ultimo and ultimo > 0:
             variacion = ((ultimo - precio_actual) / ultimo) * 100
             if variacion >= alert_drop:
                 send_notification(
-                    f"📉 Bajó {variacion:.1f}% de precio",
-                    f"{nombre}\nAntes: {format_price(ultimo, settings)}\nAhora: {precio_fmt}\n🔗 {url}",
+                    f"📉 Price dropped by {variacion:.1f}%",
+                    f"{nombre}\nBefore: {format_price(ultimo, settings)}\nNow: {precio_fmt}\n🔗 {url}",
                     settings,
                 )
             elif variacion < 0:
-                logger.info(f"{nombre} subió {abs(variacion):.1f}% → {precio_fmt}")
+                logger.info(f"{nombre} increased by {abs(variacion):.1f}% → {precio_fmt}")
 
 
-# ─── Check Principal ───
+# ─── Main Check Logic ───
 
 def detect_stock(url: str, soup: BeautifulSoup, price: Optional[float]) -> bool:
-    """Heurística simple para disponibilidad: precio presente + sin señales de agotado."""
+    """
+    Simple heuristic for stock availability: price present + no 'out of stock' text.
+    
+    Args:
+        url (str): Product URL.
+        soup (BeautifulSoup): Parsed page content.
+        price (Optional[float]): Detected price.
+        
+    Returns:
+        bool: True if likely in stock, False otherwise.
+    """
     page_text = soup.get_text(" ", strip=True).lower()
     signals_out = [
         "out of stock", "sin stock", "agotado", "no disponible",
@@ -300,9 +407,11 @@ def detect_stock(url: str, soup: BeautifulSoup, price: Optional[float]) -> bool:
 
 
 def evaluar_stock(product: Dict[str, Any], disponible: bool, settings: Dict[str, Any]) -> None:
-    """Notifica cambios de stock (disponible ↔ agotado) y persiste el estado."""
+    """
+    Notifies about stock changes (In Stock ↔ Out of Stock) and persists the state.
+    """
     url = product.get("url", "")
-    nombre = product.get("name", "Producto")
+    nombre = product.get("name", "Product")
     anterior = get_last_stock(url)
     if anterior is None:
         save_stock(url, disponible)
@@ -310,13 +419,13 @@ def evaluar_stock(product: Dict[str, Any], disponible: bool, settings: Dict[str,
     if anterior != disponible:
         if disponible:
             send_notification(
-                "🟢 ¡Volvió a estar disponible!",
+                "🟢 Back in stock!",
                 f"{nombre}\n🔗 {url}",
                 settings,
             )
         else:
             send_notification(
-                "🔴 Se agotó",
+                "🔴 Out of stock",
                 f"{nombre}\n🔗 {url}",
                 settings,
             )
@@ -324,11 +433,14 @@ def evaluar_stock(product: Dict[str, Any], disponible: bool, settings: Dict[str,
 
 
 def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
+    """
+    Fetches the URL, scrapes the price, and triggers alerts/stock checks.
+    """
     url    = product.get("url", "")
-    nombre = product.get("name", "Producto")
+    nombre = product.get("name", "Product")
     moneda = settings.get("currency_code", "$")
 
-    console.print(f"  [dim]🔍 Verificando:[/dim] {nombre}...")
+    console.print(f"  [dim]🔍 Checking:[/dim] {nombre}...")
 
     try:
         _throttle(url)
@@ -343,6 +455,7 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
         access_token = settings.get("ml_access_token", "")
         price        = None
 
+        # Dispatch to specific scrapers
         if "mercadolibre" in url:
             price = check_mercadolibre(url, soup, settings, access_token)
         elif "amazon" in url:
@@ -353,19 +466,19 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
 
         if price is None:
             if not disponible:
-                console.print(f"     [yellow]🚫 Producto no disponible[/yellow]")
+                console.print(f"     [yellow]🚫 Product not available[/yellow]")
             else:
-                console.print(f"     [red]❌ No se pudo detectar el precio.[/red]")
-            logger.warning(f"{nombre}: precio no detectado en {url}")
+                console.print(f"     [red]❌ Price not detected.[/red]")
+            logger.warning(f"{nombre}: price not detected at {url}")
             return
 
-        console.print(f"     [green]💰 Precio:[/green] {format_price(price, settings)}")
+        console.print(f"     [green]💰 Price:[/green] {format_price(price, settings)}")
 
         guardar_precio(nombre, url, price, moneda)
         evaluar_alertas(product, price, settings)
 
     except requests.Timeout:
-        console.print(f"     [red]⏱️  Timeout al acceder a {nombre}[/red]")
+        console.print(f"     [red]⏱️  Timeout accessing {nombre}[/red]")
         logger.error(f"{nombre}: timeout")
     except Exception as e:
         console.print(f"     [red]❌ Error:[/red] {e}")
@@ -373,11 +486,13 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
 
 
 def run_price_monitor_job() -> None:
-    """Ejecuta una sola ronda del monitor de precios."""
+    """
+    Executes a single round of price monitoring for all configured products.
+    """
     init_db()
     
     console.print(f"\n[cyan]{'═'*50}[/cyan]")
-    console.print(f"  [bold]Chequeo:[/bold] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    console.print(f"  [bold]Check round:[/bold] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     console.print(f"[cyan]{'═'*50}[/cyan]")
 
     data     = load_json_config()
@@ -385,32 +500,37 @@ def run_price_monitor_job() -> None:
     settings = data.get("settings", {})
 
     if not products:
-        print_warning("No hay productos configurados en productos_a_monitorear.json")
+        print_warning("No products configured in productos_a_monitorear.json")
         return
 
     for product in products:
         check_price(product, settings)
 
-    print_success(f"Chequeo completo — {len(products)} producto(s)\n")
+    print_success(f"Check complete — {len(products)} product(s)\n")
 
 
 def run_continuous_monitor(interval_minutes: int = 60) -> None:
-    """Ejecuta el monitor en un loop continuo."""
-    console.print(f"[bold green]🟢 Monitor iniciado.[/bold green] Verificando cada {interval_minutes} minuto(s)...")
+    """
+    Runs the monitor in a continuous loop at the specified interval.
+    """
+    console.print(f"[bold green]🟢 Monitor started.[/bold green] Checking every {interval_minutes} minute(s)...")
     try:
         run_price_monitor_job()
         while True:
             time.sleep(interval_minutes * 60)
             run_price_monitor_job()
     except KeyboardInterrupt:
-        console.print("\n[yellow]Monitor detenido por el usuario.[/yellow]")
+        console.print("\n[yellow]Monitor stopped by user.[/yellow]")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Monitor de Precios v2.0")
-    parser.add_argument("--now",       action="store_true", help="Ejecutar un chequeo inmediato")
-    parser.add_argument("--historial", action="store_true", help="Ver historial de precios")
-    parser.add_argument("--interval",  type=int, default=60, help="Intervalo en minutos (default: 60)")
+    """
+    Main entry point for the price monitor CLI.
+    """
+    parser = argparse.ArgumentParser(description="Price Monitor v2.0")
+    parser.add_argument("--now",       action="store_true", help="Run an immediate check")
+    parser.add_argument("--historial", action="store_true", help="View price history")
+    parser.add_argument("--interval",  type=int, default=60, help="Interval in minutes (default: 60)")
     args = parser.parse_args()
 
     if args.historial:

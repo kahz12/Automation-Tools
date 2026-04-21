@@ -14,7 +14,15 @@ except ImportError:
 
 
 def get_file_date(filepath: str) -> datetime.datetime:
-    """Gets the original creation date of the file, prefering EXIF if available."""
+    """
+    Gets the original creation date of the file, preferring EXIF data if available.
+    
+    Args:
+        filepath (str): Path to the file.
+        
+    Returns:
+        datetime.datetime: The detected or fallback modification date.
+    """
     date_taken = None
     if HAS_PILLOW:
         try:
@@ -23,12 +31,14 @@ def get_file_date(filepath: str) -> datetime.datetime:
                 if exif:
                     for tag, value in exif.items():
                         if tag in ExifTags.TAGS and ExifTags.TAGS[tag] == 'DateTimeOriginal':
+                            # Parse EXIF date format
                             date_taken = datetime.datetime.strptime(value, '%Y:%m:%d %H:%M:%S')
                             break
         except Exception:
             pass 
 
     if not date_taken:
+        # Fallback to file system modification time
         timestamp = os.path.getmtime(filepath)
         date_taken = datetime.datetime.fromtimestamp(timestamp)
     
@@ -36,7 +46,9 @@ def get_file_date(filepath: str) -> datetime.datetime:
 
 
 def _build_pattern_regex(pattern: str) -> Optional[re.Pattern]:
-    """Build a regex from a format pattern like 'viaje_{:03d}' that captures the numeric index."""
+    """
+    Builds a regex from a format pattern like 'trip_{:03d}' that captures the numeric index.
+    """
     placeholder_re = re.compile(r'\{[^}]*\}')
     if not placeholder_re.search(pattern):
         return None
@@ -46,7 +58,10 @@ def _build_pattern_regex(pattern: str) -> Optional[re.Pattern]:
 
 
 def _split_pattern_files(files: List[str], pattern: str) -> Tuple[List[str], List[str], int]:
-    """Split files into (already_matching, to_rename) and return the max existing index."""
+    """
+    Splits files into those already matching the pattern and those pending, 
+    returning the maximum existing index found.
+    """
     regex = _build_pattern_regex(pattern)
     if regex is None:
         return [], files, 0
@@ -73,7 +88,9 @@ def detect_existing_sequence(
     pattern: str,
     ext_filter: Optional[str] = None,
 ) -> Tuple[int, int]:
-    """Return (count, max_index) of files in `directory` already matching `pattern`."""
+    """
+    Returns (count, max_index) of files in a directory that already match a given pattern.
+    """
     if not pattern or not os.path.isdir(directory):
         return 0, 0
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
@@ -88,14 +105,10 @@ def detect_dominant_pattern(
     ext_filter: Optional[str] = None,
     min_count: int = 2,
 ) -> Tuple[Optional[str], int, int]:
-    """Auto-detect a dominant naming pattern like '<prefix><digits>'.
+    """
+    Auto-detects a dominant naming pattern like '<prefix><digits>'.
 
-    Looks at file names (without extension) ending in digits, groups by
-    (prefix, digit_width), and returns the most populated group as a
-    format pattern, e.g. 'viaje_{:03d}'. Requires at least `min_count` files
-    in the group.
-
-    Returns (pattern, count, max_index) or (None, 0, 0) if no dominant pattern.
+    Returns (pattern, count, max_index) or (None, 0, 0) if no dominant pattern is found.
     """
     if not os.path.isdir(directory):
         return None, 0, 0
@@ -137,7 +150,12 @@ def generate_new_name(
     old_text: Optional[str] = None,
     new_text: str = ""
 ) -> str:
-    """Generates a new name based on the chosen mode."""
+    """
+    Generates a new filename based on the selected mode.
+    
+    Args:
+        mode (str): 'patron' (sequence), 'fecha' (date-based), or 'reemplazo' (text replacement).
+    """
     name, ext = os.path.splitext(filename)
     
     if mode == 'patron':
@@ -170,7 +188,9 @@ def generate_new_name(
 
 
 def _auto_version_name(directory: str, desired: str, reserved: set) -> str:
-    """Return `desired` or `name_1.ext`, `name_2.ext`... until free."""
+    """
+    Ensures a unique filename by appending a version number (e.g., _1, _2) if needed.
+    """
     dst = os.path.join(directory, desired)
     if not os.path.exists(dst) and desired not in reserved:
         return desired
@@ -197,25 +217,27 @@ def run_massive_rename(
     auto_version: bool = True,
     preview: bool = False,
 ) -> None:
-    """Core function to execute massive rename without argparse dependency.
+    """
+    Core function to execute massive file renaming.
 
-    `continue_sequence`:
-        - True  → si hay archivos ya en secuencia, saltarlos y continuar desde el siguiente índice.
-        - False → ignorar la secuencia existente y renumerar desde 1.
-        - None  → comportamiento por defecto (equivale a True).
+    continue_sequence behavior:
+        - True  → skip files already in sequence and continue from next index.
+        - False → ignore existing sequence and restart numbering from 1.
+        - None  → default (equivalent to True).
     """
 
     if not os.path.isdir(directory):
-        print_error(f"El directorio '{directory}' no existe.")
+        print_error(f"The directory '{directory}' does not exist.")
         return
 
+    # Sort files to ensure predictable sequence numbering
     files = sorted([f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))])
 
     if ext_filter:
         files = [f for f in files if f.lower().endswith(ext_filter.lower())]
 
     if not files:
-        print_warning("No se encontraron archivos para procesar.")
+        print_warning("No files found to process.")
         return
 
     count_start = 1
@@ -224,28 +246,28 @@ def run_massive_rename(
         if matching:
             if continue_sequence is False:
                 console.print(
-                    f"[dim]Detectados {len(matching)} archivo(s) ya en secuencia "
-                    f"(índice máx: {max_index}). Reiniciando numeración desde 1.[/dim]"
+                    f"[dim]Detected {len(matching)} file(s) already in sequence "
+                    f"(max index: {max_index}). Restarting numbering from 1.[/dim]"
                 )
             else:
                 console.print(
-                    f"[dim]Detectados {len(matching)} archivo(s) ya en secuencia "
-                    f"(índice máx: {max_index}). Continuando desde {max_index + 1}.[/dim]"
+                    f"[dim]Detected {len(matching)} file(s) already in sequence "
+                    f"(max index: {max_index}). Continuing from {max_index + 1}.[/dim]"
                 )
                 files = pending
                 count_start = max_index + 1
 
     if not files:
-        print_warning("No hay archivos nuevos para renombrar.")
+        print_warning("No new files to rename.")
         return
 
-    print_step(f"Procesando {len(files)} archivos en '{directory}'...")
-    print_step(f"Modo: {mode}")
+    print_step(f"Processing {len(files)} files in '{directory}'...")
+    print_step(f"Mode: {mode}")
 
     if not apply_changes:
-        console.print("[yellow]MODO SIMULACIÓN (DRY-RUN): No se harán cambios reales.[/yellow]\n")
+        console.print("[yellow]DRY-RUN MODE: No real changes will be made.[/yellow]\n")
 
-    # Build the full plan first (source → destination) to allow preview and collision handling.
+    # Build the full plan (source → destination) to handle collisions before applying.
     plan: List[Tuple[str, str]] = []
     reserved: set = set()
     count = count_start
@@ -266,16 +288,17 @@ def run_massive_rename(
             count += 1
             continue
 
+        # Collision handling
         if os.path.exists(os.path.join(directory, new_name)) or new_name in reserved:
             if auto_version:
                 versioned = _auto_version_name(directory, new_name, reserved)
                 console.print(
-                    f"[yellow][!][/yellow] '{new_name}' ya existe; versionado a '{versioned}'"
+                    f"[yellow][!][/yellow] '{new_name}' already exists; versioned to '{versioned}'"
                 )
                 new_name = versioned
             else:
                 console.print(
-                    f"[bold red][!][/bold red] Conflicto: '{new_name}' ya existe. Saltando '{filename}'."
+                    f"[bold red][!][/bold red] Conflict: '{new_name}' already exists. Skipping '{filename}'."
                 )
                 count += 1
                 continue
@@ -285,23 +308,26 @@ def run_massive_rename(
         count += 1
 
     if not plan:
-        print_warning("No hay cambios que aplicar.")
+        print_warning("No changes to apply.")
         return
 
+    # Display the plan
     for src_name, dst_name in plan:
         console.print(f"'{src_name}' -> '{dst_name}'")
 
+    # Optional user confirmation via questionary if available
     if preview and apply_changes:
         try:
             import questionary
             if not questionary.confirm(
-                f"¿Aplicar estos {len(plan)} renombres?", default=True
+                f"Apply these {len(plan)} renames?", default=True
             ).ask():
-                print_warning("Cancelado por el usuario. No se aplicó nada.")
+                print_warning("Cancelled by user. No changes applied.")
                 return
         except ImportError:
             pass
 
+    # Apply renames
     if apply_changes:
         applied = 0
         for src_name, dst_name in plan:
@@ -309,31 +335,33 @@ def run_massive_rename(
                 os.rename(os.path.join(directory, src_name), os.path.join(directory, dst_name))
                 applied += 1
             except Exception as e:
-                print_error(f"Error al renombrar '{src_name}': {e}")
-        print_success(f"Renombrado completado. {applied}/{len(plan)} archivos.")
+                print_error(f"Error renaming '{src_name}': {e}")
+        print_success(f"Renaming complete. {applied}/{len(plan)} files processed.")
     else:
-        console.print("\n[dim]Para aplicar estos cambios, ejecuta con apply_changes=True[/dim]")
+        console.print("\n[dim]To apply these changes, run with apply_changes=True[/dim]")
 
 
 def main():
-    """CLI Entry point for standalone execution."""
-    parser = argparse.ArgumentParser(description="Renombrador Masivo Inteligente de Archivos")
+    """
+    Main entry point for the smart mass renamer CLI.
+    """
+    parser = argparse.ArgumentParser(description="Smart Mass File Renamer")
     
-    parser.add_argument("directory", help="Directorio donde están los archivos")
-    parser.add_argument("--mode", choices=['patron', 'fecha', 'reemplazo'], required=True, help="Modo de renombrado")
-    parser.add_argument("--ext", help="Filtrar por extensión (ej: .jpg)")
-    parser.add_argument("--aplicar", action="store_true", help="Aplicar los cambios reales")
+    parser.add_argument("directory", help="Target directory")
+    parser.add_argument("--mode", choices=['patron', 'fecha', 'reemplazo'], required=True, help="Rename mode")
+    parser.add_argument("--ext", help="Filter by extension (e.g., .jpg)")
+    parser.add_argument("--aplicar", action="store_true", help="Apply real changes")
     
-    parser.add_argument("--pattern", help="Patrón para el nuevo nombre (ej: 'viaje_{:03d}')")
-    parser.add_argument("--date-format", default="%Y-%m-%d", help="Formato de fecha (default: YYYY-MM-DD)")
-    parser.add_argument("--keep-name", action="store_true", help="Mantener nombre original")
-    parser.add_argument("--old-text", help="Texto a buscar para reemplazar")
-    parser.add_argument("--new-text", default="", help="Texto nuevo")
+    parser.add_argument("--pattern", help="New name pattern (e.g., 'trip_{:03d}')")
+    parser.add_argument("--date-format", default="%Y-%m-%d", help="Date format (default: YYYY-MM-DD)")
+    parser.add_argument("--keep-name", action="store_true", help="Keep original name")
+    parser.add_argument("--old-text", help="Text to search for")
+    parser.add_argument("--new-text", default="", help="Replacement text")
     seq_group = parser.add_mutually_exclusive_group()
     seq_group.add_argument("--continue-sequence", dest="continue_sequence", action="store_true",
-                           help="Continuar una secuencia ya existente desde el siguiente índice")
+                           help="Continue an existing sequence from next index")
     seq_group.add_argument("--restart-sequence", dest="continue_sequence", action="store_false",
-                           help="Ignorar la secuencia existente y renumerar desde 1")
+                           help="Ignore existing sequence and restart from 1")
     parser.set_defaults(continue_sequence=None)
 
     args = parser.parse_args()

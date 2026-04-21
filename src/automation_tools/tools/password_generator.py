@@ -16,8 +16,9 @@ from automation_tools.core.logger import console, print_error, print_success, pr
 
 
 def check_pwned(password: str, timeout: float = 5.0) -> Optional[int]:
-    """Check a password against Have I Been Pwned (k-anonymity).
-
+    """
+    Check a password against Have I Been Pwned (k-anonymity API).
+    
     Returns the number of times the password was seen in breaches,
     0 if not seen, None if the check could not be performed.
     Only the first 5 chars of the SHA-1 hash are sent — the password
@@ -51,7 +52,15 @@ def check_pwned(password: str, timeout: float = 5.0) -> Optional[int]:
 
 
 def copy_to_clipboard(text: str) -> bool:
-    """Best-effort copy to clipboard across platforms (Termux, Linux, macOS, Windows)."""
+    """
+    Best-effort copy to clipboard across platforms (Termux, Linux, macOS, Windows).
+    
+    Args:
+        text (str): The text to copy.
+        
+    Returns:
+        bool: True if copying was successful, False otherwise.
+    """
     candidates = [
         ["termux-clipboard-set"],
         ["wl-copy"],
@@ -71,8 +80,8 @@ def copy_to_clipboard(text: str) -> bool:
             continue
     return False
 
-# ─── Lista de palabras para frases memorables ───
-
+# ─── Word list for memorable passphrases ───
+# Spanish words are used to maintain the tool's original vocabulary.
 WORD_LIST = [
     "aceite", "acero", "agua", "aguila", "aire", "alfa", "alma", "alto",
     "ambar", "amor", "angel", "anillo", "arbol", "arco", "arena", "arma",
@@ -126,7 +135,7 @@ WORD_LIST = [
 ]
 
 
-# ─── Generador de Contraseñas ───
+# ─── Password Generator ───
 
 def generate_password(
     length: int = 16,
@@ -136,7 +145,20 @@ def generate_password(
     use_special: bool = True,
     exclude_ambiguous: bool = False,
 ) -> Optional[str]:
-    """Genera una contraseña aleatoria segura usando secrets."""
+    """
+    Generates a secure random password using the `secrets` module.
+    
+    Args:
+        length (int): Password length.
+        use_uppercase (bool): Include uppercase letters.
+        use_lowercase (bool): Include lowercase letters.
+        use_digits (bool): Include numeric digits.
+        use_special (bool): Include special characters.
+        exclude_ambiguous (bool): If True, excludes characters like Il1O0o.
+        
+    Returns:
+        Optional[str]: The generated password, or None if no characters were selected.
+    """
     charset = ""
     required = []
 
@@ -169,7 +191,7 @@ def generate_password(
         required.append(secrets.choice(pool))
 
     if not charset:
-        print_error("Debes seleccionar al menos un tipo de caracter.")
+        print_error("At least one character type must be selected.")
         return None
 
     if length < len(required):
@@ -178,7 +200,7 @@ def generate_password(
     remaining = length - len(required)
     password_chars = required + [secrets.choice(charset) for _ in range(remaining)]
 
-    # Mezclar de forma segura
+    # Securely shuffle the characters
     result = list(password_chars)
     for i in range(len(result) - 1, 0, -1):
         j = secrets.randbelow(i + 1)
@@ -187,7 +209,7 @@ def generate_password(
     return "".join(result)
 
 
-# ─── Generador de Frases Memorables ───
+# ─── Memorable Passphrase Generator ───
 
 def generate_passphrase(
     num_words: int = 4,
@@ -196,7 +218,19 @@ def generate_passphrase(
     add_number: bool = True,
     add_special: bool = False,
 ) -> str:
-    """Genera una frase memorable con palabras aleatorias."""
+    """
+    Generates a memorable passphrase using random words from a list.
+    
+    Args:
+        num_words (int): Number of words to include.
+        separator (str): Separator between words.
+        capitalize (bool): Whether to capitalize each word.
+        add_number (bool): Append a random number at the end.
+        add_special (bool): Append a random symbol at the end.
+        
+    Returns:
+        str: The generated passphrase.
+    """
     words = [secrets.choice(WORD_LIST) for _ in range(num_words)]
 
     if capitalize:
@@ -214,7 +248,7 @@ def generate_passphrase(
     return phrase
 
 
-# ─── Evaluador de Fortaleza ───
+# ─── Strength Evaluator ───
 
 COMMON_PASSWORDS = {
     "password", "123456", "12345678", "qwerty", "abc123", "letmein",
@@ -225,7 +259,15 @@ COMMON_PASSWORDS = {
 
 
 def calculate_entropy(password: str) -> float:
-    """Calcula la entropia en bits de una contraseña."""
+    """
+    Calculates the entropy of a password in bits.
+    
+    Args:
+        password (str): The password to evaluate.
+        
+    Returns:
+        float: Calculated entropy.
+    """
     charset_size = 0
     if re.search(r"[a-z]", password):
         charset_size += 26
@@ -242,28 +284,36 @@ def calculate_entropy(password: str) -> float:
 
 
 def evaluate_strength(password: str) -> Dict[str, Any]:
-    """Evalua la fortaleza de una contraseña y devuelve un reporte detallado."""
+    """
+    Evaluates password strength and returns a detailed report.
+    
+    Args:
+        password (str): The password to test.
+        
+    Returns:
+        Dict[str, Any]: A dictionary containing score, level, entropy, feedback, etc.
+    """
     score = 0
     feedback: List[str] = []
     details: Dict[str, str] = {}
     length = len(password)
 
-    # ── Longitud (0-35 pts) ──
+    # ── Length (0-35 pts) ──
     if length < 6:
         score += 5
-        feedback.append("Muy corta — usa al menos 8 caracteres")
+        feedback.append("Too short — use at least 8 characters")
     elif length < 8:
         score += 12
-        feedback.append("Corta — considera usar 12+ caracteres")
+        feedback.append("Short — consider using 12+ characters")
     elif length < 12:
         score += 22
     elif length < 16:
         score += 30
     else:
         score += 35
-    details["Longitud"] = f"{length} caracteres"
+    details["Length"] = f"{length} characters"
 
-    # ── Variedad de caracteres (0-40 pts) ──
+    # ── Character variety (0-40 pts) ──
     has_lower = bool(re.search(r"[a-z]", password))
     has_upper = bool(re.search(r"[A-Z]", password))
     has_digit = bool(re.search(r"\d", password))
@@ -274,21 +324,21 @@ def evaluate_strength(password: str) -> Dict[str, Any]:
 
     types_present = []
     if has_lower:
-        types_present.append("minusculas")
+        types_present.append("lowercase")
     if has_upper:
-        types_present.append("MAYUSCULAS")
+        types_present.append("UPPERCASE")
     if has_digit:
-        types_present.append("numeros")
+        types_present.append("numbers")
     if has_special:
-        types_present.append("simbolos")
-    details["Tipos de caracter"] = ", ".join(types_present) if types_present else "ninguno"
+        types_present.append("symbols")
+    details["Character Types"] = ", ".join(types_present) if types_present else "none"
 
     if variety < 3:
-        feedback.append("Agrega mas tipos de caracteres (mayusculas, numeros, simbolos)")
+        feedback.append("Add more character types (uppercase, numbers, symbols)")
 
-    # ── Entropia (0-25 pts) ──
+    # ── Entropy (0-25 pts) ──
     entropy = calculate_entropy(password)
-    details["Entropia"] = f"{entropy:.1f} bits"
+    details["Entropy"] = f"{entropy:.1f} bits"
 
     if entropy >= 70:
         score += 25
@@ -299,14 +349,14 @@ def evaluate_strength(password: str) -> Dict[str, Any]:
     elif entropy >= 20:
         score += 5
 
-    # ── Penalizaciones ──
+    # ── Penalties ──
 
-    # Caracteres repetidos consecutivos (aaa, 111)
+    # Consecutive repeated characters (aaa, 111)
     if re.search(r"(.)\1{2,}", password):
         score -= 10
-        feedback.append("Evita 3+ caracteres repetidos consecutivos")
+        feedback.append("Avoid 3+ consecutive repeated characters")
 
-    # Secuencias comunes
+    # Common sequences
     sequences = [
         "abcdef", "123456", "qwerty", "asdfgh", "zxcvbn",
         "abcde", "12345", "qwert",
@@ -315,35 +365,35 @@ def evaluate_strength(password: str) -> Dict[str, Any]:
     for seq in sequences:
         if seq in pw_lower or seq[::-1] in pw_lower:
             score -= 15
-            feedback.append("Contiene secuencias predecibles")
+            feedback.append("Contains predictable sequences")
             break
 
-    # Contraseñas comunes
+    # Common passwords check
     if pw_lower in COMMON_PASSWORDS:
         score = 3
-        feedback = ["Esta es una de las contraseñas mas comunes del mundo — cambiala inmediatamente"]
+        feedback = ["This is one of the most common passwords in the world — change it immediately"]
 
-    # Solo un tipo de caracter y corta
+    # Only one char type and short
     if variety == 1 and length < 10:
         score -= 10
-        feedback.append("Usa una combinacion de tipos de caracteres")
+        feedback.append("Use a combination of character types")
 
     score = max(0, min(100, score))
 
-    # ── Nivel ──
+    # ── Level mapping ──
     if score >= 80:
-        level, color, bar_color = "Muy fuerte", "bold green", "green"
+        level, color, bar_color = "Very Strong", "bold green", "green"
     elif score >= 60:
-        level, color, bar_color = "Fuerte", "green", "green"
+        level, color, bar_color = "Strong", "green", "green"
     elif score >= 40:
-        level, color, bar_color = "Moderada", "yellow", "yellow"
+        level, color, bar_color = "Moderate", "yellow", "yellow"
     elif score >= 20:
-        level, color, bar_color = "Debil", "red", "red"
+        level, color, bar_color = "Weak", "red", "red"
     else:
-        level, color, bar_color = "Muy debil", "bold red", "red"
+        level, color, bar_color = "Very Weak", "bold red", "red"
 
     if not feedback:
-        feedback.append("Buena contraseña")
+        feedback.append("Good password")
 
     return {
         "score": score,
@@ -356,10 +406,12 @@ def evaluate_strength(password: str) -> Dict[str, Any]:
     }
 
 
-# ─── Funciones de visualizacion ───
+# ─── Visualization Functions ───
 
 def display_strength(result: Dict[str, Any]) -> None:
-    """Muestra el resultado del analisis de fortaleza con Rich."""
+    """
+    Displays the strength analysis result using Rich components.
+    """
     score = result["score"]
     filled = int(score / 100 * 30)
     empty = 30 - filled
@@ -368,12 +420,12 @@ def display_strength(result: Dict[str, Any]) -> None:
     console.print()
     console.print(Panel(
         f"{bar}  [{result['color']}]{score}/100 — {result['level']}[/{result['color']}]",
-        title="Fortaleza",
+        title="Strength",
         border_style="cyan",
         padding=(0, 2),
     ))
 
-    # Detalles
+    # Details table
     table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column(style="bold cyan", no_wrap=True)
     table.add_column(style="white")
@@ -383,23 +435,25 @@ def display_strength(result: Dict[str, Any]) -> None:
 
     console.print(table)
 
-    # Recomendaciones
+    # Recommendations / Feedback
     if result["feedback"]:
         console.print()
         for tip in result["feedback"]:
-            icon = "+" if "Buena" in tip else "!"
-            style = "green" if "Buena" in tip else "yellow"
+            icon = "+" if "Good" in tip else "!"
+            style = "green" if "Good" in tip else "yellow"
             console.print(f"  [{style}][{icon}][/{style}] {tip}")
     console.print()
 
 
-def display_passwords(passwords: List[str], title: str = "Contraseñas Generadas") -> None:
-    """Muestra una lista de contraseñas generadas con su fortaleza."""
+def display_passwords(passwords: List[str], title: str = "Generated Passwords") -> None:
+    """
+    Displays a list of generated passwords along with their strength evaluation.
+    """
     table = Table(title=title, title_style="bold magenta", border_style="cyan")
     table.add_column("#", style="dim", width=3)
-    table.add_column("Contraseña", style="bold white")
-    table.add_column("Fortaleza", justify="center")
-    table.add_column("Entropia", justify="right", style="dim")
+    table.add_column("Password", style="bold white")
+    table.add_column("Strength", justify="center")
+    table.add_column("Entropy", justify="right", style="dim")
 
     for i, pwd in enumerate(passwords, 1):
         result = evaluate_strength(pwd)
@@ -412,7 +466,7 @@ def display_passwords(passwords: List[str], title: str = "Contraseñas Generadas
     console.print()
 
 
-# ─── Funciones de entrada publica ───
+# ─── Public Entry Points ───
 
 def run_generate_password(
     length: int = 16,
@@ -423,7 +477,9 @@ def run_generate_password(
     exclude_ambiguous: bool = False,
     count: int = 5,
 ) -> None:
-    """Genera y muestra multiples contraseñas seguras."""
+    """
+    Generates and displays multiple secure passwords.
+    """
     passwords = []
     for _ in range(count):
         pwd = generate_password(
@@ -438,8 +494,8 @@ def run_generate_password(
             passwords.append(pwd)
 
     if passwords:
-        display_passwords(passwords, title=f"Contraseñas ({length} caracteres)")
-        print_success(f"{len(passwords)} contraseñas generadas.")
+        display_passwords(passwords, title=f"Passwords ({length} chars)")
+        print_success(f"{len(passwords)} passwords generated.")
 
 
 def run_generate_passphrase(
@@ -450,7 +506,9 @@ def run_generate_passphrase(
     add_special: bool = False,
     count: int = 5,
 ) -> None:
-    """Genera y muestra multiples frases memorables."""
+    """
+    Generates and displays multiple memorable passphrases.
+    """
     phrases = []
     for _ in range(count):
         phrase = generate_passphrase(
@@ -463,39 +521,43 @@ def run_generate_passphrase(
         phrases.append(phrase)
 
     if phrases:
-        display_passwords(phrases, title=f"Frases Memorables ({num_words} palabras)")
+        display_passwords(phrases, title=f"Passphrases ({num_words} words)")
         bits = num_words * math.log2(len(WORD_LIST))
-        console.print(f"  [dim]Palabras en diccionario: {len(WORD_LIST)} | Entropia base: ~{bits:.0f} bits[/dim]\n")
-        print_success(f"{len(phrases)} frases generadas.")
+        console.print(f"  [dim]Words in dictionary: {len(WORD_LIST)} | Base entropy: ~{bits:.0f} bits[/dim]\n")
+        print_success(f"{len(phrases)} passphrases generated.")
 
 
 def run_evaluate_strength(password: str, check_breach: bool = True) -> None:
-    """Evalua y muestra la fortaleza de una contraseña, opcionalmente consulta HIBP."""
+    """
+    Evaluates and displays the strength of a password, optionally checking HIBP.
+    """
     if not password:
-        print_error("No se proporciono ninguna contraseña.")
+        print_error("No password provided.")
         return
 
     result = evaluate_strength(password)
     display_strength(result)
 
     if check_breach:
-        console.print("[dim]🔍 Consultando HaveIBeenPwned (k-anonymity, no se envía tu contraseña)…[/dim]")
+        console.print("[dim]🔍 Querying HaveIBeenPwned (k-anonymity, your password is not sent)…[/dim]")
         count = check_pwned(password)
         if count is None:
-            print_warning("No se pudo verificar contra HaveIBeenPwned (sin red / sin requests).")
+            print_warning("Could not check HaveIBeenPwned (no connection or request error).")
         elif count == 0:
-            print_success("✓ No aparece en filtraciones conocidas.")
+            print_success("✓ Does not appear in known data breaches.")
         else:
             print_error(
-                f"⚠ Apareció en {count:,} filtraciones. ¡No uses esta contraseña!"
+                f"⚠ Appeared in {count:,} data breaches. Do not use this password!"
             )
 
 
 def run_copy_password(password: str) -> None:
-    """Copy a generated password to the clipboard."""
+    """
+    Copies a password to the system clipboard.
+    """
     if copy_to_clipboard(password):
-        print_success("Contraseña copiada al portapapeles.")
+        print_success("Password copied to clipboard.")
     else:
         print_warning(
-            "No se pudo copiar al portapapeles (instala 'termux-api', 'xclip', 'wl-copy', 'pbcopy' o 'clip')."
+            "Could not copy to clipboard (ensure 'termux-api', 'xclip', 'wl-copy', 'pbcopy' or 'clip' is installed)."
         )

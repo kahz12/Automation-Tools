@@ -6,9 +6,13 @@ import sys
 from automation_tools.core.logger import console, print_error, print_step, print_success
 from automation_tools.core.config import get_downloads_folder
 
+# --- YouTube Downloader Tool ---
+# This tool uses the 'yt-dlp' library to download videos or extract audio from YouTube.
+# It supports individual videos, playlists, and can resume interrupted downloads.
+
 
 def _is_playlist(url: str) -> bool:
-    """Best-effort detection of playlist URLs."""
+    """Detects if a given URL points to a YouTube playlist."""
     return "playlist" in url.lower() or "list=" in url.lower()
 
 
@@ -18,10 +22,12 @@ def run_youtube_downloader(
     playlist: bool = False,
     resume: bool = True,
 ) -> None:
-    """Download video/audio using yt-dlp. Supports playlists and resume.
-
-    - `playlist=True`: enables playlist download; otherwise auto-detected.
-    - `resume=True`: yt-dlp reanuda descargas parciales y salta ya descargados.
+    """
+    Core download function:
+    - Sets up the output directory (defaults to system Downloads).
+    - Configures yt-dlp commands for video (MP4) or audio (MP3).
+    - Handles playlist organization into subfolders.
+    - Implements an archive file to skip previously downloaded content.
     """
     output_dir = get_downloads_folder()
 
@@ -30,11 +36,12 @@ def run_youtube_downloader(
 
     is_playlist = playlist or _is_playlist(url)
 
-    print_step(f"Preparando descarga en: [bold]{output_dir}[/bold]")
+    print_step(f"Preparing download in: [bold]{output_dir}[/bold]")
     if is_playlist:
-        print_step("📚 Modo Playlist activado.")
+        print_step("📚 Playlist mode activated.")
 
-    # For playlists, group videos into a subfolder per playlist.
+    # File naming template: 
+    # For playlists, it creates a folder named after the playlist.
     if is_playlist:
         output_template = os.path.join(
             output_dir, '%(playlist_title)s', '%(playlist_index)03d - %(title)s.%(ext)s'
@@ -42,12 +49,13 @@ def run_youtube_downloader(
     else:
         output_template = os.path.join(output_dir, '%(title)s.%(ext)s')
 
+    # Construct the yt-dlp command.
     cmd = [sys.executable, '-m', 'yt_dlp']
 
-    # Resume + skip already downloaded.
+    # Configuration for resuming and skipping duplicates.
     if resume:
         cmd.extend(['--continue', '--no-overwrites'])
-        # Archive file lets re-runs skip videos previously completed.
+        # Archive file ensures that re-running the same URL skips videos that are already finished.
         archive = os.path.join(output_dir, '.yt_archive.txt')
         cmd.extend(['--download-archive', archive])
 
@@ -57,14 +65,15 @@ def run_youtube_downloader(
         cmd.append('--no-playlist')
 
     if mode == 'audio':
-        print_step("Modo: Audio (MP3)")
+        print_step("Mode: Audio (MP3)")
         cmd.extend([
-            '-x',
-            '--audio-format', 'mp3',
-            '--audio-quality', '0',
+            '-x',                       # Extract audio.
+            '--audio-format', 'mp3',    # Set format to MP3.
+            '--audio-quality', '0',     # Set to best quality.
         ])
     else:
-        print_step("Modo: Video (Maxima resolucion)")
+        print_step("Mode: Video (Max Resolution)")
+        # Request best MP4 video or best overall if MP4 isn't available.
         cmd.extend([
             '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         ])
@@ -73,26 +82,28 @@ def run_youtube_downloader(
 
     console.print(f"[cyan]{'-' * 50}[/cyan]")
     try:
+        # Run the command in a subprocess.
         subprocess.run(cmd, check=True)
         console.print(f"[cyan]{'-' * 50}[/cyan]")
-        print_success("¡Descarga completada exitosamente!")
+        print_success("Download completed successfully!")
     except subprocess.CalledProcessError as e:
         console.print(f"[cyan]{'-' * 50}[/cyan]")
-        print_error(f"Error durante la descarga (codigo {e.returncode})")
+        print_error(f"Error during download (code {e.returncode})")
         if resume:
-            console.print("[dim]💡 Si la descarga quedó a medias, vuelve a ejecutar: "
-                          "se reanudará automáticamente desde donde quedó.[/dim]")
+            console.print("[dim]💡 If the download was interrupted, run it again: "
+                          "it will automatically resume where it left off.[/dim]")
     except FileNotFoundError:
         console.print(f"[cyan]{'-' * 50}[/cyan]")
-        print_error("No se encontró 'yt-dlp'. Asegúrate de tenerlo instalado (pip install yt-dlp).")
+        print_error("'yt-dlp' not found. Please ensure it is installed (pip install yt-dlp).")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Descargador de YouTube (Video/Audio)")
-    parser.add_argument("url", help="URL del video o playlist")
-    parser.add_argument("--mode", choices=['video', 'audio'], default='video', help="Formato de descarga")
-    parser.add_argument("--playlist", action="store_true", help="Forzar modo playlist")
-    parser.add_argument("--no-resume", action="store_true", help="Desactivar reanudación/skip archivo")
+    """CLI entry point for the YouTube Downloader."""
+    parser = argparse.ArgumentParser(description="YouTube Downloader (Video/Audio)")
+    parser.add_argument("url", help="URL of the video or playlist")
+    parser.add_argument("--mode", choices=['video', 'audio'], default='video', help="Download format")
+    parser.add_argument("--playlist", action="store_true", help="Force playlist mode")
+    parser.add_argument("--no-resume", action="store_true", help="Disable resume/archive skip")
     args = parser.parse_args()
 
     run_youtube_downloader(args.url, args.mode, playlist=args.playlist, resume=not args.no_resume)

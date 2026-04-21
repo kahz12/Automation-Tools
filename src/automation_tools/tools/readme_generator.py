@@ -8,7 +8,7 @@ from automation_tools.core.logger import console, print_error, print_step, print
 from automation_tools.tools.gemini_utils import get_gemini_client, generate_content
 
 
-# File extensions → language name.
+# Mapping of file extensions to their respective programming languages
 LANG_EXTENSIONS: Dict[str, str] = {
     ".py": "Python",
     ".js": "JavaScript",
@@ -33,7 +33,7 @@ LANG_EXTENSIONS: Dict[str, str] = {
     ".clj": "Clojure",
 }
 
-# Signal files that indicate a specific stack (stronger than extensions).
+# Signal files that indicate a specific project stack (stronger indicator than extensions)
 STACK_MARKERS: List[Tuple[str, str]] = [
     ("pyproject.toml", "Python"),
     ("requirements.txt", "Python"),
@@ -51,21 +51,33 @@ STACK_MARKERS: List[Tuple[str, str]] = [
 
 
 def detect_primary_language(directory: str) -> Optional[str]:
-    """Detect the dominant language by counting source files + stack markers."""
+    """
+    Detects the dominant programming language by counting source files and checking stack markers.
+    
+    Args:
+        directory (str): The project root directory.
+        
+    Returns:
+        Optional[str]: The detected language name or None.
+    """
     stack_hits: List[str] = []
     ext_counter: Counter = Counter()
 
     for root, dirs, files in os.walk(directory):
+        # Prune common non-source directories
         dirs[:] = [d for d in dirs if d not in ('.git', 'venv', '.venv', 'node_modules', '__pycache__', 'dist', 'build')]
         for f in files:
+            # Check for stack markers (like package.json)
             if any(f == marker for marker, _ in STACK_MARKERS):
                 for marker, lang in STACK_MARKERS:
                     if f == marker:
                         stack_hits.append(lang)
+            # Count extensions
             ext = os.path.splitext(f)[1].lower()
             if ext in LANG_EXTENSIONS:
                 ext_counter[LANG_EXTENSIONS[ext]] += 1
 
+    # Stack markers have priority over file counts
     if stack_hits:
         return Counter(stack_hits).most_common(1)[0][0]
     if ext_counter:
@@ -74,13 +86,23 @@ def detect_primary_language(directory: str) -> Optional[str]:
 
 
 def get_project_tree(directory: str, ignore_dirs: Optional[List[str]] = None) -> str:
-    """Genera una representacion en texto del arbol de directorios."""
+    """
+    Generates a text-based tree representation of the directory structure.
+    
+    Args:
+        directory (str): The directory to map.
+        ignore_dirs (Optional[List[str]]): List of directories to skip.
+        
+    Returns:
+        str: A string representing the project tree.
+    """
     if ignore_dirs is None:
         ignore_dirs = ['.git', '__pycache__', 'venv', 'env', 'node_modules', '.idea', '.vscode', '.venv']
 
     tree_str = f"{os.path.basename(os.path.abspath(directory))}/\n"
 
     for root, dirs, files in os.walk(directory):
+        # Filter out ignored directories
         dirs[:] = [d for d in dirs if d not in ignore_dirs]
         level = root.replace(directory, '').count(os.sep)
         indent = '│   ' * level
@@ -96,7 +118,16 @@ def get_project_tree(directory: str, ignore_dirs: Optional[List[str]] = None) ->
 
 
 def read_key_files(directory: str, max_files: int = 10) -> str:
-    """Lee el contenido de archivos clave para entender el proyecto."""
+    """
+    Reads the content of key files to provide context for project analysis.
+    
+    Args:
+        directory (str): Project root directory.
+        max_files (int): Maximum number of files to read to avoid hitting token limits.
+        
+    Returns:
+        str: Concatenated content of key project files.
+    """
     key_extensions = ['.py', '.js', '.html', '.md', '.json', '.txt', '.sh', '.yml', '.yaml', '.ts', '.go', '.rs', '.cpp', '.h', '.java']
     important_files = ['requirements.txt', 'package.json', 'Dockerfile', 'main.py', 'app.py', 'index.js', 'cargo.toml', 'go.mod']
 
@@ -117,8 +148,9 @@ def read_key_files(directory: str, max_files: int = 10) -> str:
 
                 try:
                     with open(filepath, 'r', encoding='utf-8') as file:
+                        # Read up to 10KB per file
                         file_content = file.read(10240)
-                        content += f"\n--- Contenido de {f} ---\n{file_content}\n"
+                        content += f"\n--- Content of {f} ---\n{file_content}\n"
                         files_read += 1
                 except Exception:
                     pass
@@ -130,7 +162,15 @@ def read_key_files(directory: str, max_files: int = 10) -> str:
 
 
 def generate_toc(markdown: str) -> str:
-    """Build a GitHub-flavored TOC from ## / ### headings in the markdown."""
+    """
+    Builds a GitHub-flavored Table of Contents (TOC) from ## and ### headings.
+    
+    Args:
+        markdown (str): The README content.
+        
+    Returns:
+        str: A markdown string containing the TOC.
+    """
     lines = markdown.splitlines()
     toc: List[str] = []
     for line in lines:
@@ -139,6 +179,7 @@ def generate_toc(markdown: str) -> str:
             continue
         level = len(m.group(1))
         title = m.group(2).strip()
+        # Skip self-referencing TOC titles
         if title.lower() in ("tabla de contenidos", "tabla de contenido", "contents", "toc"):
             continue
         slug = re.sub(r"[^\w\s-]", "", title).strip().lower().replace(" ", "-")
@@ -146,11 +187,13 @@ def generate_toc(markdown: str) -> str:
         toc.append(f"{indent}- [{title}](#{slug})")
     if not toc:
         return ""
-    return "## Tabla de contenidos\n\n" + "\n".join(toc) + "\n"
+    return "## Table of Contents\n\n" + "\n".join(toc) + "\n"
 
 
 def _inject_toc(markdown: str) -> str:
-    """Insert a TOC right after the first H1 title (or at the top)."""
+    """
+    Inserts a Table of Contents right after the first H1 title.
+    """
     toc = generate_toc(markdown)
     if not toc:
         return markdown
@@ -160,67 +203,76 @@ def _inject_toc(markdown: str) -> str:
         if line.startswith("# "):
             insert_at = i + 1
             break
-    # Skip a blank line after H1 if present.
+    # Add a blank line if necessary
     if insert_at < len(lines) and lines[insert_at].strip() == "":
         insert_at += 1
     return "\n".join(lines[:insert_at] + ["", toc] + lines[insert_at:])
 
 
 def run_readme_generator(directory: str, api_key: Optional[str] = None, out_path: str = "README_generado.md") -> None:
-    """Analiza el proyecto y usa Gemini para generar el README con TOC."""
+    """
+    Analyzes a project and uses Gemini AI to generate a comprehensive README.md.
+    
+    Args:
+        directory (str): The project directory.
+        api_key (Optional[str]): Google API key.
+        out_path (str): The destination file path.
+    """
     if not os.path.isdir(directory):
-        print_error(f"El directorio '{directory}' no existe.")
+        print_error(f"The directory '{directory}' does not exist.")
         return
 
     client = get_gemini_client(api_key)
     if not client:
         return
 
-    print_step(f"Analizando proyecto en: {directory}...")
-    language = detect_primary_language(directory) or "no identificado"
-    console.print(f"[dim]Lenguaje principal detectado: [bold]{language}[/bold][/dim]")
+    print_step(f"Analyzing project at: {directory}...")
+    language = detect_primary_language(directory) or "unidentified"
+    console.print(f"[dim]Primary language detected: [bold]{language}[/bold][/dim]")
 
     tree = get_project_tree(directory)
     code_context = read_key_files(directory)
 
-    print_step("Enviando contexto a Gemini...")
+    print_step("Sending context to Gemini...")
 
+    # Language-specific setup hints
     lang_hint = ""
     if language.lower().startswith("python"):
-        lang_hint = "Incluye sección de entorno virtual (venv) y `pip install -r requirements.txt`."
+        lang_hint = "Include virtual environment (venv) and `pip install -r requirements.txt` section."
     elif "node" in language.lower() or "javascript" in language.lower() or "typescript" in language.lower():
-        lang_hint = "Incluye comandos `npm install` / `npm run` según los scripts de package.json."
+        lang_hint = "Include `npm install` / `npm run` commands based on package.json scripts."
     elif "rust" in language.lower():
-        lang_hint = "Incluye comandos `cargo build` y `cargo run`."
+        lang_hint = "Include `cargo build` and `cargo run` commands."
     elif "go" in language.lower():
-        lang_hint = "Incluye comandos `go build` y `go run ./...`."
+        lang_hint = "Include `go build` and `go run ./...` commands."
     elif "java" in language.lower():
-        lang_hint = "Incluye comandos de Maven/Gradle según corresponda."
+        lang_hint = "Include Maven/Gradle commands as appropriate."
 
-    instruction = f"""Eres un desarrollador experto. Escribe un README.md completo, profesional y bien estructurado (en español) para el siguiente proyecto.
+    instruction = f"""You are an expert developer. Write a complete, professional, and well-structured README.md (in Spanish) for the following project.
 
-El lenguaje principal del proyecto es: {language}. {lang_hint}
+Primary language: {language}. {lang_hint}
 
-Usa la estructura de carpetas y los fragmentos de código para entender de qué se trata, qué hace, cómo se instala y cómo se usa.
+Use the folder structure and code snippets to understand the project's purpose, functionality, installation, and usage.
 
-El README debe contener:
-1. Título y descripción corta (qué hace el proyecto)
-2. Características principales (viñetas)
-3. Requisitos previos e instalación (comandos paso a paso, adaptados al lenguaje)
-4. Uso (con ejemplos de comandos)
-5. Estructura del proyecto (usando un árbol)
+The README must contain:
+1. Title and short description (what the project does)
+2. Main features (bullet points)
+3. Prerequisites and installation (step-by-step commands)
+4. Usage (with command examples)
+5. Project structure (using a tree)
 
-Instrucciones finales:
-- Devuelve ÚNICAMENTE el código Markdown del README.
-- No incluyas comentarios iniciales introductorios.
-- NO envuelvas tu respuesta en un bloque ```markdown (solo entrega el Markdown raw).
-- NO incluyas una tabla de contenidos: se agregará automáticamente después."""
+Final instructions:
+- Return ONLY the Markdown code for the README.
+- Do not include introductory comments.
+- DO NOT wrap your response in ```markdown blocks (just raw Markdown).
+- DO NOT include a table of contents; it will be added automatically."""
 
-    prompt = f"Estructura de Carpetas (arbol real):\n{tree}\n\nCódigo y Archivos Clave:\n{code_context[:50000]}"
+    prompt = f"Folder Structure (real tree):\n{tree}\n\nCode and Key Files:\n{code_context[:50000]}"
 
     readme_content = generate_content(client, prompt, system_instruction=instruction)
 
     if readme_content:
+        # Clean up potential markdown blocks if AI ignored instructions
         if readme_content.startswith("```markdown"):
             readme_content = readme_content[11:]
         elif readme_content.startswith("```"):
@@ -235,16 +287,19 @@ Instrucciones finales:
         try:
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write(readme_content)
-            print_success(f"README generado y guardado en: {out_path}")
+            print_success(f"README generated and saved at: {out_path}")
         except Exception as e:
-            print_error(f"Error al guardar el archivo: {e}")
+            print_error(f"Error saving file: {e}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generador Automatico de README con IA")
-    parser.add_argument("directory", help="Directorio del proyecto a analizar")
-    parser.add_argument("--key", help="API Key de Google (opcional si esta en env GOOGLE_API_KEY)")
-    parser.add_argument("--out", default="README_generado.md", help="Archivo de salida")
+    """
+    Main entry point for the README generator CLI.
+    """
+    parser = argparse.ArgumentParser(description="AI-powered Automatic README Generator")
+    parser.add_argument("directory", help="Project directory to analyze")
+    parser.add_argument("--key", help="Google API Key (optional if in GOOGLE_API_KEY env)")
+    parser.add_argument("--out", default="README_generado.md", help="Output file path")
     args = parser.parse_args()
 
     run_readme_generator(args.directory, args.key, args.out)

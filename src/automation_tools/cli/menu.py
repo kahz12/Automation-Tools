@@ -18,14 +18,17 @@ from automation_tools.core.logger import (
 )
 from automation_tools.core.config import load_environment, get_env_var, get_project_root
 
-# ---------------------------------------------------------------------------
-# History of recently-used tools (persisted across runs).
-# ---------------------------------------------------------------------------
+# --- CLI Menu & Interaction Module ---
+# This module implements the interactive Command Line Interface (CLI) for the project.
+# It manages tool navigation, user input prompts, and a history of recently used tools.
+
+# Path to the file that stores the most recently used tools.
 HISTORY_FILE = os.path.join(get_project_root(), ".menu_history.json")
 HISTORY_MAX = 5
 
 
 def _load_history() -> list:
+    """Loads the list of recently used tool names from a local JSON file."""
     try:
         with open(HISTORY_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -34,6 +37,7 @@ def _load_history() -> list:
 
 
 def _save_history(names: list) -> None:
+    """Saves the list of recently used tool names to a local JSON file."""
     try:
         with open(HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(names[:HISTORY_MAX], f)
@@ -42,10 +46,12 @@ def _save_history(names: list) -> None:
 
 
 def _record_use(name: str) -> None:
+    """Updates the history by adding the last used tool to the top of the list."""
     history = [n for n in _load_history() if n != name]
     history.insert(0, name)
     _save_history(history)
 
+# Import individual tool wrappers.
 from automation_tools.tools import (
     renamer,
     monitor,
@@ -63,67 +69,78 @@ from automation_tools.tools import (
 
 
 # ---------------------------------------------------------------------------
-# Shared questionary helpers (every prompt uses the same palette/style).
+# Shared questionary helpers (standardized prompts for consistency).
 # ---------------------------------------------------------------------------
 QSTYLE = question_style()
 
 
 def ask_select(message, choices, **kwargs):
+    """Shows a selection list to the user."""
     return questionary.select(message, choices=choices, style=QSTYLE, **kwargs).ask()
 
 
 def ask_text(message, **kwargs):
+    """Prompts the user for a text string."""
     return questionary.text(message, style=QSTYLE, **kwargs).ask()
 
 
 def ask_path(message, **kwargs):
+    """Prompts the user for a file or directory path."""
     return questionary.path(message, style=QSTYLE, **kwargs).ask()
 
 
 def ask_confirm(message, default=False, **kwargs):
+    """Prompts the user for a Yes/No confirmation."""
     return questionary.confirm(message, default=default, style=QSTYLE, **kwargs).ask()
 
 
 def ask_password(message, **kwargs):
+    """Prompts the user for sensitive input (hidden text)."""
     return questionary.password(message, style=QSTYLE, **kwargs).ask()
 
 
 def press_any_key():
+    """Pauses execution until the user presses a key."""
     print_rule()
     questionary.press_any_key_to_continue(style=QSTYLE).ask()
 
 
 def error_boundary(func):
-    """Decorator to catch exceptions gracefully in menu selections."""
+    """
+    Decorator that wraps tool execution to catch and display errors gracefully.
+    Prevents the entire application from crashing on tool-specific failures.
+    """
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except KeyboardInterrupt:
-            console.print("\n[bold red]Ejecución interrumpida.[/bold red]")
+            console.print("\n[bold red]Execution interrupted.[/bold red]")
         except Exception as e:
-            print_error(f"Ocurrió un error inesperado: {e}")
+            print_error(f"An unexpected error occurred: {e}")
         finally:
             press_any_key()
     return wrapper
 
 
 # ---------------------------------------------------------------------------
-# Tool screens
+# Tool-specific menu screens (Workflow definitions)
 # ---------------------------------------------------------------------------
+
 @error_boundary
 def menu_renombrador():
-    print_section("Renombrador Masivo", "Renombra lotes de archivos con patrones, fechas o reemplazos", "✂️")
+    """Screen for the Massive Renamer tool."""
+    print_section("Massive Renamer", "Rename batches of files using patterns, dates, or text replacement", "✂️")
 
-    directory = ask_path("¿Qué carpeta quieres procesar?")
+    directory = ask_path("Which folder do you want to process?")
     if not directory:
         return
 
     mode = ask_select(
-        "¿Qué modo quieres usar?",
+        "Which mode do you want to use?",
         choices=[
-            Choice("🔢  Patrón (ej: foto_001.jpg)", "patron"),
-            Choice("📅  Fecha (ej: 2024-01-01_archivo.jpg)", "fecha"),
-            Choice("🔁  Reemplazo de texto (ej: borrar 'copia de')", "reemplazo"),
+            Choice("🔢  Pattern (e.g., photo_001.jpg)", "patron"),
+            Choice("📅  Date (e.g., 2024-01-01_file.jpg)", "fecha"),
+            Choice("🔁  Text replacement (e.g., remove 'copy of')", "reemplazo"),
         ],
     )
     if not mode:
@@ -136,37 +153,37 @@ def menu_renombrador():
         detected, count, max_index = renamer.detect_dominant_pattern(directory)
         if detected:
             console.print(
-                f"[dim]Se detectó el patrón existente '{detected}' "
-                f"({count} archivo(s), índice máx: {max_index}).[/dim]"
+                f"[dim]Detected existing pattern '{detected}' "
+                f"({count} file(s), max index: {max_index}).[/dim]"
             )
             if ask_confirm(
-                f"¿Continuar con este patrón desde {max_index + 1}? (No = usar un patrón nuevo)",
+                f"Continue with this pattern from {max_index + 1}? (No = use a new pattern)",
                 default=True,
             ):
                 pattern = detected
             else:
-                print_footer_tip("Usa '{:03d}' para numeración con ceros a la izquierda (001, 002...)")
-                pattern = ask_text("Ingresa el nuevo patrón (ej: 'viaje_{:03d}'):")
+                print_footer_tip("Use '{:03d}' for zero-padded numbering (001, 002...)")
+                pattern = ask_text("Enter the new pattern (e.g., 'trip_{:03d}'):")
                 if not pattern:
                     return
         else:
-            print_footer_tip("Usa '{:03d}' para numeración con ceros a la izquierda (001, 002...)")
-            pattern = ask_text("Ingresa el patrón (ej: 'viaje_{:03d}'):")
+            print_footer_tip("Use '{:03d}' for zero-padded numbering (001, 002...)")
+            pattern = ask_text("Enter the pattern (e.g., 'trip_{:03d}'):")
             if not pattern:
                 return
     elif mode == "fecha":
-        keep = ask_confirm("¿Mantener nombre original como sufijo?")
+        keep = ask_confirm("Keep original name as suffix?")
     elif mode == "reemplazo":
-        old_text = ask_text("Texto a buscar:")
+        old_text = ask_text("Text to find:")
         if not old_text:
             return
-        new_text = ask_text("Texto nuevo (deja vacío para borrar):")
+        new_text = ask_text("New text (leave empty to delete):")
 
-    ext = ask_text("Filtrar por extensión (opcional, ej: .jpg):")
-    apply_changes = ask_confirm("¿Aplicar cambios reales? (No = solo simulación)")
+    ext = ask_text("Filter by extension (optional, e.g., .jpg):")
+    apply_changes = ask_confirm("Apply real changes? (No = simulation only)")
     preview = False
     if apply_changes:
-        preview = ask_confirm("¿Confirmar cambios antes de aplicar (preview)?", default=True)
+        preview = ask_confirm("Confirm changes before applying (preview)?", default=True)
 
     renamer.run_massive_rename(
         directory=directory,
@@ -183,14 +200,15 @@ def menu_renombrador():
 
 @error_boundary
 def menu_monitor():
-    print_section("Monitor de Precios", "Rastrea precios en MercadoLibre y Amazon", "💰")
+    """Screen for the Price Monitor tool."""
+    print_section("Price Monitor", "Track prices on MercadoLibre and Amazon", "💰")
 
     action = ask_select(
-        "¿Qué quieres hacer?",
+        "What do you want to do?",
         choices=[
-            Choice("⚡  Ejecutar un chequeo ahora mismo", "now"),
-            Choice("🔁  Iniciar monitoreo continuo (cada hora)", "loop"),
-            Choice("📝  Ver configuración (archivo)", "config"),
+            Choice("⚡  Run a check right now", "now"),
+            Choice("🔁  Start continuous monitoring (hourly)", "loop"),
+            Choice("📝  View configuration (file)", "config"),
         ],
     )
     if not action:
@@ -202,22 +220,24 @@ def menu_monitor():
         monitor.run_continuous_monitor()
     elif action == "config":
         config_path = os.path.join(get_project_root(), "productos_a_monitorear.json")
-        console.print(f"📄 Archivo de configuración: [link=file://{config_path}]{config_path}[/link]")
+        console.print(f"📄 Config file: [link=file://{config_path}]{config_path}[/link]")
 
 
 def check_api_key() -> Optional[str]:
+    """Helper to ensure the Google API Key is available for AI tools."""
     api_key = get_env_var("GOOGLE_API_KEY")
     if not api_key:
-        print_warning("No se detectó GOOGLE_API_KEY en variables de entorno.")
-        api_key = ask_password("Ingresa tu Google API Key:")
+        print_warning("GOOGLE_API_KEY not detected in environment variables.")
+        api_key = ask_password("Enter your Google API Key:")
     return api_key
 
 
 @error_boundary
 def menu_resumidor():
-    print_section("Resumidor con IA", "Genera un resumen ejecutivo de PDF o TXT con Gemini", "📝")
+    """Screen for the AI Summarizer tool."""
+    print_section("AI Summarizer", "Generate an executive summary of PDF or TXT files with Gemini", "📝")
 
-    filepath = ask_path("Selecciona el archivo PDF o TXT:")
+    filepath = ask_path("Select the PDF or TXT file:")
     if not filepath:
         return
 
@@ -226,32 +246,33 @@ def menu_resumidor():
         return
 
     out_path = None
-    if ask_confirm("¿Guardar resumen en archivo?"):
-        out_path = os.path.splitext(filepath)[0] + "_resumen.txt"
-        console.print(f"[dim]Se guardará en: {out_path}[/dim]")
+    if ask_confirm("Save summary to a file?"):
+        out_path = os.path.splitext(filepath)[0] + "_summary.txt"
+        console.print(f"[dim]Will be saved to: {out_path}[/dim]")
 
     summarizer.run_summarizer(filepath=filepath, api_key=api_key, out_path=out_path)
 
 
 @error_boundary
 def menu_convertir():
-    print_section("Convertidor de Imágenes", "Cambia de formato (png, jpg, webp, …) o PDF→imagen", "🖼️")
+    """Screen for the Image Converter tool."""
+    print_section("Image Converter", "Change format (png, jpg, webp, …) or render PDF to images", "🖼️")
 
     action = ask_select(
-        "¿Qué quieres hacer?",
+        "What do you want to do?",
         choices=[
-            Choice("🖼️   Convertir imagen o carpeta", "img"),
-            Choice("📄  Renderizar PDF a imágenes", "pdf"),
+            Choice("🖼️   Convert image or folder", "img"),
+            Choice("📄  Render PDF to images", "pdf"),
         ],
     )
     if not action:
         return
 
     if action == "pdf":
-        pdf_path = ask_path("Selecciona el PDF a renderizar:")
+        pdf_path = ask_path("Select the PDF to render:")
         if not pdf_path:
             return
-        fmt = ask_select("Formato de salida:", choices=["png", "jpg", "webp"]) or "png"
+        fmt = ask_select("Output format:", choices=["png", "jpg", "webp"]) or "png"
         dpi_raw = ask_text("DPI:", default="200")
         try:
             dpi = max(50, min(600, int(dpi_raw or "200")))
@@ -260,12 +281,12 @@ def menu_convertir():
         converter.run_pdf_to_image(pdf_path, fmt, dpi=dpi)
         return
 
-    img_path = ask_path("Selecciona la imagen o carpeta a convertir:")
+    img_path = ask_path("Select the image or folder to convert:")
     if not img_path:
         return
 
     fmt = ask_select(
-        "Selecciona el formato de salida:",
+        "Select output format:",
         choices=["png", "jpg", "webp", "tiff", "bmp", "gif"],
     )
     if not fmt:
@@ -273,7 +294,7 @@ def menu_convertir():
 
     quality = 85
     if fmt in ("jpg", "jpeg", "webp"):
-        raw = ask_text("Calidad (1-100):", default="85")
+        raw = ask_text("Quality (1-100):", default="85")
         try:
             quality = max(1, min(100, int(raw or "85")))
         except ValueError:
@@ -284,30 +305,32 @@ def menu_convertir():
 
 @error_boundary
 def menu_convertir_pdf():
-    print_section("Convertir a PDF", "Transforma documentos Office a PDF con LibreOffice", "📄")
+    """Screen for the Office-to-PDF Converter tool."""
+    print_section("Convert to PDF", "Transform Office documents to PDF using LibreOffice", "📄")
 
-    filepath = ask_path("Selecciona el archivo a convertir (ej: .docx, .odt, .pptx):")
+    filepath = ask_path("Select the file to convert (e.g., .docx, .odt, .pptx):")
     if filepath:
         converter.run_pdf_converter(filepath)
 
 
 @error_boundary
 def menu_traductor():
-    print_section("Traductor de Archivos", "Traduce texto, subtítulos o código con Gemini", "🌐")
+    """Screen for the AI Translator tool."""
+    print_section("File Translator", "Translate text, subtitles, or code using Gemini", "🌐")
 
-    filepath = ask_path("Selecciona el archivo a traducir:")
+    filepath = ask_path("Select the file to translate:")
     if not filepath:
         return
 
     lang = ask_select(
-        "Idioma destino:",
-        choices=["Ingles", "Espanol", "Frances", "Portugues", "Aleman", "Italiano", "Otro"],
+        "Target language:",
+        choices=["English", "Spanish", "French", "Portuguese", "German", "Italian", "Other"],
     )
     if not lang:
         return
 
-    if lang == "Otro":
-        lang = ask_text("Escribe el idioma destino:")
+    if lang == "Other":
+        lang = ask_text("Type the target language:")
         if not lang:
             return
 
@@ -316,32 +339,33 @@ def menu_traductor():
         return
 
     out_path = None
-    if ask_confirm("¿Guardar traducción en archivo?"):
+    if ask_confirm("Save translation to a file?"):
         base = os.path.splitext(filepath)[0]
         ext = os.path.splitext(filepath)[1]
         out_path = f"{base}_{lang.lower()}{ext}"
-        console.print(f"[dim]Se guardará en: {out_path}[/dim]")
+        console.print(f"[dim]Will be saved to: {out_path}[/dim]")
 
     translator.run_translator(filepath=filepath, target_lang=lang.lower(), api_key=api_key, out_path=out_path)
 
 
 @error_boundary
 def menu_detector_duplicados():
-    print_section("Detector de Duplicados", "Encuentra archivos idénticos por contenido (MD5)", "🧬")
-    directory = ask_path("¿Qué carpeta quieres escanear?")
+    """Screen for the Duplicate Finder tool."""
+    print_section("Duplicate Detector", "Find identical files by content (MD5 hash)", "🧬")
+    directory = ask_path("Which folder do you want to scan?")
     if not directory:
         return
 
     exclude_raw = ask_text(
-        "Patrones glob a excluir (coma-separados, opcional, ej: '*.tmp,backup_*'):"
+        "Glob patterns to exclude (comma-separated, optional, e.g., '*.tmp,backup_*'):"
     )
     excludes = [p.strip() for p in exclude_raw.split(",") if p.strip()] if exclude_raw else None
 
     export_path = None
-    if ask_confirm("¿Exportar reporte CSV de duplicados?", default=False):
-        export_path = ask_text("Ruta del archivo CSV:", default="duplicados.csv") or "duplicados.csv"
+    if ask_confirm("Export CSV report of duplicates?", default=False):
+        export_path = ask_text("CSV file path:", default="duplicates.csv") or "duplicates.csv"
 
-    delete = ask_confirm("¿Eliminar duplicados automáticamente (conservando el original)?")
+    delete = ask_confirm("Automatically delete duplicates (keeping one original)?")
     duplicate_finder.run_duplicate_finder(
         directory, auto_delete=delete, excludes=excludes, export_path=export_path
     )
@@ -349,15 +373,16 @@ def menu_detector_duplicados():
 
 @error_boundary
 def menu_descargador_youtube():
-    print_section("Descargador de YouTube", "Descarga videos y audios en máxima calidad", "📺")
-    url = ask_text("URL del video o playlist:")
+    """Screen for the YouTube Downloader tool."""
+    print_section("YouTube Downloader", "Download videos and audio in maximum quality", "📺")
+    url = ask_text("Video or playlist URL:")
     if not url:
         return
 
     mode = ask_select(
-        "¿Qué deseas descargar?",
+        "What do you want to download?",
         choices=[
-            Choice("🎬  Video (MP4 alta calidad)", "video"),
+            Choice("🎬  Video (High Quality MP4)", "video"),
             Choice("🎵  Audio (MP3)", "audio"),
         ],
     )
@@ -368,15 +393,16 @@ def menu_descargador_youtube():
     is_playlist = "list=" in url or "playlist" in url.lower()
     playlist = False
     if is_playlist:
-        playlist = ask_confirm("Detectamos una playlist. ¿Descargar todos los videos?", default=True)
+        playlist = ask_confirm("Playlist detected. Download all videos?", default=True)
 
     youtube_downloader.run_youtube_downloader(url, mode, playlist=playlist)
 
 
 @error_boundary
 def menu_generador_readme():
-    print_section("Generador de README (IA)", "Analiza un proyecto y redacta su README con Gemini", "📘")
-    directory = ask_path("¿Carpeta del proyecto a analizar?")
+    """Screen for the AI README Generator tool."""
+    print_section("README Generator (AI)", "Analyze a project and draft its README using Gemini", "📘")
+    directory = ask_path("Project folder to analyze?")
     if not directory:
         return
 
@@ -389,20 +415,21 @@ def menu_generador_readme():
 
 @error_boundary
 def menu_extractor_metadata():
-    print_section("Extractor de Metadatos", "Revela EXIF de imágenes e info de PDFs", "🔎")
-    filepath = ask_path("¿Archivo a escrutar (PDF, JPG, PNG, etc)?")
+    """Screen for the Metadata Extractor tool."""
+    print_section("Metadata Extractor", "Reveal EXIF data from images and PDF information", "🔎")
+    filepath = ask_path("File to inspect (PDF, JPG, PNG, etc)?")
     if not filepath:
         return
 
     export_path = None
-    if ask_confirm("¿Exportar metadatos a archivo (JSON/CSV)?", default=False):
-        export_path = ask_text("Ruta de salida (usa .json o .csv):", default="metadata.json")
+    if ask_confirm("Export metadata to a file (JSON/CSV)?", default=False):
+        export_path = ask_text("Output path (use .json or .csv):", default="metadata.json")
 
     clean = False
     ext = os.path.splitext(filepath)[1].lower()
     if ext in (".jpg", ".jpeg", ".png", ".tiff", ".webp", ".bmp"):
         clean = ask_confirm(
-            "¿Crear una copia sin EXIF (sin GPS ni datos de cámara)?", default=False
+            "Create a copy without EXIF (no GPS or camera data)?", default=False
         )
 
     metadata.run_metadata_extractor(filepath, export_path=export_path, clean_exif=clean)
@@ -410,14 +437,15 @@ def menu_extractor_metadata():
 
 @error_boundary
 def menu_organizar_descargas():
-    print_section("Organizar Descargas", "Mueve archivos de Downloads en subcarpetas por tipo", "📦")
+    """Screen for the Downloads Organizer tool."""
+    print_section("Organize Downloads", "Move files in Downloads into subfolders by type", "📦")
 
     action = ask_select(
-        "¿Qué quieres hacer?",
+        "What do you want to do?",
         choices=[
-            Choice("📦  Organizar ahora", "run"),
-            Choice("↩️   Revertir última organización", "undo"),
-            Choice("🗂️   Listar historial", "list"),
+            Choice("📦  Organize now", "run"),
+            Choice("↩️   Undo last organization", "undo"),
+            Choice("🗂️   List history", "list"),
         ],
     )
     if not action:
@@ -425,11 +453,11 @@ def menu_organizar_descargas():
 
     if action == "run":
         policy = ask_select(
-            "Si un archivo ya existe en la carpeta destino:",
+            "If a file already exists in the destination folder:",
             choices=[
-                Choice("📝  Renombrar (archivo_1.ext)", "rename"),
-                Choice("⏭️   Saltar", "skip"),
-                Choice("⚠️   Sobrescribir", "overwrite"),
+                Choice("📝  Rename (file_1.ext)", "rename"),
+                Choice("⏭️   Skip", "skip"),
+                Choice("⚠️   Overwrite", "overwrite"),
             ],
         ) or "rename"
         organizer.run_download_organizer(collision_policy=policy)
@@ -438,7 +466,7 @@ def menu_organizar_descargas():
     elif action == "list":
         files = organizer.list_history()
         if not files:
-            print_warning("No hay historial.")
+            print_warning("No history found.")
         else:
             for f in files:
                 console.print(f"  [dim]•[/dim] {f}")
@@ -446,39 +474,40 @@ def menu_organizar_descargas():
 
 @error_boundary
 def menu_password_generator():
-    print_section("Gestor de Contraseñas", "Genera contraseñas, frases y evalúa fortaleza", "🔐")
+    """Screen for the Password Manager tool."""
+    print_section("Password Manager", "Generate passwords, phrases, and evaluate strength", "🔐")
 
     action = ask_select(
-        "¿Qué quieres hacer?",
+        "What do you want to do?",
         choices=[
-            Choice("🎲  Generar contraseña segura", "secure"),
-            Choice("🧠  Generar frase memorable", "passphrase"),
-            Choice("🛡️   Evaluar fortaleza de contraseña", "strength"),
+            Choice("🎲  Generate secure password", "secure"),
+            Choice("🧠  Generate memorable passphrase", "passphrase"),
+            Choice("🛡️   Evaluate password strength", "strength"),
         ],
     )
     if not action:
         return
 
     if action == "secure":
-        length_str = ask_text("Longitud de la contraseña:", default="16")
+        length_str = ask_text("Password length:", default="16")
         if not length_str:
             return
         try:
             length = int(length_str)
             if length < 4:
-                print_warning("Longitud mínima ajustada a 4.")
+                print_warning("Minimum length adjusted to 4.")
                 length = 4
             elif length > 128:
-                print_warning("Longitud máxima ajustada a 128.")
+                print_warning("Maximum length adjusted to 128.")
                 length = 128
         except ValueError:
-            print_error("Longitud no válida.")
+            print_error("Invalid length.")
             return
 
-        use_special = ask_confirm("¿Incluir símbolos (!@#$%...)?", default=True)
-        exclude_ambiguous = ask_confirm("¿Excluir ambiguos (I/l/1, O/0)?", default=False)
+        use_special = ask_confirm("Include symbols (!@#$%...)?", default=True)
+        exclude_ambiguous = ask_confirm("Exclude ambiguous characters (I/l/1, O/0)?", default=False)
 
-        count_str = ask_text("¿Cuántas generar?", default="5")
+        count_str = ask_text("How many to generate?", default="5")
         count = min(max(int(count_str or "5"), 1), 20)
 
         password_generator.run_generate_password(
@@ -488,7 +517,7 @@ def menu_password_generator():
             count=count,
         )
 
-        if ask_confirm("¿Copiar la primera contraseña al portapapeles?", default=False):
+        if ask_confirm("Copy the first password to clipboard?", default=False):
             pwd = password_generator.generate_password(
                 length=length, use_special=use_special, exclude_ambiguous=exclude_ambiguous
             )
@@ -496,16 +525,16 @@ def menu_password_generator():
                 password_generator.run_copy_password(pwd)
 
     elif action == "passphrase":
-        words_str = ask_text("¿Cuántas palabras?", default="4")
+        words_str = ask_text("How many words?", default="4")
         num_words = min(max(int(words_str or "4"), 2), 10)
 
-        separator = ask_select("Separador:", choices=["-", ".", "_", " "]) or "-"
+        separator = ask_select("Separator:", choices=["-", ".", "_", " "]) or "-"
 
-        capitalize = ask_confirm("¿Capitalizar palabras?", default=True)
-        add_number = ask_confirm("¿Agregar número al final?", default=True)
-        add_special = ask_confirm("¿Agregar símbolo al final?", default=False)
+        capitalize = ask_confirm("Capitalize words?", default=True)
+        add_number = ask_confirm("Add number at the end?", default=True)
+        add_special = ask_confirm("Add symbol at the end?", default=False)
 
-        count_str = ask_text("¿Cuántas generar?", default="5")
+        count_str = ask_text("How many to generate?", default="5")
         count = min(max(int(count_str or "5"), 1), 20)
 
         password_generator.run_generate_passphrase(
@@ -518,59 +547,60 @@ def menu_password_generator():
         )
 
     elif action == "strength":
-        pwd = ask_password("Ingresa la contraseña a evaluar:")
+        pwd = ask_password("Enter the password to evaluate:")
         if pwd:
             check_breach = ask_confirm(
-                "¿Consultar HaveIBeenPwned? (k-anonymity, seguro)", default=True
+                "Check HaveIBeenPwned? (secure k-anonymity)", default=True
             )
             password_generator.run_evaluate_strength(pwd, check_breach=check_breach)
 
 
 @error_boundary
 def menu_limpiador_espacio():
-    print_section("Limpiador de Espacio", "Detecta caché, archivos grandes y antiguos (dry-run por defecto)", "🧹")
+    """Screen for the Space Cleaner tool."""
+    print_section("Space Cleaner", "Detect cache, large, and old files (dry-run by default)", "🧹")
 
-    directory = ask_path("¿Qué carpeta quieres analizar?")
+    directory = ask_path("Which folder do you want to analyze?")
     if not directory:
         return
 
     find_junk = ask_confirm(
-        "¿Buscar caché/basura (__pycache__, node_modules, .DS_Store, etc.)?", default=True
+        "Find junk/cache (__pycache__, node_modules, .DS_Store, etc.)?", default=True
     )
 
-    find_large = ask_confirm("¿Buscar archivos grandes?", default=True)
+    find_large = ask_confirm("Find large files?", default=True)
     large_mb = space_cleaner.DEFAULT_LARGE_MB
     if find_large:
-        raw = ask_text("Umbral de archivo grande (MB):", default=str(space_cleaner.DEFAULT_LARGE_MB))
+        raw = ask_text("Large file threshold (MB):", default=str(space_cleaner.DEFAULT_LARGE_MB))
         try:
             large_mb = max(1, int(raw or space_cleaner.DEFAULT_LARGE_MB))
         except ValueError:
-            print_warning("Valor no válido, usando 100 MB.")
+            print_warning("Invalid value, using 100 MB.")
 
-    find_old = ask_confirm("¿Buscar archivos antiguos?", default=True)
+    find_old = ask_confirm("Find old files?", default=True)
     old_days = space_cleaner.DEFAULT_OLD_DAYS
     if find_old:
         raw = ask_text(
-            "Umbral de antigüedad (días desde la última modificación):",
+            "Age threshold (days since last modification):",
             default=str(space_cleaner.DEFAULT_OLD_DAYS),
         )
         try:
             old_days = max(1, int(raw or space_cleaner.DEFAULT_OLD_DAYS))
         except ValueError:
-            print_warning("Valor no válido, usando 365 días.")
+            print_warning("Invalid value, using 365 days.")
 
-    apply = ask_confirm("¿Aplicar eliminación? (No = solo simulación)", default=False)
+    apply = ask_confirm("Apply deletion? (No = simulation only)", default=False)
 
     delete_all = False
     if apply:
         delete_all = ask_confirm(
-            "¿Incluir archivos grandes/antiguos en la eliminación? (solo caché si respondes No)",
+            "Include large/old files in the deletion? (only cache if you answer No)",
             default=False,
         )
 
     export_path = None
-    if ask_confirm("¿Exportar reporte de escaneo a archivo?", default=False):
-        export_path = ask_text("Ruta (.json o .csv):", default="limpieza_reporte.json")
+    if ask_confirm("Export scan report to a file?", default=False):
+        export_path = ask_text("Path (.json or .csv):", default="cleaning_report.json")
 
     space_cleaner.run_space_cleaner(
         directory=directory,
@@ -586,37 +616,37 @@ def menu_limpiador_espacio():
 
 
 # ---------------------------------------------------------------------------
-# Main menu — grouped by category with icons and separators.
+# Main menu layout — grouped by category with icons and separators.
 # ---------------------------------------------------------------------------
 MENU_ENTRIES = [
-    ("📂  Archivos", [
-        ("✂️   Renombrador Masivo",      menu_renombrador),
-        ("📦  Organizar Descargas",      menu_organizar_descargas),
-        ("🧬  Detector de Duplicados",   menu_detector_duplicados),
-        ("🧹  Limpiador de Espacio",     menu_limpiador_espacio),
+    ("📂  Files", [
+        ("✂️   Massive Renamer",      menu_renombrador),
+        ("📦  Organize Downloads",      menu_organizar_descargas),
+        ("🧬  Duplicate Detector",   menu_detector_duplicados),
+        ("🧹  Space Cleaner",     menu_limpiador_espacio),
     ]),
-    ("🔄  Conversión", [
-        ("🖼️   Convertir Imagen",         menu_convertir),
-        ("📄  Convertir a PDF",           menu_convertir_pdf),
+    ("🔄  Conversion", [
+        ("🖼️   Image Converter",         menu_convertir),
+        ("📄  Convert to PDF",           menu_convertir_pdf),
     ]),
-    ("🧠  IA (Gemini)", [
-        ("📝  Resumidor de Documentos",   menu_resumidor),
-        ("🌐  Traductor de Archivos",     menu_traductor),
-        ("📘  Generador de README",       menu_generador_readme),
+    ("🧠  AI (Gemini)", [
+        ("📝  Document Summarizer",   menu_resumidor),
+        ("🌐  File Translator",     menu_traductor),
+        ("📘  README Generator",       menu_generador_readme),
     ]),
     ("🌐  Web & Multimedia", [
-        ("💰  Monitor de Precios",        menu_monitor),
-        ("📺  Descargar de YouTube",      menu_descargador_youtube),
+        ("💰  Price Monitor",        menu_monitor),
+        ("📺  YouTube Downloader",      menu_descargador_youtube),
     ]),
-    ("🔧  Utilidades", [
-        ("🔎  Extractor de Metadatos",    menu_extractor_metadata),
-        ("🔐  Gestor de Contraseñas",     menu_password_generator),
+    ("🔧  Utilities", [
+        ("🔎  Metadata Extractor",    menu_extractor_metadata),
+        ("🔐  Password Manager",     menu_password_generator),
     ]),
 ]
 
 
 def _label_to_action():
-    """Flat map {label → action} across all menu groups."""
+    """Flat map {label → action} across all menu groups for easy lookup."""
     flat = {}
     for _, entries in MENU_ENTRIES:
         for label, action in entries:
@@ -625,38 +655,44 @@ def _label_to_action():
 
 
 def _build_menu_choices():
+    """Constructs the list of choices for the main menu, including history and categories."""
     choices = []
 
-    # Recientes: top of menu, if history exists.
+    # Recently used tools: Top of the menu.
     flat = _label_to_action()
     recents = _load_history()
     visible_recents = [r for r in recents if r in flat]
     if visible_recents:
-        choices.append(Separator("── 🕘  Recientes ──"))
+        choices.append(Separator("── 🕘  Recents ──"))
         for label_key in visible_recents[:HISTORY_MAX]:
             label, action = flat[label_key]
             choices.append(Choice(f"  {label}", value=action))
 
+    # Categorized tools.
     for group_label, entries in MENU_ENTRIES:
         choices.append(Separator(f"── {group_label} ──"))
         for label, action in entries:
             choices.append(Choice(f"  {label}", value=action))
     choices.append(Separator(" "))
-    choices.append(Choice("  🚪  Salir", value="exit"))
+    choices.append(Choice("  🚪  Exit", value="exit"))
     return choices
 
 
 def main_menu():
+    """
+    Main application loop.
+    Loads the environment, displays the banner, and handles user tool selection.
+    """
     load_environment()
 
     while True:
         print_banner()
-        print_footer_tip("Escribe para filtrar · ↑/↓ navegar · Enter elegir · Ctrl+C cancelar.")
+        print_footer_tip("Type to filter · ↑/↓ navigate · Enter choose · Ctrl+C cancel.")
         console.print()
 
         # `use_search_filter=True` enables typing-to-filter in questionary.
         selection = questionary.select(
-            "¿Qué quieres hacer hoy?",
+            "What do you want to do today?",
             choices=_build_menu_choices(),
             style=QSTYLE,
             use_indicator=True,
@@ -667,16 +703,17 @@ def main_menu():
 
         if selection is None or selection == "exit":
             console.print()
-            console.print("[bold #a78bfa]¡Hasta luego![/] 👋")
+            console.print("[bold #a78bfa]See you later![/] 👋")
             break
 
-        # Record which entry was picked (by its displayed label), then run.
+        # Record usage history.
         flat = _label_to_action()
         for label_key, (_, action) in flat.items():
             if action is selection:
                 _record_use(label_key)
                 break
 
+        # Execute the selected tool's menu screen.
         selection()
 
 
