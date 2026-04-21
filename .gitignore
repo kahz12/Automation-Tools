@@ -1,8 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments
 .env
 venv/
 .venv/
-__pycache__/
-*.pyc
-*.zip
-automation_tools.log
+env/
+ENV/
+
+# Logs and databases
+*.log
 *.db
+
+# Project specific
+.menu_history.json
+
+# Distribution / packaging
+*.zip
+dist/
+build/
+*.egg-info/
+
+# IDEs and editors
+.vscode/
+.idea/
+.claude/
