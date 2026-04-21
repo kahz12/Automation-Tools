@@ -73,7 +73,7 @@ def _gradient_text(text: str, start: str, end: str) -> Text:
     from rich.color_triplet import ColorTriplet
 
     lines = text.strip("\n").splitlines()
-    if not :
+    if not lines:
         return Text(text)
 
     def _parse(hex_color: str) -> ColorTriplet:
