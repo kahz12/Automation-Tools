@@ -2,15 +2,15 @@
 
 # Automation Tools
 
-**A unified command-line toolkit of thirteen Python utilities for everyday automation.**
+**A unified command-line toolkit of fifteen Python utilities for everyday automation.**
 
-File organization · Price monitoring · AI summarization · Translation · Image & PDF conversion
-Password management · Metadata forensics · Disk cleanup · YouTube downloads · and more
+File organization · PDF toolkit · AI summarization · Translation · Web clipping · Price monitoring
+Image & PDF conversion · Password management · Metadata forensics · Disk cleanup · YouTube downloads
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Termux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
-[![Made with](https://img.shields.io/badge/Made%20with-Rich%20%2B%20Gemini-purple.svg)]()
+[![Made with](https://img.shields.io/badge/Made%20with-Textual%20%2B%20Gemini-purple.svg)]()
 
 </div>
 
@@ -29,7 +29,7 @@ Password management · Metadata forensics · Disk cleanup · YouTube downloads �
 
 ## Overview
 
-**Automation Tools** is a collection of thirteen purpose-built Python scripts, bundled behind a single interactive menu. Every tool runs standalone from the terminal, or can be launched via the unified `automation-tools` command for a guided experience.
+**Automation Tools** is a collection of fifteen purpose-built Python scripts, bundled behind a single interactive menu. Every tool runs standalone from the terminal, or can be launched via the unified `automation-tools` command for a guided experience.
 
 <table>
 <tr>
@@ -132,6 +132,8 @@ Every utility is also accessible directly. See the [Tools Reference](#tools-refe
 | 11 | [Metadata Extractor](#11--metadata-extractor) | Forensic EXIF and PDF metadata dump           |
 | 12 | [Password Manager](#12--password-manager)    | Generate and evaluate passwords                |
 | 13 | [Space Cleaner](#13--space-cleaner)          | Identify and reclaim disk space                |
+| 14 | [PDF Toolkit](#14--pdf-toolkit)              | Merge, split, extract, rotate, encrypt PDFs    |
+| 15 | [Web Clipper](#15--web-clipper)              | Save a web article as Markdown or text         |
 
 </div>
 
@@ -569,6 +571,79 @@ python3 src/automation_tools/tools/space_cleaner.py ~/code --apply --all
 
 ---
 
+### 14 — PDF Toolkit
+
+**Script:** `src/automation_tools/tools/pdf_toolkit.py`
+
+Manipulate existing PDF files. Built entirely on `pypdf` (pure Python — **no external binaries**), so it behaves identically on Linux, Windows, and Termux/Android.
+
+**Operations**
+
+| Command   | Description                                                          |
+|-----------|----------------------------------------------------------------------|
+| `merge`   | Combine several PDFs (a comma-separated list **or** a folder) into one |
+| `split`   | Explode a PDF into one file per page                                 |
+| `extract` | Build a new PDF from a 1-based page selection (e.g. `1-3,5,8-10`)     |
+| `rotate`  | Rotate pages clockwise by 90 / 180 / 270°                            |
+| `encrypt` | Password-protect a PDF (AES-256 when available)                      |
+| `decrypt` | Remove protection given the current password                         |
+
+> [!NOTE]
+> Existing output files are never overwritten without confirmation. Encrypted inputs must be decrypted first.
+
+**Examples**
+
+```bash
+# Merge a list — or a whole folder — into one PDF
+python3 src/automation_tools/tools/pdf_toolkit.py merge "a.pdf,b.pdf" merged.pdf
+python3 src/automation_tools/tools/pdf_toolkit.py merge ./folder merged.pdf
+
+# Split into one file per page
+python3 src/automation_tools/tools/pdf_toolkit.py split report.pdf --out-dir pages/
+
+# Extract pages 1-3 and 5 into a new document
+python3 src/automation_tools/tools/pdf_toolkit.py extract report.pdf 1-3,5 --out selection.pdf
+
+# Rotate page 2 by 90°
+python3 src/automation_tools/tools/pdf_toolkit.py rotate scan.pdf 90 --pages 2
+
+# Encrypt, then decrypt
+python3 src/automation_tools/tools/pdf_toolkit.py encrypt private.pdf "myPassword"
+python3 src/automation_tools/tools/pdf_toolkit.py decrypt private_encrypted.pdf "myPassword"
+```
+
+---
+
+### 15 — Web Clipper
+
+**Script:** `src/automation_tools/tools/web_clipper.py`
+
+Fetches a web page, strips away the chrome (navigation, ads, scripts), isolates the **main article**, and saves it as clean **Markdown** or **plain text**. Relative links and images are resolved to absolute URLs, and a metadata header (title, source, date, author) is prepended. The output feeds neatly into the [AI Summarizer](#03--ai-summarizer) and [File Translator](#07--file-translator).
+
+> [!NOTE]
+> Uses only `requests` + `beautifulsoup4` with the stdlib HTML parser — no extra binaries or `lxml` required.
+
+**Arguments**
+
+| Option        | Description                                                  |
+|---------------|--------------------------------------------------------------|
+| `url`         | Page URL — scheme defaults to `https://` *(required)*        |
+| `--text`      | Output plain text instead of Markdown                        |
+| `--no-images` | Drop image references (Markdown only)                        |
+| `--out`       | Output file path                                             |
+| `--save`      | Save with an auto-generated filename (slug of the title)     |
+| `--timeout`   | Network timeout in seconds (default: 20)                     |
+
+**Examples**
+
+```bash
+python3 src/automation_tools/tools/web_clipper.py "https://example.com/article" --save
+python3 src/automation_tools/tools/web_clipper.py example.com/post --text --out note.txt
+python3 src/automation_tools/tools/web_clipper.py "https://example.com/post" --no-images --out article.md
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -585,7 +660,9 @@ Automation-Tools/
         │   ├── logger.py            Unified logging & Rich output
         │   └── config.py            Settings & path resolution
         ├── cli/                     Presentation layer
-        │   └── menu.py              Interactive menu
+        │   ├── menu.py              Menu data & entry point
+        │   ├── tui.py               Textual dashboard (home screen)
+        │   └── screens.py           Per-tool input screens
         └── tools/                   Business logic
             ├── renamer.py
             ├── monitor.py
@@ -596,10 +673,12 @@ Automation-Tools/
             ├── youtube_downloader.py
             ├── readme_generator.py
             ├── converter.py
+            ├── pdf_toolkit.py
             ├── organizer.py
             ├── metadata.py
             ├── password_generator.py
-            └── space_cleaner.py
+            ├── space_cleaner.py
+            └── web_clipper.py
 ```
 
 ---
@@ -614,6 +693,6 @@ Released under the **MIT License**.
 
 **Crafted by [Ale](https://github.com/kahz12)**
 
-*Built with Python, Rich, Questionary, and the Google Gemini API.*
+*Built with Python, Textual, Rich, Questionary, and the Google Gemini API.*
 
 </div>

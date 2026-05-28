@@ -42,6 +42,7 @@ MENU_ENTRIES = [
     ("🔄  Conversion", [
         ("🖼️   Image Converter",    None),
         ("📄  Convert to PDF",      None),
+        ("📑  PDF Toolkit",         None),
     ]),
     ("🧠  AI (Gemini)", [
         ("📝  Document Summarizer", None),
@@ -51,6 +52,7 @@ MENU_ENTRIES = [
     ("🌐  Web & Multimedia", [
         ("💰  Price Monitor",       None),
         ("📺  YouTube Downloader",  None),
+        ("📰  Web Clipper",         None),
     ]),
     ("🔧  Utilities", [
         ("🔎  Metadata Extractor",  None),

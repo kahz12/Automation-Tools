@@ -41,6 +41,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "📄", "Convert to PDF",
         "Transform Office documents (.docx, .pptx)\nto PDF using LibreOffice.",
     ),
+    "📑  PDF Toolkit": (
+        "📑", "PDF Toolkit",
+        "Merge, split, extract, rotate, encrypt\nor decrypt PDF files. No extra deps.",
+    ),
     "📝  Document Summarizer": (
         "📝", "Document Summarizer",
         "Generate an executive summary of PDF\nor TXT files using Google Gemini AI.",
@@ -60,6 +64,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
     "📺  YouTube Downloader": (
         "📺", "YouTube Downloader",
         "Download videos (MP4) or audio (MP3)\nfrom YouTube. Playlist support.",
+    ),
+    "📰  Web Clipper": (
+        "📰", "Web Clipper",
+        "Save a web page's main article as clean\nMarkdown or text. Feeds the AI tools.",
     ),
     "🔎  Metadata Extractor": (
         "🔎", "Metadata Extractor",

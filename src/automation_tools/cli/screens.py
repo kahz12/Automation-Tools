@@ -1384,6 +1384,233 @@ class CleanerScreen(ToolScreen):
         )
 
 
+# ── 14. PDF Toolkit ────────────────────────────────────────────────────────
+class PdfToolkitScreen(ToolScreen):
+    TOOL_TITLE = "📑  PDF Toolkit"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]📑  PDF Toolkit[/]\n"
+                "[dim #64748b]Merge, split, extract, rotate, encrypt or decrypt PDF files[/]",
+                classes="tool-panel",
+            )
+            yield Label("Operation:", classes="field-label")
+            with RadioSet(id="op"):
+                yield RadioButton("🔗  Merge several PDFs into one", id="rb-merge", value=True)
+                yield RadioButton("✂️   Split into one file per page", id="rb-split")
+                yield RadioButton("📑  Extract selected pages", id="rb-extract")
+                yield RadioButton("🔄  Rotate pages", id="rb-rotate")
+                yield RadioButton("🔒  Encrypt (set a password)", id="rb-encrypt")
+                yield RadioButton("🔓  Decrypt (remove password)", id="rb-decrypt")
+
+            # Merge
+            with Vertical(id="sec-merge", classes="sub-section"):
+                yield Label("PDF files (comma-separated) or a folder:", classes="field-label")
+                yield Input(placeholder="/a.pdf, /b.pdf    or    /folder", id="merge-input")
+                yield Label("Output PDF path:", classes="field-label")
+                yield Input(placeholder="/path/to/merged.pdf", id="merge-out")
+
+            # Split
+            with Vertical(id="sec-split", classes="sub-section"):
+                yield Label("PDF file to split:", classes="field-label")
+                yield Input(placeholder="/path/to/file.pdf", id="split-input")
+                yield Label("Output folder (optional):", classes="field-label")
+                yield Input(placeholder="default: <name>_pages", id="split-out")
+
+            # Extract
+            with Vertical(id="sec-extract", classes="sub-section"):
+                yield Label("PDF file:", classes="field-label")
+                yield Input(placeholder="/path/to/file.pdf", id="extract-input")
+                yield Label("Pages to keep (1-based, e.g. 1-3,5,8-10):", classes="field-label")
+                yield Input(placeholder="1-3,5", id="extract-pages")
+                yield Label("Output PDF (optional):", classes="field-label")
+                yield Input(placeholder="default: <name>_extract.pdf", id="extract-out")
+
+            # Rotate
+            with Vertical(id="sec-rotate", classes="sub-section"):
+                yield Label("PDF file:", classes="field-label")
+                yield Input(placeholder="/path/to/file.pdf", id="rotate-input")
+                yield Label("Angle (clockwise):", classes="field-label")
+                with RadioSet(id="rotate-angle"):
+                    yield RadioButton("90°", id="rb-90", value=True)
+                    yield RadioButton("180°", id="rb-180")
+                    yield RadioButton("270°", id="rb-270")
+                yield Label("Pages (optional, blank = all pages):", classes="field-label")
+                yield Input(placeholder="all pages", id="rotate-pages")
+                yield Label("Output PDF (optional):", classes="field-label")
+                yield Input(placeholder="default: <name>_rotated.pdf", id="rotate-out")
+
+            # Encrypt
+            with Vertical(id="sec-encrypt", classes="sub-section"):
+                yield Label("PDF file:", classes="field-label")
+                yield Input(placeholder="/path/to/file.pdf", id="encrypt-input")
+                yield Label("Password to set:", classes="field-label")
+                yield Input(placeholder="••••••••", password=True, id="encrypt-pwd")
+                yield Label("Output PDF (optional):", classes="field-label")
+                yield Input(placeholder="default: <name>_encrypted.pdf", id="encrypt-out")
+
+            # Decrypt
+            with Vertical(id="sec-decrypt", classes="sub-section"):
+                yield Label("Encrypted PDF file:", classes="field-label")
+                yield Input(placeholder="/path/to/file.pdf", id="decrypt-input")
+                yield Label("Current password:", classes="field-label")
+                yield Input(placeholder="••••••••", password=True, id="decrypt-pwd")
+                yield Label("Output PDF (optional):", classes="field-label")
+                yield Input(placeholder="default: <name>_decrypted.pdf", id="decrypt-out")
+
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    _SECTIONS = ("merge", "split", "extract", "rotate", "encrypt", "decrypt")
+
+    def on_mount(self) -> None:
+        for name in self._SECTIONS:
+            if name != "merge":
+                self.query_one(f"#sec-{name}").display = False
+
+    @on(RadioSet.Changed, "#op")
+    def _op_changed(self, e: RadioSet.Changed) -> None:
+        rid = e.pressed.id if e.pressed else "rb-merge"
+        selected = rid.replace("rb-", "")
+        for name in self._SECTIONS:
+            self.query_one(f"#sec-{name}").display = (name == selected)
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import pdf_toolkit
+        op = (self._rval(self.query_one("#op", RadioSet)) or "rb-merge").replace("rb-", "")
+
+        if op == "merge":
+            inputs = self._ival(self.query_one("#merge-input", Input))
+            out = self._ival(self.query_one("#merge-out", Input))
+            if not inputs:
+                self._err("Provide PDF files or a folder.")
+                return
+            if not out:
+                self._err("Output path is required.")
+                return
+            await self._run_tool(pdf_toolkit.run_pdf_merge, inputs=inputs, output_path=out)
+
+        elif op == "split":
+            inp = self._ival(self.query_one("#split-input", Input))
+            if not inp:
+                self._err("PDF file is required.")
+                return
+            out = self._ival(self.query_one("#split-out", Input)) or None
+            await self._run_tool(pdf_toolkit.run_pdf_split, input_path=inp, output_dir=out)
+
+        elif op == "extract":
+            inp = self._ival(self.query_one("#extract-input", Input))
+            pages = self._ival(self.query_one("#extract-pages", Input))
+            if not inp:
+                self._err("PDF file is required.")
+                return
+            if not pages:
+                self._err("Page selection is required.")
+                return
+            out = self._ival(self.query_one("#extract-out", Input)) or None
+            await self._run_tool(pdf_toolkit.run_pdf_extract, input_path=inp,
+                                 pages=pages, output_path=out)
+
+        elif op == "rotate":
+            inp = self._ival(self.query_one("#rotate-input", Input))
+            if not inp:
+                self._err("PDF file is required.")
+                return
+            angle_map = {"rb-90": 90, "rb-180": 180, "rb-270": 270}
+            angle = angle_map.get(self._rval(self.query_one("#rotate-angle", RadioSet)) or "rb-90", 90)
+            pages = self._ival(self.query_one("#rotate-pages", Input)) or None
+            out = self._ival(self.query_one("#rotate-out", Input)) or None
+            await self._run_tool(pdf_toolkit.run_pdf_rotate, input_path=inp,
+                                 angle=angle, pages=pages, output_path=out)
+
+        elif op == "encrypt":
+            inp = self._ival(self.query_one("#encrypt-input", Input))
+            pwd = self._ival(self.query_one("#encrypt-pwd", Input))
+            if not inp:
+                self._err("PDF file is required.")
+                return
+            if not pwd:
+                self._err("Password is required.")
+                return
+            out = self._ival(self.query_one("#encrypt-out", Input)) or None
+            await self._run_tool(pdf_toolkit.run_pdf_encrypt, input_path=inp,
+                                 password=pwd, output_path=out)
+
+        else:  # decrypt
+            inp = self._ival(self.query_one("#decrypt-input", Input))
+            pwd = self._ival(self.query_one("#decrypt-pwd", Input))
+            if not inp:
+                self._err("PDF file is required.")
+                return
+            out = self._ival(self.query_one("#decrypt-out", Input)) or None
+            await self._run_tool(pdf_toolkit.run_pdf_decrypt, input_path=inp,
+                                 password=pwd, output_path=out)
+
+
+# ── 15. Web Clipper ────────────────────────────────────────────────────────
+class WebClipperScreen(ToolScreen):
+    TOOL_TITLE = "📰  Web Clipper"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]📰  Web Clipper[/]\n"
+                "[dim #64748b]Save a web page's main article as clean Markdown or text[/]",
+                classes="tool-panel",
+            )
+            yield Label("Page URL:", classes="field-label")
+            yield Input(placeholder="https://example.com/article", id="url")
+            yield Label("Output format:", classes="field-label")
+            with RadioSet(id="fmt"):
+                yield RadioButton("📝  Markdown", id="rb-md", value=True)
+                yield RadioButton("📄  Plain text", id="rb-txt")
+            with Vertical(id="sec-img", classes="sub-section"):
+                yield Label("Include images? (Markdown only)", classes="field-label")
+                yield Switch(id="images", value=True)
+            yield Label("Save to a file?", classes="field-label")
+            yield Switch(id="save", value=True)
+            with Vertical(id="sec-out", classes="sub-section"):
+                yield Label("Output path (leave empty for auto-name):", classes="field-label")
+                yield Input(placeholder="article.md", id="out-path")
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    @on(RadioSet.Changed, "#fmt")
+    def _fmt_changed(self, e: RadioSet.Changed) -> None:
+        self.query_one("#sec-img").display = (
+            (e.pressed.id if e.pressed else "rb-md") == "rb-md"
+        )
+
+    @on(Switch.Changed, "#save")
+    def _save_changed(self, e: Switch.Changed) -> None:
+        self.query_one("#sec-out").display = e.value
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import web_clipper
+        url = self._ival(self.query_one("#url", Input))
+        if not url:
+            self._err("A page URL is required.")
+            return
+        fmt = "markdown" if (self._rval(self.query_one("#fmt", RadioSet)) or "rb-md") == "rb-md" else "text"
+        include_images = self._bval(self.query_one("#images", Switch))
+        save = self._bval(self.query_one("#save", Switch))
+        out_path = self._ival(self.query_one("#out-path", Input)) or None
+        await self._run_tool(
+            web_clipper.run_web_clipper,
+            url=url, out_path=out_path, fmt=fmt,
+            include_images=include_images, save=save,
+        )
+
+
 # ── Screen map: tool label → Screen class ──────────────────────────────────
 SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "✂️   Massive Renamer":     RenamerScreen,
@@ -1392,11 +1619,13 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "🧹  Space Cleaner":        CleanerScreen,
     "🖼️   Image Converter":      ConverterScreen,
     "📄  Convert to PDF":       PdfConverterScreen,
+    "📑  PDF Toolkit":          PdfToolkitScreen,
     "📝  Document Summarizer":  SummarizerScreen,
     "🌐  File Translator":      TranslatorScreen,
     "📘  README Generator":     ReadmeScreen,
     "💰  Price Monitor":        MonitorScreen,
     "📺  YouTube Downloader":   YoutubeScreen,
+    "📰  Web Clipper":          WebClipperScreen,
     "🔎  Metadata Extractor":   MetadataScreen,
     "🔐  Password Manager":     PasswordScreen,
 }
