@@ -1,0 +1,42 @@
+{
+  "timestamp": "20260503_112036",
+  "root": "/storage/emulated/0/Download",
+  "moves": [
+    {
+      "from": "/storage/emulated/0/Download/.exmu-cfg1.data",
+      "to": "/storage/emulated/0/Download/Otros/.exmu-cfg1.data"
+    },
+    {
+      "from": "/storage/emulated/0/Download/RDT_20260426_202517.mp4",
+      "to": "/storage/emulated/0/Download/Videos/RDT_20260426_202517.mp4"
+    },
+    {
+      "from": "/storage/emulated/0/Download/Prueba EXCEL.docx",
+      "to": "/storage/emulated/0/Download/Documentos/Prueba EXCEL.docx"
+    },
+    {
+      "from": "/storage/emulated/0/Download/Libro 6.txt",
+      "to": "/storage/emulated/0/Download/Documentos/Libro 6.txt"
+    },
+    {
+      "from": "/storage/emulated/0/Download/Investigacion_Cuantitativa_Preguntas.docx",
+      "to": "/storage/emulated/0/Download/Documentos/Investigacion_Cuantitativa_Preguntas.docx"
+    },
+    {
+      "from": "/storage/emulated/0/Download/informe_emprendimiento.docx",
+      "to": "/storage/emulated/0/Download/Documentos/informe_emprendimiento.docx"
+    },
+    {
+      "from": "/storage/emulated/0/Download/Investigacion_Cuantitativa_Preguntas.pdf",
+      "to": "/storage/emulated/0/Download/Documentos/Investigacion_Cuantitativa_Preguntas.pdf"
+    },
+    {
+      "from": "/storage/emulated/0/Download/github-recovery-codes.txt",
+      "to": "/storage/emulated/0/Download/Documentos/github-recovery-codes.txt"
+    },
+    {
+      "from": "/storage/emulated/0/Download/SaveClip.App_557955763_17939461575066583_1409514450400331723_n.jpg.webp",
+      "to": "/storage/emulated/0/Download/Imágenes/SaveClip.App_557955763_17939461575066583_1409514450400331723_n.jpg.webp"
+    }
+  ]
+}

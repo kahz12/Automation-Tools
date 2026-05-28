@@ -166,7 +166,7 @@ def run_duplicate_finder(
 
         for p in paths[1:]:
             console.print(f"  [red](Copy)[/red]    {p}")
-        print()
+        console.print()
 
     mb_saved = total_wasted_bytes / (1024 * 1024)
     console.print(f"Recoverable space: [bold green]{mb_saved:.2f} MB[/bold green]\n")

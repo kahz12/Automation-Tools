@@ -241,7 +241,22 @@ def run_massive_rename(
         return
 
     count_start = 1
-    if mode == 'patron' and pattern:
+    if mode == 'patron':
+        if not pattern:
+            detected, det_count, det_max = detect_dominant_pattern(directory, ext_filter)
+            if detected:
+                console.print(
+                    f"[dim]No pattern provided. Auto-detected dominant pattern: "
+                    f"[bold]{detected}[/bold] ({det_count} file(s), max index: {det_max}).[/dim]"
+                )
+                pattern = detected
+            else:
+                print_error(
+                    "Pattern is required in 'patron' mode. "
+                    "Tip: use a placeholder like 'photo_{:03d}' (no extension)."
+                )
+                return
+
         matching, pending, max_index = _split_pattern_files(files, pattern)
         if matching:
             if continue_sequence is False:
@@ -258,7 +273,7 @@ def run_massive_rename(
                 count_start = max_index + 1
 
     if not files:
-        print_warning("No new files to rename.")
+        print_warning("No new files to rename — every file already matches the pattern.")
         return
 
     print_step(f"Processing {len(files)} files in '{directory}'...")
