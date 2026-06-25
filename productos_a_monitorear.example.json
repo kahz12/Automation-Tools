@@ -9,9 +9,9 @@
     },
     "products": [
         {
-            "name": "Botas Mujer",
-            "url": "https://articulo.mercadolibre.com.co/MCO-886072080-bota-de-caucho-impermeable-dama-moto-mujer-color-_JM?matt_tool=15401541#origin=share&sid=share",
-            "target_price": 74490,
+            "name": "Nombre del producto",
+            "url": "https://articulo.mercadolibre.com.co/MCO-000000000-ejemplo",
+            "target_price": 0,
             "alert_drop_percent": 5
         }
     ]

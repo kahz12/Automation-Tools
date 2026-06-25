@@ -17,6 +17,10 @@ ENV/
 
 # Project specific
 .menu_history.json
+# Holds live credentials (telegram_token, ml_access_token). Use the .example as template.
+productos_a_monitorear.json
+# Move history with absolute paths to private files.
+.organizer_history/
 
 # Distribution / packaging
 *.zip
