@@ -37,6 +37,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "🖼️", "Image Converter",
         "Convert images between formats\n(png, jpg, webp…) or render PDF to images.",
     ),
+    "🪄  Image Processor": (
+        "🪄", "Image Processor",
+        "Batch resize, compress or watermark\nimages. Originals are never touched.",
+    ),
     "📄  Convert to PDF": (
         "📄", "Convert to PDF",
         "Transform Office documents (.docx, .pptx)\nto PDF using LibreOffice.",
@@ -76,6 +80,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
     "🔐  Password Manager": (
         "🔐", "Password Manager",
         "Generate secure passwords or passphrases.\nStrength check via HaveIBeenPwned.",
+    ),
+    "🔒  Encryption Vault": (
+        "🔒", "Encryption Vault",
+        "Encrypt or decrypt files and folders\nwith a password (AES, authenticated).",
     ),
 }
 

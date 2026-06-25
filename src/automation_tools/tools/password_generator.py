@@ -9,10 +9,8 @@ from typing import Optional, List, Dict, Any
 
 from rich.table import Table
 from rich.panel import Panel
-from rich.text import Text
-from rich.progress_bar import ProgressBar
 
-from automation_tools.core.logger import console, print_error, print_success, print_step, print_warning
+from automation_tools.core.logger import console, print_error, print_success, print_warning
 
 
 def check_pwned(password: str, timeout: float = 5.0) -> Optional[int]:
@@ -457,7 +455,6 @@ def display_passwords(passwords: List[str], title: str = "Generated Passwords") 
 
     for i, pwd in enumerate(passwords, 1):
         result = evaluate_strength(pwd)
-        score = result["score"]
         label = f"[{result['color']}]{result['level']}[/{result['color']}]"
         table.add_row(str(i), pwd, label, f"{result['entropy']:.0f} bits")
 

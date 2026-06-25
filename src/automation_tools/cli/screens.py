@@ -1611,6 +1611,207 @@ class WebClipperScreen(ToolScreen):
         )
 
 
+class ImageProcessorScreen(ToolScreen):
+    TOOL_TITLE = "🪄  Image Processor"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]🪄  Image Processor[/]\n"
+                "[dim #64748b]Batch resize, compress or watermark images. Originals are kept[/]",
+                classes="tool-panel",
+            )
+            yield Label("Operation:", classes="field-label")
+            with RadioSet(id="op"):
+                yield RadioButton("📐  Resize", id="rb-resize", value=True)
+                yield RadioButton("🗜️   Compress", id="rb-compress")
+                yield RadioButton("🪄  Watermark", id="rb-watermark")
+            yield Label("Image file or folder:", classes="field-label")
+            yield Input(placeholder="/path/to/image_or_folder", id="path")
+            # Resize options
+            with Vertical(id="sec-resize", classes="sub-section"):
+                yield Label("Max dimension — longest side, px (leave empty if using %):",
+                            classes="field-label")
+                yield Input(placeholder="1920", id="max-size")
+                yield Label("Or scale by percentage (e.g. 50):", classes="field-label")
+                yield Input(placeholder="(optional)", id="scale")
+            # Compress options
+            with Vertical(id="sec-compress", classes="sub-section"):
+                yield Label("Quality (1–100, lower = smaller file):", classes="field-label")
+                yield Input(placeholder="80", id="quality")
+            # Watermark options
+            with Vertical(id="sec-watermark", classes="sub-section"):
+                yield Label("Watermark text:", classes="field-label")
+                yield Input(placeholder="© My Name 2026", id="wm-text")
+                yield Label("Position:", classes="field-label")
+                with RadioSet(id="wm-pos"):
+                    yield RadioButton("Bottom-right", id="rb-br", value=True)
+                    yield RadioButton("Bottom-left", id="rb-bl")
+                    yield RadioButton("Top-right", id="rb-tr")
+                    yield RadioButton("Top-left", id="rb-tl")
+                    yield RadioButton("Center", id="rb-center")
+                yield Label("Opacity (0–100):", classes="field-label")
+                yield Input(placeholder="50", id="wm-opacity")
+            yield Label("Recurse into subfolders?", classes="field-label")
+            yield Switch(id="recursive", value=False)
+            yield Label("Output folder (leave empty for '<input>/processed'):",
+                        classes="field-label")
+            yield Input(placeholder="(optional)", id="out-dir")
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#sec-compress").display = False
+        self.query_one("#sec-watermark").display = False
+
+    @on(RadioSet.Changed, "#op")
+    def _op_changed(self, e: RadioSet.Changed) -> None:
+        rid = e.pressed.id if e.pressed else "rb-resize"
+        self.query_one("#sec-resize").display = (rid == "rb-resize")
+        self.query_one("#sec-compress").display = (rid == "rb-compress")
+        self.query_one("#sec-watermark").display = (rid == "rb-watermark")
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import image_processor
+
+        path = self._ival(self.query_one("#path", Input))
+        if not path:
+            self._err("Path is required.")
+            return
+
+        op_map = {"rb-resize": "resize", "rb-compress": "compress", "rb-watermark": "watermark"}
+        operation = op_map.get(self._rval(self.query_one("#op", RadioSet)) or "rb-resize", "resize")
+        out_dir = self._ival(self.query_one("#out-dir", Input)) or None
+        recursive = self._bval(self.query_one("#recursive", Switch))
+
+        kwargs: dict = {
+            "input_path": path,
+            "operation": operation,
+            "output_dir": out_dir,
+            "recursive": recursive,
+        }
+
+        if operation == "resize":
+            scale_raw = self._ival(self.query_one("#scale", Input))
+            max_raw = self._ival(self.query_one("#max-size", Input))
+            scale_percent = None
+            max_size = None
+            if scale_raw:
+                try:
+                    scale_percent = max(1, min(1000, int(scale_raw)))
+                except ValueError:
+                    self._err("Scale must be a whole number.")
+                    return
+            else:
+                try:
+                    max_size = max(1, int(max_raw or "1920"))
+                except ValueError:
+                    self._err("Max dimension must be a whole number.")
+                    return
+            kwargs["scale_percent"] = scale_percent
+            kwargs["max_size"] = max_size
+        elif operation == "compress":
+            try:
+                kwargs["quality"] = max(1, min(100, int(self._ival(self.query_one("#quality", Input)) or "80")))
+            except ValueError:
+                kwargs["quality"] = 80
+        else:  # watermark
+            text = self._ival(self.query_one("#wm-text", Input))
+            if not text:
+                self._err("Watermark text is required.")
+                return
+            pos_map = {
+                "rb-br": "bottom-right", "rb-bl": "bottom-left",
+                "rb-tr": "top-right", "rb-tl": "top-left", "rb-center": "center",
+            }
+            kwargs["watermark_text"] = text
+            kwargs["wm_position"] = pos_map.get(
+                self._rval(self.query_one("#wm-pos", RadioSet)) or "rb-br", "bottom-right"
+            )
+            try:
+                kwargs["wm_opacity"] = max(0, min(100, int(self._ival(self.query_one("#wm-opacity", Input)) or "50")))
+            except ValueError:
+                kwargs["wm_opacity"] = 50
+
+        await self._run_tool(image_processor.run_batch_image_processor, **kwargs)
+
+
+class VaultScreen(ToolScreen):
+    TOOL_TITLE = "🔒  Encryption Vault"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]🔒  Encryption Vault[/]\n"
+                "[dim #64748b]Encrypt or decrypt files and folders with a password (AES)[/]",
+                classes="tool-panel",
+            )
+            yield Label("Action:", classes="field-label")
+            with RadioSet(id="action"):
+                yield RadioButton("🔒  Encrypt", id="rb-encrypt", value=True)
+                yield RadioButton("🔓  Decrypt", id="rb-decrypt")
+            yield Label("File or folder:", classes="field-label")
+            yield Input(placeholder="/path/to/file_or_folder", id="path")
+            yield Label("Password:", classes="field-label")
+            yield Input(placeholder="••••••••", password=True, id="password")
+            # Only shown for encryption: confirm to avoid locking yourself out.
+            with Vertical(id="sec-confirm", classes="sub-section"):
+                yield Label("Confirm password:", classes="field-label")
+                yield Input(placeholder="••••••••", password=True, id="password2")
+            yield Label("Recurse into subfolders?", classes="field-label")
+            yield Switch(id="recursive", value=True)
+            yield Label("Delete originals after? (irreversible — asks to confirm)",
+                        classes="field-label")
+            yield Switch(id="remove", value=False)
+            yield Label("Output folder (leave empty to write next to each file):",
+                        classes="field-label")
+            yield Input(placeholder="(optional)", id="out-dir")
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    @on(RadioSet.Changed, "#action")
+    def _action_changed(self, e: RadioSet.Changed) -> None:
+        is_encrypt = (e.pressed.id if e.pressed else "rb-encrypt") == "rb-encrypt"
+        self.query_one("#sec-confirm").display = is_encrypt
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import vault
+
+        path = self._ival(self.query_one("#path", Input))
+        if not path:
+            self._err("Path is required.")
+            return
+        password = self.query_one("#password", Input).value
+        if not password:
+            self._err("Password is required.")
+            return
+
+        action = "encrypt" if (self._rval(self.query_one("#action", RadioSet)) or "rb-encrypt") == "rb-encrypt" else "decrypt"
+        if action == "encrypt":
+            password2 = self.query_one("#password2", Input).value
+            if password != password2:
+                self._err("Passwords do not match.")
+                return
+
+        await self._run_tool(
+            vault.run_vault,
+            path=path,
+            action=action,
+            password=password,
+            output_dir=self._ival(self.query_one("#out-dir", Input)) or None,
+            remove_originals=self._bval(self.query_one("#remove", Switch)),
+            recursive=self._bval(self.query_one("#recursive", Switch)),
+        )
+
+
 # ── Screen map: tool label → Screen class ──────────────────────────────────
 SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "✂️   Massive Renamer":     RenamerScreen,
@@ -1618,6 +1819,7 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "🧬  Duplicate Detector":   DuplicatesScreen,
     "🧹  Space Cleaner":        CleanerScreen,
     "🖼️   Image Converter":      ConverterScreen,
+    "🪄  Image Processor":      ImageProcessorScreen,
     "📄  Convert to PDF":       PdfConverterScreen,
     "📑  PDF Toolkit":          PdfToolkitScreen,
     "📝  Document Summarizer":  SummarizerScreen,
@@ -1628,4 +1830,5 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "📰  Web Clipper":          WebClipperScreen,
     "🔎  Metadata Extractor":   MetadataScreen,
     "🔐  Password Manager":     PasswordScreen,
+    "🔒  Encryption Vault":     VaultScreen,
 }

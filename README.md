@@ -2,10 +2,10 @@
 
 # Automation Tools
 
-**A unified command-line toolkit of fifteen Python utilities for everyday automation.**
+**A unified command-line toolkit of seventeen Python utilities for everyday automation.**
 
 File organization · PDF toolkit · AI summarization · Translation · Web clipping · Price monitoring
-Image & PDF conversion · Password management · Metadata forensics · Disk cleanup · YouTube downloads
+Image conversion & batch processing · File encryption · Password management · Metadata forensics · Disk cleanup · YouTube downloads
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Termux-lightgrey.svg)]()
@@ -22,6 +22,7 @@ Image & PDF conversion · Password management · Metadata forensics · Disk clea
 - [Installation](#installation)
 - [Usage](#usage)
 - [Tools Reference](#tools-reference)
+- [Testing](#testing)
 - [Project Structure](#project-structure)
 - [License](#license)
 
@@ -29,7 +30,7 @@ Image & PDF conversion · Password management · Metadata forensics · Disk clea
 
 ## Overview
 
-**Automation Tools** is a collection of fifteen purpose-built Python scripts, bundled behind a single interactive menu. Every tool runs standalone from the terminal, or can be launched via the unified `automation-tools` command for a guided experience.
+**Automation Tools** is a collection of seventeen purpose-built Python scripts, bundled behind a single interactive menu. Every tool runs standalone from the terminal, or can be launched via the unified `automation-tools` command for a guided experience.
 
 <table>
 <tr>
@@ -42,6 +43,7 @@ Image & PDF conversion · Password management · Metadata forensics · Disk clea
 - **Standalone scripts** — each tool works independently
 - **AI-powered** — Gemini integration for summaries, translations, and README generation
 - **Safe by default** — dry-run mode on destructive operations
+- **Tested** — a `pytest` suite covering every tool and the menu wiring
 
 </td>
 <td width="50%" valign="top">
@@ -51,7 +53,7 @@ Image & PDF conversion · Password management · Metadata forensics · Disk clea
 - **Python** 3.8 or newer
 - **LibreOffice** (optional, for office-to-PDF conversion)
 - **Google API Key** (optional, for AI features)
-- **yt-dlp** (bundled in `requirements.txt`)
+- **Python deps** (bundled in `requirements.txt`) — `yt-dlp`, `Pillow`, `cryptography`, …
 
 </td>
 </tr>
@@ -134,6 +136,8 @@ Every utility is also accessible directly. See the [Tools Reference](#tools-refe
 | 13 | [Space Cleaner](#13--space-cleaner)          | Identify and reclaim disk space                |
 | 14 | [PDF Toolkit](#14--pdf-toolkit)              | Merge, split, extract, rotate, encrypt PDFs    |
 | 15 | [Web Clipper](#15--web-clipper)              | Save a web article as Markdown or text         |
+| 16 | [Image Processor](#16--image-processor)      | Batch resize, compress, or watermark images    |
+| 17 | [Encryption Vault](#17--encryption-vault)    | Encrypt / decrypt files & folders with a password |
 
 </div>
 
@@ -178,7 +182,13 @@ python3 src/automation_tools/tools/renamer.py ./files --mode reemplazo --old-tex
 
 Tracks prices on **MercadoLibre** and **Amazon**. Triggers console alerts (and optionally Telegram) when a product hits the target price or drops by a configured percentage.
 
-**Configuration** — edit `productos_a_monitorear.json` (full guide in [GUIDE_CONFIG.md](GUIDE_CONFIG.md)):
+**Configuration** — copy the template, then edit your copy (full guide in [GUIDE_CONFIG.md](GUIDE_CONFIG.md)):
+
+```bash
+cp productos_a_monitorear.example.json productos_a_monitorear.json
+```
+
+`productos_a_monitorear.json` is git-ignored, so your Telegram / MercadoLibre tokens stay out of version control.
 
 ```json
 {
@@ -644,6 +654,97 @@ python3 src/automation_tools/tools/web_clipper.py "https://example.com/post" --n
 
 ---
 
+### 16 — Image Processor
+
+**Script:** `src/automation_tools/tools/image_processor.py`
+
+Batch operations over a single image or a whole folder — **resize**, **compress**, or **watermark** — built only on Pillow, so it runs identically on Linux, Windows, and Termux/Android.
+
+> [!NOTE]
+> Originals are **never modified**. Results are written to a separate folder (`<input>/processed` by default).
+
+**Arguments**
+
+| Option        | Description                                                          |
+|---------------|----------------------------------------------------------------------|
+| `input_path`  | Image file or folder of images *(required)*                          |
+| `--op`        | Operation: `resize` (default), `compress`, or `watermark`            |
+| `--out-dir`   | Output folder (default: `<input>/processed`)                         |
+| `--recursive` | Recurse into subfolders                                              |
+| `--max-size`  | Resize: longest-side cap in px (default: 1920)                       |
+| `--scale`     | Resize: by percentage instead of `--max-size`                        |
+| `--quality`   | Compress: JPEG/WebP quality 1–100 (default: 80)                      |
+| `--text`      | Watermark: the text to stamp                                         |
+| `--position`  | Watermark: `top-left`, `top-right`, `bottom-left`, `bottom-right`, `center` |
+| `--opacity`   | Watermark: opacity 0–100 (default: 50)                               |
+
+**Examples**
+
+```bash
+# Resize a folder so the longest side is at most 1024 px
+python3 src/automation_tools/tools/image_processor.py ./photos --op resize --max-size 1024
+
+# Compress images to ~40% quality to shrink file size
+python3 src/automation_tools/tools/image_processor.py ./photos --op compress --quality 40
+
+# Stamp a watermark in the bottom-right corner
+python3 src/automation_tools/tools/image_processor.py poster.png --op watermark --text "© Ale 2026" --opacity 60
+```
+
+---
+
+### 17 — Encryption Vault
+
+**Script:** `src/automation_tools/tools/vault.py`
+
+Encrypt or decrypt any file (or a whole folder) with a password. Uses only the `cryptography` library — no external binaries — so it behaves identically across platforms.
+
+- **Key derivation** — PBKDF2-HMAC-SHA256 (600,000 iterations) with a random salt
+- **Cipher** — Fernet (AES-128-CBC + HMAC-SHA256): **authenticated**, so a wrong password or any tampering is detected, never producing garbage output
+- **Self-describing** — each `.enc` file stores its salt, so it can be decrypted standalone later
+
+> [!IMPORTANT]
+> Keep your password safe — without it, encrypted files **cannot** be recovered.
+
+**Arguments**
+
+| Option               | Description                                                     |
+|----------------------|-----------------------------------------------------------------|
+| `path`               | File or folder to process *(required)*                          |
+| `action`             | `encrypt` or `decrypt` *(required)*                             |
+| `--password`         | Password (you are prompted securely if omitted)                 |
+| `--out-dir`          | Output folder (default: alongside each source file)             |
+| `--remove-originals` | Delete each source file after processing (asks to confirm)      |
+| `--no-recursive`     | Do not recurse into subfolders                                  |
+
+**Examples**
+
+```bash
+# Encrypt a folder (each file -> file.enc)
+python3 src/automation_tools/tools/vault.py ./secret_docs encrypt --password "myStrongPass"
+
+# Decrypt a single file into a chosen folder
+python3 src/automation_tools/tools/vault.py report.pdf.enc decrypt --out-dir ./restored
+```
+
+> [!NOTE]
+> The CLI exits with a non-zero status if any file fails (e.g. wrong password), so it scripts cleanly.
+
+---
+
+## Testing
+
+The project ships with a `pytest` suite that covers every tool plus the menu/screen wiring.
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+Tests live in `tests/` and run entirely against temporary directories — they never touch your real files. Network- and API-backed paths (HaveIBeenPwned, Google Gemini, yt-dlp) are mocked, so the suite runs fully offline.
+
+---
+
 ## Project Structure
 
 ```
@@ -651,34 +752,39 @@ Automation-Tools/
 ├── README.md
 ├── GUIDE_CONFIG.md
 ├── requirements.txt
-├── productos_a_monitorear.json
+├── requirements-dev.txt             Dev/test dependencies
+├── pytest.ini                       Test configuration
+├── productos_a_monitorear.example.json   Price-monitor config template
 ├── run.py                           User entry point
-└── src/
-    └── automation_tools/
-        ├── __init__.py
-        ├── core/                    Cross-cutting concerns
-        │   ├── logger.py            Unified logging & Rich output
-        │   └── config.py            Settings & path resolution
-        ├── cli/                     Presentation layer
-        │   ├── menu.py              Menu data & entry point
-        │   ├── tui.py               Textual dashboard (home screen)
-        │   └── screens.py           Per-tool input screens
-        └── tools/                   Business logic
-            ├── renamer.py
-            ├── monitor.py
-            ├── gemini_utils.py
-            ├── summarizer.py
-            ├── translator.py
-            ├── duplicate_finder.py
-            ├── youtube_downloader.py
-            ├── readme_generator.py
-            ├── converter.py
-            ├── pdf_toolkit.py
-            ├── organizer.py
-            ├── metadata.py
-            ├── password_generator.py
-            ├── space_cleaner.py
-            └── web_clipper.py
+├── src/
+│   └── automation_tools/
+│       ├── __init__.py
+│       ├── core/                    Cross-cutting concerns
+│       │   ├── logger.py            Unified logging & Rich output
+│       │   └── config.py            Settings & path resolution
+│       ├── cli/                     Presentation layer
+│       │   ├── menu.py              Menu data & entry point
+│       │   ├── tui.py               Textual dashboard (home screen)
+│       │   └── screens.py           Per-tool input screens
+│       └── tools/                   Business logic
+│           ├── renamer.py
+│           ├── monitor.py
+│           ├── gemini_utils.py
+│           ├── summarizer.py
+│           ├── translator.py
+│           ├── duplicate_finder.py
+│           ├── youtube_downloader.py
+│           ├── readme_generator.py
+│           ├── converter.py
+│           ├── image_processor.py
+│           ├── pdf_toolkit.py
+│           ├── organizer.py
+│           ├── metadata.py
+│           ├── password_generator.py
+│           ├── space_cleaner.py
+│           ├── web_clipper.py
+│           └── vault.py
+└── tests/                           pytest suite (one file per module)
 ```
 
 ---
@@ -693,6 +799,6 @@ Released under the **MIT License**.
 
 **Crafted by [Ale](https://github.com/kahz12)**
 
-*Built with Python, Textual, Rich, Questionary, and the Google Gemini API.*
+*Built with Python, Textual, Rich, Questionary, Pillow, cryptography, and the Google Gemini API.*
 
 </div>

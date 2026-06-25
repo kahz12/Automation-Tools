@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 import pypdf
 from rich.table import Table
 
-from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
+from automation_tools.core.logger import console, print_error, print_success, print_warning
 
 try:
     from PIL import Image, ExifTags

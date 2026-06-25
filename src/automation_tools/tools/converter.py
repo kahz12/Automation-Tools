@@ -1,8 +1,7 @@
 import argparse
 import os
-from typing import Optional
 
-from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
+from automation_tools.core.logger import console, print_error, print_step, print_success
 
 try:
     from PIL import Image

@@ -1,4 +1,3 @@
-import json
 import time
 import random
 import sqlite3
@@ -6,13 +5,13 @@ import os
 import re
 import argparse
 from datetime import datetime
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, Any
 from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
-from automation_tools.core.logger import setup_logger, console, print_error, print_success, print_warning, print_step
+from automation_tools.core.logger import setup_logger, console, print_success, print_warning
 from automation_tools.core.config import load_json_config, get_project_root
 
 # Get logger specific to this tool
@@ -466,9 +465,9 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
 
         if price is None:
             if not disponible:
-                console.print(f"     [yellow]🚫 Product not available[/yellow]")
+                console.print("     [yellow]🚫 Product not available[/yellow]")
             else:
-                console.print(f"     [red]❌ Price not detected.[/red]")
+                console.print("     [red]❌ Price not detected.[/red]")
             logger.warning(f"{nombre}: price not detected at {url}")
             return
 

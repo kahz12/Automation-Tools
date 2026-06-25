@@ -83,23 +83,6 @@ def _split_pattern_files(files: List[str], pattern: str) -> Tuple[List[str], Lis
     return matching, pending, max_index
 
 
-def detect_existing_sequence(
-    directory: str,
-    pattern: str,
-    ext_filter: Optional[str] = None,
-) -> Tuple[int, int]:
-    """
-    Returns (count, max_index) of files in a directory that already match a given pattern.
-    """
-    if not pattern or not os.path.isdir(directory):
-        return 0, 0
-    files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-    if ext_filter:
-        files = [f for f in files if f.lower().endswith(ext_filter.lower())]
-    matching, _, max_index = _split_pattern_files(files, pattern)
-    return len(matching), max_index
-
-
 def detect_dominant_pattern(
     directory: str,
     ext_filter: Optional[str] = None,

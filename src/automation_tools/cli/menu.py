@@ -41,6 +41,7 @@ MENU_ENTRIES = [
     ]),
     ("🔄  Conversion", [
         ("🖼️   Image Converter",    None),
+        ("🪄  Image Processor",     None),
         ("📄  Convert to PDF",      None),
         ("📑  PDF Toolkit",         None),
     ]),
@@ -57,6 +58,7 @@ MENU_ENTRIES = [
     ("🔧  Utilities", [
         ("🔎  Metadata Extractor",  None),
         ("🔐  Password Manager",    None),
+        ("🔒  Encryption Vault",    None),
     ]),
 ]
 

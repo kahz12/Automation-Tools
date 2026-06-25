@@ -3,6 +3,20 @@
 Este archivo controla todo el comportamiento del monitor de precios.
 Se divide en dos secciones: `settings` (configuración global) y `products` (lista de productos).
 
+> **Importante:** `productos_a_monitorear.json` está **excluido del control de versiones** (`.gitignore`) porque guarda tus tokens privados de Telegram y MercadoLibre. Nunca lo subas al repositorio ni lo compartas.
+
+---
+
+## Primer paso — crear tu archivo de configuración
+
+El repositorio incluye una plantilla con la estructura y los campos vacíos. Cópiala al archivo real que lee el monitor:
+
+```bash
+cp productos_a_monitorear.example.json productos_a_monitorear.json
+```
+
+Después edita `productos_a_monitorear.json` con tus productos y credenciales siguiendo las secciones de abajo.
+
 ---
 
 ## `settings` — Configuración Global
@@ -146,18 +160,22 @@ La API oficial es más estable que el scraping. No se rompe cuando ML cambia su 
 
 ## Comandos disponibles
 
+Desde el menú interactivo: `automation-tools` → **Price Monitor**.
+
+O directamente por terminal:
+
 ```bash
 # Chequeo inmediato
-python3 tools/monitor_precios.py --now
+python3 src/automation_tools/tools/monitor.py --now
 
 # Ver historial de precios guardados
-python3 tools/monitor_precios.py --historial
+python3 src/automation_tools/tools/monitor.py --historial
 
 # Monitoreo continuo cada 30 minutos
-python3 tools/monitor_precios.py --interval 30
+python3 src/automation_tools/tools/monitor.py --interval 30
 
 # Monitoreo continuo cada hora (por defecto)
-python3 tools/monitor_precios.py
+python3 src/automation_tools/tools/monitor.py
 ```
 
 ---

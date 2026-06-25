@@ -19,3 +19,10 @@ Pillow
 
 # Utilidades Varias
 yt-dlp
+
+# Cifrado de archivos (Bóveda)
+cryptography
+
+# Tests
+pytest
+pyflakes

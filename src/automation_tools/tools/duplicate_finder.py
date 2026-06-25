@@ -3,7 +3,7 @@ import hashlib
 import argparse
 import csv
 import fnmatch
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 from collections import defaultdict
 
 import questionary
