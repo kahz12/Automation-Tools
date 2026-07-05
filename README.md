@@ -2,7 +2,7 @@
 
 # Automation Tools
 
-**A unified command-line toolkit of seventeen Python utilities for everyday automation.**
+**A unified command-line toolkit of nineteen Python utilities for everyday automation.**
 
 Files · Conversion · AI (Gemini) · Web & Multimedia · Encryption · Utilities
 
@@ -30,7 +30,7 @@ Files · Conversion · AI (Gemini) · Web & Multimedia · Encryption · Utilitie
 
 ## Overview
 
-**Automation Tools** bundles seventeen standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
+**Automation Tools** bundles nineteen standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
 
 - **Unified launcher** — one `automation-tools` command, arrow-key navigation, a recent-tools list
 - **Standalone scripts** — every tool also works on its own with a conventional CLI (`--help` everywhere)
@@ -97,8 +97,14 @@ python3 src/automation_tools/tools/vault.py ./secret_docs encrypt --password "my
 # Summarize a PDF with Gemini
 python3 src/automation_tools/tools/summarizer.py report.pdf --out summary.txt
 
+# Extract text from a scanned image with Gemini Vision
+python3 src/automation_tools/tools/ocr.py scan.png --out scan.txt
+
 # Merge two PDFs into one
 python3 src/automation_tools/tools/pdf_toolkit.py merge "a.pdf,b.pdf" merged.pdf
+
+# Back up a folder to a timestamped zip, excluding logs (dry-run unless --apply)
+python3 src/automation_tools/tools/archiver.py create ./project -x "*.log" "__pycache__" --apply
 ```
 
 ---
@@ -115,6 +121,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 | Downloads Organizer | `organizer.py` | Sort the Downloads folder into category subfolders, with undo and history. |
 | Duplicate Finder | `duplicate_finder.py` | Find byte-identical files by MD5 hash; optional CSV report and auto-delete. |
 | Space Cleaner | `space_cleaner.py` | Reclaim space from caches, large files, and stale files (dry-run by default). |
+| Archiver | `archiver.py` | Bundle files/folders into a timestamped zip/tar backup, list it, or extract it — pure Python, dry-run by default, Zip Slip-safe. |
 
 ### Conversion
 
@@ -132,6 +139,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 | AI Summarizer | `summarizer.py` | Generate an executive summary with bullet points from a PDF or text file. |
 | File Translator | `translator.py` | Translate files while preserving structure (code comments, subtitles, JSON, Markdown). |
 | README Generator | `readme_generator.py` | Analyze a project's structure and code, then draft a professional `README.md`. |
+| Image OCR | `ocr.py` | Extract text from images or scans with Gemini Vision — single file or batch, as plain text or Markdown. |
 
 ### Web & Multimedia
 
@@ -193,7 +201,7 @@ Automation-Tools/
 ├── src/automation_tools/
 │   ├── core/                           # logger (Rich output) · config (settings & paths)
 │   ├── cli/                            # menu · tui (Textual dashboard) · screens
-│   └── tools/                          # 17 tool modules (one per utility)
+│   └── tools/                          # 19 tool modules (one per utility)
 └── tests/                              # pytest suite (one file per module)
 ```
 

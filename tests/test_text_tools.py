@@ -71,3 +71,40 @@ def test_is_rate_limit():
     assert gemini_utils._is_rate_limit(Exception("Error 429 too many requests")) is True
     assert gemini_utils._is_rate_limit(Exception("resource_exhausted")) is True
     assert gemini_utils._is_rate_limit(Exception("invalid argument")) is False
+
+
+class _FakeResp:
+    def __init__(self, text):
+        self.text = text
+        self.usage_metadata = None
+
+
+class _FakeModels:
+    def __init__(self):
+        self.calls = []
+
+    def generate_content(self, model, contents):
+        self.calls.append((model, contents))
+        return _FakeResp("ok")
+
+
+class _FakeClient:
+    def __init__(self):
+        self.models = _FakeModels()
+
+
+def test_generate_content_passes_text_prompt():
+    client = _FakeClient()
+    assert gemini_utils.generate_content(client, "hola") == "ok"
+    _, contents = client.models.calls[0]
+    assert contents == "hola"
+
+
+def test_generate_vision_content_sends_image_and_prompt():
+    client = _FakeClient()
+    out = gemini_utils.generate_vision_content(client, "read this", b"\x89PNG\r\n", "image/png")
+    assert out == "ok"
+    _, contents = client.models.calls[0]
+    # contents is [image_part, prompt] for a multimodal request
+    assert isinstance(contents, list) and len(contents) == 2
+    assert contents[1] == "read this"

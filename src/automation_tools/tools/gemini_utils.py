@@ -69,33 +69,29 @@ def _log_usage(response, model_name: str) -> None:
         console.print(f"[dim]🧮 Tokens: {total} (prompt {prompt} + output {out}) · {model_name}[/dim]")
 
 
-def generate_content(
+def _generate(
     client: genai.Client,
-    prompt: str,
+    contents,
     model_name: str = PRIMARY_MODEL,
-    system_instruction: Optional[str] = None,
     allow_fallback: bool = True,
 ) -> Optional[str]:
     """
-    Sends a prompt to Gemini with retry/backoff logic and model fallback.
-    
+    Core request loop shared by the text and vision helpers.
+
     - Retries on 429/503/Unavailable errors with exponential backoff.
     - If the primary model remains limited, falls back to `FALLBACK_MODEL`.
     - Logs token consumption for each call.
-    
+
     Args:
         client (genai.Client): The Gemini client.
-        prompt (str): The main prompt text.
+        contents: Whatever the SDK accepts as `contents` — a prompt string, or a
+            list of parts (e.g. an image Part plus a prompt) for multimodal calls.
         model_name (str): The primary model to use.
-        system_instruction (Optional[str]): Optional system instruction to prepend.
         allow_fallback (bool): Whether to allow falling back to a secondary model.
-        
+
     Returns:
         Optional[str]: The generated text content, or None if it fails.
     """
-    if system_instruction:
-        prompt = f"{system_instruction}\n\n{prompt}"
-
     models_to_try = [model_name]
     if allow_fallback and model_name != FALLBACK_MODEL:
         models_to_try.append(FALLBACK_MODEL)
@@ -105,7 +101,7 @@ def generate_content(
         backoff = BASE_BACKOFF
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                response = client.models.generate_content(model=current_model, contents=prompt)
+                response = client.models.generate_content(model=current_model, contents=contents)
                 _log_usage(response, current_model)
                 return response.text
             except Exception as e:
@@ -119,7 +115,7 @@ def generate_content(
                     backoff *= 2
                     continue
                 break  # Non-retriable error or retries exhausted for this model
-        
+
         # If we hit a rate limit and have a fallback model available, try the next one
         if last_err and _is_rate_limit(last_err) and current_model != models_to_try[-1]:
             print_warning(f"Switching to fallback model: {FALLBACK_MODEL}")
@@ -128,3 +124,58 @@ def generate_content(
 
     print_error(f"Gemini API Error: {last_err}")
     return None
+
+
+def generate_content(
+    client: genai.Client,
+    prompt: str,
+    model_name: str = PRIMARY_MODEL,
+    system_instruction: Optional[str] = None,
+    allow_fallback: bool = True,
+) -> Optional[str]:
+    """
+    Sends a text prompt to Gemini with retry/backoff and model fallback.
+
+    Args:
+        client (genai.Client): The Gemini client.
+        prompt (str): The main prompt text.
+        model_name (str): The primary model to use.
+        system_instruction (Optional[str]): Optional system instruction to prepend.
+        allow_fallback (bool): Whether to allow falling back to a secondary model.
+
+    Returns:
+        Optional[str]: The generated text content, or None if it fails.
+    """
+    if system_instruction:
+        prompt = f"{system_instruction}\n\n{prompt}"
+    return _generate(client, prompt, model_name=model_name, allow_fallback=allow_fallback)
+
+
+def generate_vision_content(
+    client: genai.Client,
+    prompt: str,
+    image_bytes: bytes,
+    mime_type: str,
+    model_name: str = PRIMARY_MODEL,
+    allow_fallback: bool = True,
+) -> Optional[str]:
+    """
+    Sends an image plus a text prompt to Gemini (multimodal), reusing the same
+    retry/backoff/fallback logic as `generate_content`. Used for OCR and other
+    image-understanding tasks.
+
+    Args:
+        client (genai.Client): The Gemini client.
+        prompt (str): The instruction describing what to do with the image.
+        image_bytes (bytes): Raw image data.
+        mime_type (str): The image's MIME type (e.g. "image/png").
+        model_name (str): The primary model to use.
+        allow_fallback (bool): Whether to allow falling back to a secondary model.
+
+    Returns:
+        Optional[str]: The generated text content, or None if it fails.
+    """
+    from google.genai import types
+
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+    return _generate(client, [image_part, prompt], model_name=model_name, allow_fallback=allow_fallback)

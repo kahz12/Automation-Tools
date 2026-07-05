@@ -33,6 +33,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "🧹", "Space Cleaner",
         "Detect cache, large, and old files.\nDry-run by default — safe to explore.",
     ),
+    "💾  Archiver": (
+        "💾", "Archiver",
+        "Bundle files into a zip/tar backup, list\nit, or extract it. Dry-run by default.",
+    ),
     "🖼️   Image Converter": (
         "🖼️", "Image Converter",
         "Convert images between formats\n(png, jpg, webp…) or render PDF to images.",
@@ -60,6 +64,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
     "📘  README Generator": (
         "📘", "README Generator",
         "Analyze a project directory and auto-generate\na professional README using Gemini.",
+    ),
+    "🔡  Image OCR": (
+        "🔡", "Image OCR",
+        "Extract text from images or scans using\nGoogle Gemini Vision. Plain text or Markdown.",
     ),
     "💰  Price Monitor": (
         "💰", "Price Monitor",

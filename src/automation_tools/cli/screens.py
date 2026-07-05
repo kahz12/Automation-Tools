@@ -1812,12 +1812,186 @@ class VaultScreen(ToolScreen):
         )
 
 
+# ── 18. Archiver ───────────────────────────────────────────────────────────
+class ArchiverScreen(ToolScreen):
+    TOOL_TITLE = "💾  Archiver"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]💾  Archiver[/]\n"
+                "[dim #64748b]Bundle files into a zip/tar backup, list it, or extract it[/]",
+                classes="tool-panel",
+            )
+            yield Label("Action:", classes="field-label")
+            with RadioSet(id="action"):
+                yield RadioButton("📦  Create a backup archive", id="rb-create", value=True)
+                yield RadioButton("📋  List an archive's contents", id="rb-list")
+                yield RadioButton("📂  Extract an archive", id="rb-extract")
+
+            # Create
+            with Vertical(id="sec-create", classes="sub-section"):
+                yield Label("Sources — files/folders (comma-separated):", classes="field-label")
+                yield Input(placeholder="/path/to/folder, /path/to/file.txt", id="create-sources")
+                yield Label("Output archive (optional):", classes="field-label")
+                yield Input(placeholder="default: <source>_<timestamp>", id="create-output")
+                yield Label("Format:", classes="field-label")
+                with RadioSet(id="create-format"):
+                    yield RadioButton("zip", id="rb-zip", value=True)
+                    yield RadioButton("tar.gz", id="rb-targz")
+                    yield RadioButton("tar.bz2", id="rb-tarbz2")
+                yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
+                yield Input(placeholder="*.log, __pycache__, node_modules", id="create-exclude")
+                yield Label("Include hidden dotfiles?", classes="field-label")
+                yield Switch(id="create-hidden", value=False)
+                yield Label("Apply? (off = preview only)", classes="field-label")
+                yield Switch(id="create-apply", value=False)
+
+            # List
+            with Vertical(id="sec-list", classes="sub-section"):
+                yield Label("Archive to inspect:", classes="field-label")
+                yield Input(placeholder="/path/to/backup.zip", id="list-archive")
+
+            # Extract
+            with Vertical(id="sec-extract", classes="sub-section"):
+                yield Label("Archive to extract:", classes="field-label")
+                yield Input(placeholder="/path/to/backup.zip", id="extract-archive")
+                yield Label("Destination folder (optional):", classes="field-label")
+                yield Input(placeholder="default: archive name", id="extract-dest")
+                yield Label("Overwrite existing files?", classes="field-label")
+                yield Switch(id="extract-overwrite", value=False)
+                yield Label("Apply? (off = preview only)", classes="field-label")
+                yield Switch(id="extract-apply", value=False)
+
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    _SECTIONS = ("create", "list", "extract")
+
+    def on_mount(self) -> None:
+        for name in self._SECTIONS:
+            if name != "create":
+                self.query_one(f"#sec-{name}").display = False
+
+    @on(RadioSet.Changed, "#action")
+    def _action_changed(self, e: RadioSet.Changed) -> None:
+        rid = e.pressed.id if e.pressed else "rb-create"
+        selected = rid.replace("rb-", "")
+        for name in self._SECTIONS:
+            self.query_one(f"#sec-{name}").display = (name == selected)
+
+    @staticmethod
+    def _split(value: str) -> list:
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import archiver
+        action = (self._rval(self.query_one("#action", RadioSet)) or "rb-create").replace("rb-", "")
+
+        if action == "create":
+            sources = self._split(self._ival(self.query_one("#create-sources", Input)))
+            if not sources:
+                self._err("At least one source file or folder is required.")
+                return
+            fmt_map = {"rb-zip": "zip", "rb-targz": "tar.gz", "rb-tarbz2": "tar.bz2"}
+            fmt = fmt_map.get(self._rval(self.query_one("#create-format", RadioSet)) or "rb-zip", "zip")
+            await self._run_tool(
+                archiver.run_archiver,
+                action="create",
+                sources=sources,
+                output=self._ival(self.query_one("#create-output", Input)) or None,
+                fmt=fmt,
+                exclude=self._split(self._ival(self.query_one("#create-exclude", Input))),
+                include_hidden=self._bval(self.query_one("#create-hidden", Switch)),
+                apply=self._bval(self.query_one("#create-apply", Switch)),
+            )
+
+        elif action == "list":
+            archive = self._ival(self.query_one("#list-archive", Input))
+            if not archive:
+                self._err("Archive path is required.")
+                return
+            await self._run_tool(archiver.run_archiver, action="list", archive=archive)
+
+        else:  # extract
+            archive = self._ival(self.query_one("#extract-archive", Input))
+            if not archive:
+                self._err("Archive path is required.")
+                return
+            await self._run_tool(
+                archiver.run_archiver,
+                action="extract",
+                archive=archive,
+                dest=self._ival(self.query_one("#extract-dest", Input)) or None,
+                overwrite=self._bval(self.query_one("#extract-overwrite", Switch)),
+                apply=self._bval(self.query_one("#extract-apply", Switch)),
+            )
+
+
+# ── 19. Image OCR ──────────────────────────────────────────────────────────
+class OcrScreen(ToolScreen):
+    TOOL_TITLE = "🔡  Image OCR"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]🔡  Image OCR[/]\n"
+                "[dim #64748b]Extract text from images or scans with Gemini Vision[/]",
+                classes="tool-panel",
+            )
+            yield Label("Image file or folder:", classes="field-label")
+            yield Input(placeholder="/path/to/scan.png  or  /path/to/folder", id="path")
+            yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
+            yield Input(placeholder="AIza...", password=True, id="api-key")
+            yield Label("Reconstruct layout as Markdown? (off = plain text)", classes="field-label")
+            yield Switch(id="markdown", value=False)
+            yield Label("Language hint (optional):", classes="field-label")
+            yield Input(placeholder="e.g. Spanish, English…", id="language")
+            yield Label("Recurse into subfolders? (when a folder is given)", classes="field-label")
+            yield Switch(id="recursive", value=False)
+            yield Label("Output file (single image) or folder (batch) — optional:", classes="field-label")
+            yield Input(placeholder="leave empty to auto-name / save next to source", id="out-path")
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        from automation_tools.core.config import get_env_var
+        key = get_env_var("GOOGLE_API_KEY", "")
+        if key:
+            self.query_one("#api-key", Input).value = key
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import ocr
+        path = self._ival(self.query_one("#path", Input))
+        if not path:
+            self._err("An image file or folder is required.")
+            return
+        await self._run_tool(
+            ocr.run_ocr,
+            path=path,
+            api_key=self._ival(self.query_one("#api-key", Input)) or None,
+            out_path=self._ival(self.query_one("#out-path", Input)) or None,
+            markdown=self._bval(self.query_one("#markdown", Switch)),
+            language=self._ival(self.query_one("#language", Input)) or None,
+            recursive=self._bval(self.query_one("#recursive", Switch)),
+        )
+
+
 # ── Screen map: tool label → Screen class ──────────────────────────────────
 SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "✂️   Massive Renamer":     RenamerScreen,
     "📦  Organize Downloads":   OrganizerScreen,
     "🧬  Duplicate Detector":   DuplicatesScreen,
     "🧹  Space Cleaner":        CleanerScreen,
+    "💾  Archiver":             ArchiverScreen,
     "🖼️   Image Converter":      ConverterScreen,
     "🪄  Image Processor":      ImageProcessorScreen,
     "📄  Convert to PDF":       PdfConverterScreen,
@@ -1825,6 +1999,7 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "📝  Document Summarizer":  SummarizerScreen,
     "🌐  File Translator":      TranslatorScreen,
     "📘  README Generator":     ReadmeScreen,
+    "🔡  Image OCR":            OcrScreen,
     "💰  Price Monitor":        MonitorScreen,
     "📺  YouTube Downloader":   YoutubeScreen,
     "📰  Web Clipper":          WebClipperScreen,
