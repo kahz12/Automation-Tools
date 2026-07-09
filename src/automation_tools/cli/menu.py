@@ -61,6 +61,7 @@ MENU_ENTRIES = [
         ("🔎  Metadata Extractor",  None),
         ("🔐  Password Manager",    None),
         ("🔒  Encryption Vault",    None),
+        ("🧾  Integrity Checker",   None),
     ]),
 ]
 

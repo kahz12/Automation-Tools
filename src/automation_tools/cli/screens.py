@@ -1985,6 +1985,99 @@ class OcrScreen(ToolScreen):
         )
 
 
+# ── 20. Integrity Checker ──────────────────────────────────────────────────
+class IntegrityScreen(ToolScreen):
+    TOOL_TITLE = "🧾  Integrity Checker"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]🧾  Integrity Checker[/]\n"
+                "[dim #64748b]Create a checksum manifest of a folder and verify it later[/]",
+                classes="tool-panel",
+            )
+            yield Label("Action:", classes="field-label")
+            with RadioSet(id="action"):
+                yield RadioButton("🧾  Create a checksum manifest", id="rb-create", value=True)
+                yield RadioButton("✅  Verify a folder against a manifest", id="rb-verify")
+            yield Label("Directory:", classes="field-label")
+            yield Input(placeholder="/path/to/folder", id="dir")
+
+            # Create
+            with Vertical(id="sec-create", classes="sub-section"):
+                yield Label("Hash algorithm:", classes="field-label")
+                with RadioSet(id="algorithm"):
+                    yield RadioButton("SHA-256  (recommended)", id="rb-sha256", value=True)
+                    yield RadioButton("SHA-512", id="rb-sha512")
+                    yield RadioButton("MD5  (fast, legacy)", id="rb-md5")
+                yield Label("Manifest output path (optional):", classes="field-label")
+                yield Input(placeholder="default: <directory>/checksums.sha256", id="output")
+
+            # Verify
+            with Vertical(id="sec-verify", classes="sub-section"):
+                yield Label("Manifest file (optional — auto-detects checksums.*):", classes="field-label")
+                yield Input(placeholder="default: auto-detect inside the folder", id="manifest")
+                yield Label("Also report new files not in the manifest?", classes="field-label")
+                yield Switch(id="extra", value=True)
+
+            yield Static("[dim #4b5563]── Options ──────────────────────────[/]", classes="section-sep")
+            yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
+            yield Input(placeholder="*.log, __pycache__", id="excludes")
+            yield Label("Include hidden dotfiles?", classes="field-label")
+            yield Switch(id="hidden", value=False)
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#sec-verify").display = False
+
+    @on(RadioSet.Changed, "#action")
+    def _action_changed(self, e: RadioSet.Changed) -> None:
+        is_create = (e.pressed.id if e.pressed else "rb-create") == "rb-create"
+        self.query_one("#sec-create").display = is_create
+        self.query_one("#sec-verify").display = not is_create
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import integrity
+        directory = self._ival(self.query_one("#dir", Input))
+        if not directory:
+            self._err("Directory is required.")
+            return
+        raw_exc = self._ival(self.query_one("#excludes", Input))
+        excludes = [p.strip() for p in raw_exc.split(",") if p.strip()] if raw_exc else None
+        include_hidden = self._bval(self.query_one("#hidden", Switch))
+        action = (self._rval(self.query_one("#action", RadioSet)) or "rb-create").replace("rb-", "")
+
+        if action == "create":
+            alg_map = {"rb-sha256": "sha256", "rb-sha512": "sha512", "rb-md5": "md5"}
+            algorithm = alg_map.get(
+                self._rval(self.query_one("#algorithm", RadioSet)) or "rb-sha256", "sha256"
+            )
+            await self._run_tool(
+                integrity.run_integrity,
+                action="create",
+                directory=directory,
+                output=self._ival(self.query_one("#output", Input)) or None,
+                algorithm=algorithm,
+                exclude=excludes,
+                include_hidden=include_hidden,
+            )
+        else:  # verify
+            await self._run_tool(
+                integrity.run_integrity,
+                action="verify",
+                directory=directory,
+                manifest=self._ival(self.query_one("#manifest", Input)) or None,
+                exclude=excludes,
+                include_hidden=include_hidden,
+                check_extra=self._bval(self.query_one("#extra", Switch)),
+            )
+
+
 # ── Screen map: tool label → Screen class ──────────────────────────────────
 SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "✂️   Massive Renamer":     RenamerScreen,
@@ -2006,4 +2099,5 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "🔎  Metadata Extractor":   MetadataScreen,
     "🔐  Password Manager":     PasswordScreen,
     "🔒  Encryption Vault":     VaultScreen,
+    "🧾  Integrity Checker":    IntegrityScreen,
 }

@@ -2,7 +2,7 @@
 
 # Automation Tools
 
-**A unified command-line toolkit of nineteen Python utilities for everyday automation.**
+**A unified command-line toolkit of twenty Python utilities for everyday automation.**
 
 Files · Conversion · AI (Gemini) · Web & Multimedia · Encryption · Utilities
 
@@ -30,7 +30,7 @@ Files · Conversion · AI (Gemini) · Web & Multimedia · Encryption · Utilitie
 
 ## Overview
 
-**Automation Tools** bundles nineteen standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
+**Automation Tools** bundles twenty standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
 
 - **Unified launcher** — one `automation-tools` command, arrow-key navigation, a recent-tools list
 - **Standalone scripts** — every tool also works on its own with a conventional CLI (`--help` everywhere)
@@ -105,6 +105,10 @@ python3 src/automation_tools/tools/pdf_toolkit.py merge "a.pdf,b.pdf" merged.pdf
 
 # Back up a folder to a timestamped zip, excluding logs (dry-run unless --apply)
 python3 src/automation_tools/tools/archiver.py create ./project -x "*.log" "__pycache__" --apply
+
+# Create a checksum manifest of a folder, then verify it later
+python3 src/automation_tools/tools/integrity.py create ./backups
+python3 src/automation_tools/tools/integrity.py verify ./backups --extra
 ```
 
 ---
@@ -156,6 +160,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 | Metadata Extractor | `metadata.py` | Inspect EXIF/PDF metadata; optionally strip EXIF (e.g. GPS) from images. |
 | Password Manager | `password_generator.py` | Generate passwords/passphrases and score strength (HaveIBeenPwned check). |
 | Encryption Vault | `vault.py` | Encrypt/decrypt files & folders with a password (AES, authenticated). |
+| Integrity Checker | `integrity.py` | Create a checksum manifest (MD5/SHA-1/SHA-256/SHA-512) of a folder and verify it later — `sha256sum -c` compatible. |
 
 ---
 
@@ -201,7 +206,7 @@ Automation-Tools/
 ├── src/automation_tools/
 │   ├── core/                           # logger (Rich output) · config (settings & paths)
 │   ├── cli/                            # menu · tui (Textual dashboard) · screens
-│   └── tools/                          # 19 tool modules (one per utility)
+│   └── tools/                          # 20 tool modules (one per utility)
 └── tests/                              # pytest suite (one file per module)
 ```
 

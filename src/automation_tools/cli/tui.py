@@ -93,6 +93,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "🔒", "Encryption Vault",
         "Encrypt or decrypt files and folders\nwith a password (AES, authenticated).",
     ),
+    "🧾  Integrity Checker": (
+        "🧾", "Integrity Checker",
+        "Create a checksum manifest of a folder\nand verify it later. Detects corruption.",
+    ),
 }
 
 
