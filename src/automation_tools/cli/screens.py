@@ -2183,6 +2183,72 @@ class LogAnalyzerScreen(ToolScreen):
             out_path=out_path
         )
 
+# ── 23. Dotenv & Config Manager ──────────────────────────────────────────────
+class EnvManagerScreen(ToolScreen):
+    TOOL_TITLE = "⚙️  Dotenv Manager"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]⚙️  Dotenv Manager[/]\n"
+                "[dim #64748b]Manage, scan, and validate your .env files[/]",
+                classes="tool-panel",
+            )
+            yield Label("Action:", classes="field-label")
+            with RadioSet(id="action"):
+                yield RadioButton("Generate .env.example template", id="rb-generate", value=True)
+                yield RadioButton("Scan directory for exposed .env files", id="rb-scan")
+                yield RadioButton("Validate .env against template", id="rb-validate")
+                
+            yield Label("Target Path (.env file or directory):", classes="field-label")
+            yield Input(placeholder="/path/to/.env OR /path/to/project/", id="target-path")
+            
+            with Vertical(id="sec-example-path", classes="sub-section"):
+                yield Label("Template Path (e.g. .env.example) [For Validate]:", classes="field-label")
+                yield Input(placeholder="/path/to/.env.example", id="example-path")
+                
+            with Vertical(id="sec-out-path", classes="sub-section"):
+                yield Label("Output Path [For Generate]:", classes="field-label")
+                yield Input(placeholder="Leave empty for <target>.example", id="out-path")
+                
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#sec-example-path").display = False
+
+    @on(RadioSet.Changed, "#action")
+    def _action_changed(self, e: RadioSet.Changed) -> None:
+        rid = e.pressed.id if e.pressed else "rb-generate"
+        self.query_one("#sec-example-path").display = (rid == "rb-validate")
+        self.query_one("#sec-out-path").display = (rid == "rb-generate")
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import env_manager
+        
+        target_path = self._ival(self.query_one("#target-path", Input))
+        if not target_path:
+            self._err("Target path is required.")
+            return
+            
+        action_map = {"rb-generate": "generate", "rb-scan": "scan", "rb-validate": "validate"}
+        action = action_map.get(self._rval(self.query_one("#action", RadioSet)) or "rb-generate")
+        
+        example_path = self._ival(self.query_one("#example-path", Input)) or None
+        out_path = self._ival(self.query_one("#out-path", Input)) or None
+        
+        await self._run_tool(
+            env_manager.run_env_manager,
+            action=action,
+            target_path=target_path,
+            example_path=example_path,
+            out_path=out_path
+        )
+
 
 # ── Screen map: tool label → Screen class ──────────────────────────────────
 SCREEN_MAP: dict[str, type[ToolScreen]] = {
@@ -2208,4 +2274,5 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "🔐  Password Manager":     PasswordScreen,
     "🔒  Encryption Vault":     VaultScreen,
     "🧾  Integrity Checker":    IntegrityScreen,
+    "⚙️  Dotenv Manager":      EnvManagerScreen,
 }

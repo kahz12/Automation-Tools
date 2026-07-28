@@ -57,6 +57,7 @@ def run_transcriber(
     else:
         prompt = "Transcribe the audio in this file. Provide a clean, readable transcript in paragraphs."
 
+    response_text = None
     try:
         response_text = _generate(
             client=client,

@@ -64,6 +64,7 @@ MENU_ENTRIES = [
         ("🔐  Password Manager",    None),
         ("🔒  Encryption Vault",    None),
         ("🧾  Integrity Checker",   None),
+        ("⚙️  Dotenv Manager",      None),
     ]),
 ]
 
