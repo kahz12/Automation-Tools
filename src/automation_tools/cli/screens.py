@@ -2077,6 +2077,112 @@ class IntegrityScreen(ToolScreen):
                 check_extra=self._bval(self.query_one("#extra", Switch)),
             )
 
+# ── 21. A/V Transcriber ────────────────────────────────────────────────────
+class TranscriberScreen(ToolScreen):
+    TOOL_TITLE = "🎤  A/V Transcriber"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]🎤  A/V Transcriber[/]\n"
+                "[dim #64748b]Transcribe audio and video files using Gemini AI[/]",
+                classes="tool-panel",
+            )
+            yield Label("File path (audio or video):", classes="field-label")
+            yield Input(placeholder="/path/to/media.mp3", id="filepath")
+            yield Label("Output format:", classes="field-label")
+            with RadioSet(id="mode"):
+                yield RadioButton("SRT Subtitles", id="rb-srt", value=True)
+                yield RadioButton("Plain Text", id="rb-txt")
+            yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
+            yield Input(placeholder="AIza...", password=True, id="api-key")
+            with Vertical(id="sec-outpath", classes="sub-section"):
+                yield Label("Output path (leave empty for auto):", classes="field-label")
+                yield Input(placeholder="transcription.srt", id="out-path")
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        from automation_tools.core.config import get_env_var
+        key = get_env_var("GOOGLE_API_KEY", "")
+        if key:
+            self.query_one("#api-key", Input).value = key
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import transcriber
+        filepath = self._ival(self.query_one("#filepath", Input))
+        if not filepath:
+            self._err("File path is required.")
+            return
+        mode = "srt" if self._rval(self.query_one("#mode", RadioSet)) == "rb-srt" else "txt"
+        api_key = self._ival(self.query_one("#api-key", Input)) or None
+        out_path = self._ival(self.query_one("#out-path", Input)) or None
+        
+        await self._run_tool(transcriber.run_transcriber, filepath=filepath,
+                             mode=mode, api_key=api_key, out_path=out_path)
+
+# ── 22. Log Analyzer ─────────────────────────────────────────────────────────
+class LogAnalyzerScreen(ToolScreen):
+    TOOL_TITLE = "🔍  Log Analyzer"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                "[bold #22d3ee]🔍  Log Analyzer[/]\n"
+                "[dim #64748b]Scan log files for errors, exceptions or specific patterns[/]",
+                classes="tool-panel",
+            )
+            yield Label("File or Directory path:", classes="field-label")
+            yield Input(placeholder="/var/log/ OR /path/to/app.log", id="path")
+            yield Label("Keywords (comma separated) or Regex pattern:", classes="field-label")
+            yield Input(placeholder="Error, Exception, Fatal", id="keywords")
+            
+            yield Label("Search mode:", classes="field-label")
+            with RadioSet(id="mode"):
+                yield RadioButton("Normal text (comma separated)", id="rb-text", value=True)
+                yield RadioButton("Regex pattern", id="rb-regex")
+                
+            yield Label("Case Sensitive?", classes="field-label")
+            yield Switch(id="case-sensitive", value=False)
+            
+            yield Label("Save report to file? (Optional):", classes="field-label")
+            yield Input(placeholder="report.txt", id="out-path")
+            
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import log_analyzer
+        path = self._ival(self.query_one("#path", Input))
+        if not path:
+            self._err("Path is required.")
+            return
+        keywords = self._ival(self.query_one("#keywords", Input))
+        if not keywords:
+            self._err("Keywords are required.")
+            return
+            
+        use_regex = self._rval(self.query_one("#mode", RadioSet)) == "rb-regex"
+        case_sensitive = self._bval(self.query_one("#case-sensitive", Switch))
+        out_path = self._ival(self.query_one("#out-path", Input)) or None
+        
+        await self._run_tool(
+            log_analyzer.run_log_analyzer,
+            path=path,
+            keywords=keywords,
+            use_regex=use_regex,
+            ignore_case=not case_sensitive,
+            out_path=out_path
+        )
+
 
 # ── Screen map: tool label → Screen class ──────────────────────────────────
 SCREEN_MAP: dict[str, type[ToolScreen]] = {
@@ -2085,6 +2191,7 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "🧬  Duplicate Detector":   DuplicatesScreen,
     "🧹  Space Cleaner":        CleanerScreen,
     "💾  Archiver":             ArchiverScreen,
+    "🔍  Log Analyzer":        LogAnalyzerScreen,
     "🖼️   Image Converter":      ConverterScreen,
     "🪄  Image Processor":      ImageProcessorScreen,
     "📄  Convert to PDF":       PdfConverterScreen,
@@ -2093,6 +2200,7 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "🌐  File Translator":      TranslatorScreen,
     "📘  README Generator":     ReadmeScreen,
     "🔡  Image OCR":            OcrScreen,
+    "🎤  A/V Transcriber":      TranscriberScreen,
     "💰  Price Monitor":        MonitorScreen,
     "📺  YouTube Downloader":   YoutubeScreen,
     "📰  Web Clipper":          WebClipperScreen,

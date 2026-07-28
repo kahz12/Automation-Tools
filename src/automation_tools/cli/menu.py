@@ -39,6 +39,7 @@ MENU_ENTRIES = [
         ("🧬  Duplicate Detector",  None),
         ("🧹  Space Cleaner",       None),
         ("💾  Archiver",            None),
+        ("🔍  Log Analyzer",        None),
     ]),
     ("🔄  Conversion", [
         ("🖼️   Image Converter",    None),
@@ -51,6 +52,7 @@ MENU_ENTRIES = [
         ("🌐  File Translator",     None),
         ("📘  README Generator",    None),
         ("🔡  Image OCR",           None),
+        ("🎤  A/V Transcriber",      None),
     ]),
     ("🌐  Web & Multimedia", [
         ("💰  Price Monitor",       None),
