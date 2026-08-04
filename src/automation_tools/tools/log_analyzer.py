@@ -1,9 +1,13 @@
 import os
 import argparse
 import re
-from typing import List, Optional
+from typing import Optional
 
 from automation_tools.core.logger import console, print_error, print_step, print_warning
+
+# Matches beyond this are still written to the report file, just not echoed to
+# the console — a million-hit scan should not scroll for an hour.
+MAX_CONSOLE_MATCHES = 100
 
 
 def run_log_analyzer(
@@ -61,64 +65,74 @@ def run_log_analyzer(
 
     print_step(f"Analyzing {len(files_to_scan)} file(s) for {len(patterns)} pattern(s)...")
 
-    results = []
-    total_matches = 0
-
-    for file_path in files_to_scan:
-        file_matches = []
-        try:
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                for line_num, line in enumerate(f, 1):
-                    line = line.strip()
-                    for regex in compiled_regexes:
-                        if regex.search(line):
-                            file_matches.append((line_num, line))
-                            total_matches += 1
-                            break  # Avoid double counting if multiple regexes match
-        except Exception as e:
-            print_warning(f"Could not read {file_path}: {e}")
-            continue
-
-        if file_matches:
-            results.append((file_path, file_matches))
-
-    # Display results
-    console.print(f"\n[cyan]{'='*50}[/cyan]")
-    console.print(f"[bold]LOG ANALYSIS REPORT[/bold]")
-    console.print(f"[cyan]{'='*50}[/cyan]")
-    console.print(f"[dim]Total matches found: {total_matches}[/dim]\n")
-
-    report_lines = []
-    report_lines.append("LOG ANALYSIS REPORT")
-    report_lines.append(f"Total matches found: {total_matches}\n")
-
-    for file_path, matches in results:
-        file_header = f"📄 {file_path} ({len(matches)} matches)"
-        console.print(f"[bold #a78bfa]{file_header}[/]")
-        report_lines.append(f"--- {file_path} ({len(matches)} matches) ---")
-        
-        # Only show up to 100 matches per file in the console to avoid spam
-        for i, (line_num, line) in enumerate(matches):
-            if i < 100:
-                console.print(f"  [dim]Line {line_num}:[/] {line[:200]}")
-            elif i == 100:
-                console.print(f"  [dim]... and {len(matches) - 100} more matches (hidden in UI).[/]")
-            report_lines.append(f"Line {line_num}: {line}")
-        console.print()
-        report_lines.append("")
-
-    if total_matches == 0:
-        console.print("[green]✓ No matches found for the given keywords.[/green]")
-        report_lines.append("No matches found.")
-
-    # Save to file
+    # Open the report up front so a bad path fails before a long scan, and so
+    # matches can be streamed straight to disk instead of piling up in memory.
+    report = None
     if out_path:
         try:
-            with open(out_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(report_lines))
-            console.print(f"[dim]Full report saved to: {out_path}[/dim]")
-        except Exception as e:
+            report = open(out_path, "w", encoding="utf-8")
+        except OSError as e:
             print_error(f"Error saving report to {out_path}: {e}")
+            return
+
+    console.print(f"\n[cyan]{'='*50}[/cyan]")
+    console.print("[bold]LOG ANALYSIS REPORT[/bold]")
+    console.print(f"[cyan]{'='*50}[/cyan]\n")
+
+    total_matches = 0
+    try:
+        if report:
+            report.write("LOG ANALYSIS REPORT\n\n")
+
+        for file_path in files_to_scan:
+            file_matches = 0
+            shown = 0
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    for line_num, line in enumerate(f, 1):
+                        line = line.strip()
+                        # One hit per line, no matter how many patterns match it.
+                        if not any(regex.search(line) for regex in compiled_regexes):
+                            continue
+
+                        if file_matches == 0:
+                            console.print(f"[bold #a78bfa]📄 {file_path}[/]")
+                            if report:
+                                report.write(f"--- {file_path} ---\n")
+                        file_matches += 1
+                        total_matches += 1
+
+                        if shown < MAX_CONSOLE_MATCHES:
+                            console.print(f"  [dim]Line {line_num}:[/] {line[:200]}")
+                            shown += 1
+                        elif shown == MAX_CONSOLE_MATCHES:
+                            console.print("  [dim]... more matches hidden here; see the full report.[/]")
+                            shown += 1
+
+                        if report:
+                            report.write(f"Line {line_num}: {line}\n")
+            except OSError as e:
+                print_warning(f"Could not read {file_path}: {e}")
+                continue
+
+            if file_matches:
+                console.print(f"  [dim]({file_matches} match(es) in this file)[/]\n")
+                if report:
+                    report.write(f"({file_matches} matches)\n\n")
+
+        # The total is only known once every file has been streamed through.
+        if total_matches == 0:
+            console.print("[green]✓ No matches found for the given keywords.[/green]")
+        console.print(f"[cyan]{'='*50}[/cyan]")
+        console.print(f"[dim]Total matches found: {total_matches}[/dim]")
+        if report:
+            report.write(f"Total matches found: {total_matches}\n")
+    finally:
+        if report:
+            report.close()
+
+    if out_path:
+        console.print(f"[dim]Full report saved to: {out_path}[/dim]")
 
 
 def main():

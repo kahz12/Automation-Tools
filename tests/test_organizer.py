@@ -1,5 +1,3 @@
-import os
-
 from automation_tools.tools import organizer
 
 

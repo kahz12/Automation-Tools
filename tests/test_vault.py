@@ -1,4 +1,4 @@
-import os
+import sys
 import types
 
 import pytest
@@ -95,6 +95,70 @@ def test_run_vault_validation_errors(tmp_path):
     assert vault.run_vault(str(tmp_path), "encrypt", "") is False          # no password
     assert vault.run_vault(str(tmp_path), "bogus", "pw") is False          # bad action
     assert vault.run_vault("/no/such/path", "encrypt", "pw") is False      # missing path
+
+
+# ── password prompting ──────────────────────────────────────────────────────
+# Encrypting with a mistyped password makes the data permanently unrecoverable,
+# so the prompt must ask twice and require a match. Decrypting is harmless to
+# get wrong (Fernet just rejects it), so it stays a single prompt.
+
+def _scripted_prompt(answers):
+    """Returns a getpass-like callable that yields `answers` in order."""
+    remaining = list(answers)
+    calls = []
+
+    def _prompt(label=""):
+        calls.append(label)
+        return remaining.pop(0)
+
+    _prompt.calls = calls
+    return _prompt
+
+
+def test_prompt_password_encrypt_requires_confirmation():
+    prompt = _scripted_prompt(["hunter2", "hunter2"])
+    assert vault._prompt_password("encrypt", prompt=prompt) == "hunter2"
+    assert len(prompt.calls) == 2
+
+
+def test_prompt_password_encrypt_rejects_mismatch():
+    prompt = _scripted_prompt(["hunter2", "hunter3"])
+    assert vault._prompt_password("encrypt", prompt=prompt) is None
+    assert len(prompt.calls) == 2
+
+
+def test_prompt_password_decrypt_asks_once():
+    prompt = _scripted_prompt(["hunter2"])
+    assert vault._prompt_password("decrypt", prompt=prompt) == "hunter2"
+    assert len(prompt.calls) == 1
+
+
+def test_prompt_password_rejects_empty():
+    prompt = _scripted_prompt(["", ""])
+    assert vault._prompt_password("encrypt", prompt=prompt) is None
+
+
+def test_main_aborts_without_encrypting_when_confirmation_fails(tmp_path, monkeypatch, capsys):
+    """A mistyped confirmation must exit non-zero and leave no .enc behind."""
+    src = tmp_path / "f.txt"
+    src.write_text("data")
+    out_dir = tmp_path / "enc"
+
+    monkeypatch.setattr(vault, "_prompt_password", lambda action, **kw: None)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["vault", str(src), "encrypt", "--out-dir", str(out_dir)],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        vault.main()
+
+    assert excinfo.value.code == 1
+    assert not out_dir.exists()
+    assert src.read_text() == "data"
+    # The prompt already said what went wrong. Falling through into run_vault
+    # would tack on a contradictory "A password is required." after it.
+    assert "A password is required" not in capsys.readouterr().out
 
 
 def test_remove_originals_confirmed(tmp_path, monkeypatch):

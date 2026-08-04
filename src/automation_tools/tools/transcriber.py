@@ -6,6 +6,42 @@ from typing import Optional
 from automation_tools.core.logger import console, print_error, print_step, print_warning
 from automation_tools.tools.gemini_utils import get_gemini_client, _generate, PRIMARY_MODEL
 
+# Upload polling: how long to wait for Gemini to finish processing a media file
+# before giving up, and how often to re-check in the meantime.
+UPLOAD_TIMEOUT = 600.0  # seconds
+POLL_INTERVAL = 3.0     # seconds
+
+
+def _wait_for_active(
+    client,
+    file_name: str,
+    timeout: float = UPLOAD_TIMEOUT,
+    poll_interval: float = POLL_INTERVAL,
+) -> bool:
+    """
+    Polls an uploaded file until Gemini reports it as ACTIVE.
+
+    Returns True once the file is ready to use. Returns False if Gemini reports
+    the file as FAILED, or if `timeout` seconds go by first — a file stuck in
+    PROCESSING or an API that keeps erroring must never hang the tool forever.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            # genai state may be a string or an Enum; compare on its text form.
+            state_str = str(client.files.get(name=file_name).state).upper()
+            if "ACTIVE" in state_str:
+                return True
+            if "FAILED" in state_str:
+                print_error("Gemini failed to process the media file.")
+                return False
+        except Exception as e:
+            print_warning(f"Error checking file state: {e}")
+        time.sleep(poll_interval)
+
+    print_error(f"Gave up waiting for Gemini to process the file after {timeout:.0f}s.")
+    return False
+
 
 def run_transcriber(
     filepath: str,
@@ -34,21 +70,14 @@ def run_transcriber(
 
     console.print(f"[dim]File uploaded. ID: {uploaded_file.name}. Waiting for processing...[/dim]")
 
-    # Wait for the file to be processed (important for large audio/video)
-    while True:
+    # Wait for the file to be processed (important for large audio/video).
+    if not _wait_for_active(client, uploaded_file.name):
+        # Don't leave the unusable upload sitting on the remote side.
         try:
-            f = client.files.get(name=uploaded_file.name)
-            # genai state might be a string or Enum, check for 'ACTIVE' string representation
-            state_str = str(f.state).upper()
-            if "ACTIVE" in state_str:
-                break
-            elif "FAILED" in state_str:
-                print_error("Gemini failed to process the media file.")
-                return
-            time.sleep(3)
-        except Exception as e:
-            print_warning(f"Error checking file state: {e}")
-            time.sleep(5)
+            client.files.delete(name=uploaded_file.name)
+        except Exception:
+            pass
+        return
 
     print_step("Generating transcription...")
 

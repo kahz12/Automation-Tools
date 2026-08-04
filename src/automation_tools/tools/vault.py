@@ -1,8 +1,9 @@
 import argparse
 import base64
+import getpass
 import os
 import struct
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import questionary
 
@@ -67,6 +68,30 @@ def _unique_path(path: str) -> str:
         if not os.path.exists(candidate):
             return candidate
         i += 1
+
+
+def _prompt_password(action: str, prompt: Callable[[str], str] = getpass.getpass) -> Optional[str]:
+    """
+    Asks the user for the vault password.
+
+    Encrypting asks twice and requires both entries to match: a typo there seals
+    the files under a password nobody knows, and the contents are gone for good.
+    Decrypting asks once — a wrong password is simply rejected by Fernet.
+
+    Returns None if the password is empty or the confirmation does not match.
+    """
+    password = prompt("Password: ")
+    if not password:
+        print_error("A password is required.")
+        return None
+
+    if action == "encrypt":
+        confirmation = prompt("Confirm password: ")
+        if confirmation != password:
+            print_error("The passwords do not match. Nothing was encrypted.")
+            return None
+
+    return password
 
 
 def _collect_files(path: str, action: str, recursive: bool) -> List[str]:
@@ -259,8 +284,9 @@ def main() -> None:
 
     password = args.password
     if not password:
-        import getpass
-        password = getpass.getpass("Password: ")
+        password = _prompt_password(args.action)
+        if not password:
+            raise SystemExit(1)
 
     ok = run_vault(
         path=args.path,

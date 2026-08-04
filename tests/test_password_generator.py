@@ -1,7 +1,5 @@
 import re
 
-import pytest
-
 from automation_tools.tools import password_generator as pg
 
 

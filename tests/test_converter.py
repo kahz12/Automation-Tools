@@ -1,5 +1,3 @@
-import os
-
 from PIL import Image
 
 from automation_tools.tools import converter

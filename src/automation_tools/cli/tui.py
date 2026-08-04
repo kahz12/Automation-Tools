@@ -37,6 +37,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "💾", "Archiver",
         "Bundle files into a zip/tar backup, list\nit, or extract it. Dry-run by default.",
     ),
+    "🔍  Log Analyzer": (
+        "🔍", "Log Analyzer",
+        "Scan .log files for keywords or regex\npatterns. Exports a full report.",
+    ),
     "🖼️   Image Converter": (
         "🖼️", "Image Converter",
         "Convert images between formats\n(png, jpg, webp…) or render PDF to images.",
@@ -69,6 +73,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "🔡", "Image OCR",
         "Extract text from images or scans using\nGoogle Gemini Vision. Plain text or Markdown.",
     ),
+    "🎤  A/V Transcriber": (
+        "🎤", "A/V Transcriber",
+        "Transcribe audio or video into SRT\nsubtitles or plain text via Gemini.",
+    ),
     "💰  Price Monitor": (
         "💰", "Price Monitor",
         "Track product prices on MercadoLibre\nand Amazon. Supports Telegram alerts.",
@@ -96,6 +104,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
     "🧾  Integrity Checker": (
         "🧾", "Integrity Checker",
         "Create a checksum manifest of a folder\nand verify it later. Detects corruption.",
+    ),
+    "⚙️  Dotenv Manager": (
+        "⚙️", "Dotenv Manager",
+        "Generate .env.example, scan for exposed\n.env files, validate against a template.",
     ),
 }
 
