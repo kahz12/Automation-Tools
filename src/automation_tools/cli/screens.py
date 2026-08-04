@@ -475,7 +475,10 @@ class ExecutionScreen(Screen):
 class ToolScreen(Screen):
     CSS = _CSS
 
+    # Subclasses supply these two plus `compose_fields`; the surrounding chrome
+    # (header panel, error slot, RUN/BACK row) is built once, here.
     TOOL_TITLE = "Tool"
+    TOOL_DESC = ""
 
     # The default selector ("*") focuses the first focusable widget, which is
     # the ScrollableContainer itself — keystrokes then drive scrolling instead
@@ -486,6 +489,26 @@ class ToolScreen(Screen):
         Binding("escape", "go_back", "Back"),
         Binding("ctrl+r", "do_run", "Run"),
     ]
+
+    def compose(self) -> ComposeResult:
+        """Standard tool layout. Override `compose_fields`, not this."""
+        yield Header()
+        with ScrollableContainer(classes="tool-body"):
+            yield Static(
+                f"[bold #22d3ee]{self.TOOL_TITLE}[/]\n"
+                f"[dim #64748b]{self.TOOL_DESC}[/]",
+                classes="tool-panel",
+            )
+            yield from self.compose_fields()
+            yield Static("", id="error-msg", classes="error-msg")
+            with Horizontal(classes="btn-row"):
+                yield Button("▶  RUN", id="run-btn")
+                yield Button("← BACK", id="back-btn")
+        yield Footer()
+
+    def compose_fields(self) -> ComposeResult:
+        """The form fields between the header panel and the buttons."""
+        yield from ()
 
     def action_go_back(self) -> None:
         self.app.pop_screen()
@@ -536,49 +559,38 @@ class ToolScreen(Screen):
 # ── 1. Massive Renamer ─────────────────────────────────────────────────────
 class RenamerScreen(ToolScreen):
     TOOL_TITLE = "✂️   Massive Renamer"
+    TOOL_DESC = "Rename batches of files using patterns, dates, or text replacement"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]✂️   Massive Renamer[/]\n"
-                "[dim #64748b]Rename batches of files using patterns, dates, or text replacement[/]",
-                classes="tool-panel",
-            )
-            yield Label("Directory:", classes="field-label")
-            yield Input(placeholder="/path/to/folder", id="dir")
-            yield Label("Mode:", classes="field-label")
-            with RadioSet(id="mode"):
-                yield RadioButton("Pattern  (e.g. photo_{:03d}.jpg)", id="rb-patron", value=True)
-                yield RadioButton("Date  (e.g. 2024-01-01_file.jpg)", id="rb-fecha")
-                yield RadioButton("Text replacement  (find → replace)", id="rb-replace")
-            # Pattern section
-            with Vertical(id="sec-patron", classes="sub-section"):
-                yield Label("Pattern (use {:03d} for numbering):", classes="field-label")
-                yield Input(placeholder="photo_{:03d}", id="pattern")
-            # Fecha section
-            with Vertical(id="sec-fecha", classes="sub-section"):
-                yield Label("Keep original name as suffix?", classes="field-label")
-                yield Switch(id="keep-name")
-            # Replace section
-            with Vertical(id="sec-replace", classes="sub-section"):
-                yield Label("Text to find:", classes="field-label")
-                yield Input(placeholder="copy of", id="old-text")
-                yield Label("Replacement (empty = delete):", classes="field-label")
-                yield Input(placeholder="", id="new-text")
-            yield Static("[dim #4b5563]── Options ──────────────────────────[/]", classes="section-sep")
-            yield Label("Filter by extension (optional, e.g. .jpg):", classes="field-label")
-            yield Input(placeholder=".jpg", id="ext")
-            yield Label("Apply changes? (off = simulation only)", classes="field-label")
-            yield Switch(id="apply", value=False)
-            with Vertical(id="sec-preview", classes="sub-section"):
-                yield Label("Preview & confirm before applying?", classes="field-label")
-                yield Switch(id="preview", value=True)
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Directory:", classes="field-label")
+        yield Input(placeholder="/path/to/folder", id="dir")
+        yield Label("Mode:", classes="field-label")
+        with RadioSet(id="mode"):
+            yield RadioButton("Pattern  (e.g. photo_{:03d}.jpg)", id="rb-patron", value=True)
+            yield RadioButton("Date  (e.g. 2024-01-01_file.jpg)", id="rb-fecha")
+            yield RadioButton("Text replacement  (find → replace)", id="rb-replace")
+        # Pattern section
+        with Vertical(id="sec-patron", classes="sub-section"):
+            yield Label("Pattern (use {:03d} for numbering):", classes="field-label")
+            yield Input(placeholder="photo_{:03d}", id="pattern")
+        # Fecha section
+        with Vertical(id="sec-fecha", classes="sub-section"):
+            yield Label("Keep original name as suffix?", classes="field-label")
+            yield Switch(id="keep-name")
+        # Replace section
+        with Vertical(id="sec-replace", classes="sub-section"):
+            yield Label("Text to find:", classes="field-label")
+            yield Input(placeholder="copy of", id="old-text")
+            yield Label("Replacement (empty = delete):", classes="field-label")
+            yield Input(placeholder="", id="new-text")
+        yield Static("[dim #4b5563]── Options ──────────────────────────[/]", classes="section-sep")
+        yield Label("Filter by extension (optional, e.g. .jpg):", classes="field-label")
+        yield Input(placeholder=".jpg", id="ext")
+        yield Label("Apply changes? (off = simulation only)", classes="field-label")
+        yield Switch(id="apply", value=False)
+        with Vertical(id="sec-preview", classes="sub-section"):
+            yield Label("Preview & confirm before applying?", classes="field-label")
+            yield Switch(id="preview", value=True)
 
     def on_mount(self) -> None:
         self.query_one("#sec-fecha").display = False
@@ -629,25 +641,14 @@ class RenamerScreen(ToolScreen):
 # ── 2. Price Monitor ───────────────────────────────────────────────────────
 class MonitorScreen(ToolScreen):
     TOOL_TITLE = "💰  Price Monitor"
+    TOOL_DESC = "Track prices on MercadoLibre and Amazon"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]💰  Price Monitor[/]\n"
-                "[dim #64748b]Track prices on MercadoLibre and Amazon[/]",
-                classes="tool-panel",
-            )
-            yield Label("Action:", classes="field-label")
-            with RadioSet(id="action"):
-                yield RadioButton("⚡  Run a check right now", id="rb-now", value=True)
-                yield RadioButton("🔁  Start continuous monitoring (hourly)", id="rb-loop")
-                yield RadioButton("📝  View configuration file path", id="rb-config")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Action:", classes="field-label")
+        with RadioSet(id="action"):
+            yield RadioButton("⚡  Run a check right now", id="rb-now", value=True)
+            yield RadioButton("🔁  Start continuous monitoring (hourly)", id="rb-loop")
+            yield RadioButton("📝  View configuration file path", id="rb-config")
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import monitor
@@ -679,29 +680,18 @@ class MonitorScreen(ToolScreen):
 # ── 3. AI Summarizer ───────────────────────────────────────────────────────
 class SummarizerScreen(ToolScreen):
     TOOL_TITLE = "📝  Document Summarizer"
+    TOOL_DESC = "Generate an executive summary of PDF or TXT files with Gemini AI"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]📝  Document Summarizer[/]\n"
-                "[dim #64748b]Generate an executive summary of PDF or TXT files with Gemini AI[/]",
-                classes="tool-panel",
-            )
-            yield Label("File path (PDF or TXT):", classes="field-label")
-            yield Input(placeholder="/path/to/file.pdf", id="filepath")
-            yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
-            yield Input(placeholder="AIza...", password=True, id="api-key")
-            yield Label("Save summary to file?", classes="field-label")
-            yield Switch(id="save", value=False)
-            with Vertical(id="sec-outpath", classes="sub-section"):
-                yield Label("Output path (leave empty for auto):", classes="field-label")
-                yield Input(placeholder="summary.txt", id="out-path")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("File path (PDF or TXT):", classes="field-label")
+        yield Input(placeholder="/path/to/file.pdf", id="filepath")
+        yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
+        yield Input(placeholder="AIza...", password=True, id="api-key")
+        yield Label("Save summary to file?", classes="field-label")
+        yield Switch(id="save", value=False)
+        with Vertical(id="sec-outpath", classes="sub-section"):
+            yield Label("Output path (leave empty for auto):", classes="field-label")
+            yield Input(placeholder="summary.txt", id="out-path")
 
     def on_mount(self) -> None:
         from automation_tools.core.config import get_env_var
@@ -733,46 +723,35 @@ class SummarizerScreen(ToolScreen):
 # ── 4. Image / PDF Converter ───────────────────────────────────────────────
 class ConverterScreen(ToolScreen):
     TOOL_TITLE = "🖼️   Image Converter"
+    TOOL_DESC = "Convert images between formats or render PDF pages to images"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🖼️   Image Converter[/]\n"
-                "[dim #64748b]Convert images between formats or render PDF pages to images[/]",
-                classes="tool-panel",
-            )
-            yield Label("Mode:", classes="field-label")
-            with RadioSet(id="mode"):
-                yield RadioButton("🖼️   Convert image or folder", id="rb-img", value=True)
-                yield RadioButton("📄  Render PDF to images", id="rb-pdf")
-            yield Label("File or folder path:", classes="field-label")
-            yield Input(placeholder="/path/to/image_or_folder", id="path")
-            # Image options
-            with Vertical(id="sec-img", classes="sub-section"):
-                yield Label("Output format:", classes="field-label")
-                with RadioSet(id="img-fmt"):
-                    yield RadioButton("PNG", id="rb-png", value=True)
-                    yield RadioButton("JPG", id="rb-jpg")
-                    yield RadioButton("WEBP", id="rb-webp")
-                    yield RadioButton("TIFF", id="rb-tiff")
-                with Vertical(id="sec-quality", classes="sub-section"):
-                    yield Label("Quality (1–100):", classes="field-label")
-                    yield Input(placeholder="85", id="quality")
-            # PDF options
-            with Vertical(id="sec-pdf-opts", classes="sub-section"):
-                yield Label("Output format:", classes="field-label")
-                with RadioSet(id="pdf-fmt"):
-                    yield RadioButton("PNG", id="rb-pdf-png", value=True)
-                    yield RadioButton("JPG", id="rb-pdf-jpg")
-                    yield RadioButton("WEBP", id="rb-pdf-webp")
-                yield Label("DPI:", classes="field-label")
-                yield Input(placeholder="200", id="dpi")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Mode:", classes="field-label")
+        with RadioSet(id="mode"):
+            yield RadioButton("🖼️   Convert image or folder", id="rb-img", value=True)
+            yield RadioButton("📄  Render PDF to images", id="rb-pdf")
+        yield Label("File or folder path:", classes="field-label")
+        yield Input(placeholder="/path/to/image_or_folder", id="path")
+        # Image options
+        with Vertical(id="sec-img", classes="sub-section"):
+            yield Label("Output format:", classes="field-label")
+            with RadioSet(id="img-fmt"):
+                yield RadioButton("PNG", id="rb-png", value=True)
+                yield RadioButton("JPG", id="rb-jpg")
+                yield RadioButton("WEBP", id="rb-webp")
+                yield RadioButton("TIFF", id="rb-tiff")
+            with Vertical(id="sec-quality", classes="sub-section"):
+                yield Label("Quality (1–100):", classes="field-label")
+                yield Input(placeholder="85", id="quality")
+        # PDF options
+        with Vertical(id="sec-pdf-opts", classes="sub-section"):
+            yield Label("Output format:", classes="field-label")
+            with RadioSet(id="pdf-fmt"):
+                yield RadioButton("PNG", id="rb-pdf-png", value=True)
+                yield RadioButton("JPG", id="rb-pdf-jpg")
+                yield RadioButton("WEBP", id="rb-pdf-webp")
+            yield Label("DPI:", classes="field-label")
+            yield Input(placeholder="200", id="dpi")
 
     def on_mount(self) -> None:
         self.query_one("#sec-pdf-opts").display = False
@@ -819,22 +798,11 @@ class ConverterScreen(ToolScreen):
 # ── 5. Convert to PDF ──────────────────────────────────────────────────────
 class PdfConverterScreen(ToolScreen):
     TOOL_TITLE = "📄  Convert to PDF"
+    TOOL_DESC = "Transform Office documents to PDF using LibreOffice"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]📄  Convert to PDF[/]\n"
-                "[dim #64748b]Transform Office documents to PDF using LibreOffice[/]",
-                classes="tool-panel",
-            )
-            yield Label("File to convert (.docx, .odt, .pptx, …):", classes="field-label")
-            yield Input(placeholder="/path/to/document.docx", id="filepath")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("File to convert (.docx, .odt, .pptx, …):", classes="field-label")
+        yield Input(placeholder="/path/to/document.docx", id="filepath")
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import converter
@@ -848,37 +816,26 @@ class PdfConverterScreen(ToolScreen):
 # ── 6. File Translator ─────────────────────────────────────────────────────
 class TranslatorScreen(ToolScreen):
     TOOL_TITLE = "🌐  File Translator"
+    TOOL_DESC = "Translate text, subtitles, or code files with Gemini AI"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🌐  File Translator[/]\n"
-                "[dim #64748b]Translate text, subtitles, or code files with Gemini AI[/]",
-                classes="tool-panel",
-            )
-            yield Label("File to translate:", classes="field-label")
-            yield Input(placeholder="/path/to/file.txt", id="filepath")
-            yield Label("Target language:", classes="field-label")
-            with RadioSet(id="lang"):
-                yield RadioButton("English", id="rb-en", value=True)
-                yield RadioButton("Spanish", id="rb-es")
-                yield RadioButton("French", id="rb-fr")
-                yield RadioButton("Portuguese", id="rb-pt")
-                yield RadioButton("German", id="rb-de")
-                yield RadioButton("Other…", id="rb-other")
-            with Vertical(id="sec-other", classes="sub-section"):
-                yield Label("Language name:", classes="field-label")
-                yield Input(placeholder="Japanese", id="other-lang")
-            yield Label("Google API Key:", classes="field-label")
-            yield Input(placeholder="AIza...", password=True, id="api-key")
-            yield Label("Save translation to file?", classes="field-label")
-            yield Switch(id="save", value=False)
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("File to translate:", classes="field-label")
+        yield Input(placeholder="/path/to/file.txt", id="filepath")
+        yield Label("Target language:", classes="field-label")
+        with RadioSet(id="lang"):
+            yield RadioButton("English", id="rb-en", value=True)
+            yield RadioButton("Spanish", id="rb-es")
+            yield RadioButton("French", id="rb-fr")
+            yield RadioButton("Portuguese", id="rb-pt")
+            yield RadioButton("German", id="rb-de")
+            yield RadioButton("Other…", id="rb-other")
+        with Vertical(id="sec-other", classes="sub-section"):
+            yield Label("Language name:", classes="field-label")
+            yield Input(placeholder="Japanese", id="other-lang")
+        yield Label("Google API Key:", classes="field-label")
+        yield Input(placeholder="AIza...", password=True, id="api-key")
+        yield Label("Save translation to file?", classes="field-label")
+        yield Switch(id="save", value=False)
 
     def on_mount(self) -> None:
         from automation_tools.core.config import get_env_var
@@ -924,31 +881,20 @@ class TranslatorScreen(ToolScreen):
 # ── 7. Duplicate Detector ──────────────────────────────────────────────────
 class DuplicatesScreen(ToolScreen):
     TOOL_TITLE = "🧬  Duplicate Detector"
+    TOOL_DESC = "Find identical files by content (MD5 hash)"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🧬  Duplicate Detector[/]\n"
-                "[dim #64748b]Find identical files by content (MD5 hash)[/]",
-                classes="tool-panel",
-            )
-            yield Label("Directory to scan:", classes="field-label")
-            yield Input(placeholder="/path/to/folder", id="dir")
-            yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
-            yield Input(placeholder="*.tmp, backup_*", id="excludes")
-            yield Label("Export CSV report of duplicates?", classes="field-label")
-            yield Switch(id="export", value=False)
-            with Vertical(id="sec-export", classes="sub-section"):
-                yield Label("CSV output path:", classes="field-label")
-                yield Input(placeholder="duplicates.csv", id="export-path")
-            yield Label("Auto-delete duplicates (keep one original)?", classes="field-label")
-            yield Switch(id="delete", value=False)
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Directory to scan:", classes="field-label")
+        yield Input(placeholder="/path/to/folder", id="dir")
+        yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
+        yield Input(placeholder="*.tmp, backup_*", id="excludes")
+        yield Label("Export CSV report of duplicates?", classes="field-label")
+        yield Switch(id="export", value=False)
+        with Vertical(id="sec-export", classes="sub-section"):
+            yield Label("CSV output path:", classes="field-label")
+            yield Input(placeholder="duplicates.csv", id="export-path")
+        yield Label("Auto-delete duplicates (keep one original)?", classes="field-label")
+        yield Switch(id="delete", value=False)
 
     def on_mount(self) -> None:
         self.query_one("#sec-export").display = False
@@ -977,28 +923,17 @@ class DuplicatesScreen(ToolScreen):
 # ── 8. YouTube Downloader ──────────────────────────────────────────────────
 class YoutubeScreen(ToolScreen):
     TOOL_TITLE = "📺  YouTube Downloader"
+    TOOL_DESC = "Download videos and audio in maximum quality"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]📺  YouTube Downloader[/]\n"
-                "[dim #64748b]Download videos and audio in maximum quality[/]",
-                classes="tool-panel",
-            )
-            yield Label("Video or playlist URL:", classes="field-label")
-            yield Input(placeholder="https://youtube.com/watch?v=...", id="url")
-            yield Label("Download mode:", classes="field-label")
-            with RadioSet(id="mode"):
-                yield RadioButton("🎬  Video — high quality MP4", id="rb-video", value=True)
-                yield RadioButton("🎵  Audio — MP3", id="rb-audio")
-            yield Label("Download full playlist?", classes="field-label")
-            yield Switch(id="playlist", value=False)
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Video or playlist URL:", classes="field-label")
+        yield Input(placeholder="https://youtube.com/watch?v=...", id="url")
+        yield Label("Download mode:", classes="field-label")
+        with RadioSet(id="mode"):
+            yield RadioButton("🎬  Video — high quality MP4", id="rb-video", value=True)
+            yield RadioButton("🎵  Audio — MP3", id="rb-audio")
+        yield Label("Download full playlist?", classes="field-label")
+        yield Switch(id="playlist", value=False)
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import youtube_downloader
@@ -1016,24 +951,13 @@ class YoutubeScreen(ToolScreen):
 # ── 9. README Generator ────────────────────────────────────────────────────
 class ReadmeScreen(ToolScreen):
     TOOL_TITLE = "📘  README Generator"
+    TOOL_DESC = "Analyze a project and draft its README using Gemini AI"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]📘  README Generator[/]\n"
-                "[dim #64748b]Analyze a project and draft its README using Gemini AI[/]",
-                classes="tool-panel",
-            )
-            yield Label("Project directory:", classes="field-label")
-            yield Input(placeholder="/path/to/project", id="dir")
-            yield Label("Google API Key:", classes="field-label")
-            yield Input(placeholder="AIza...", password=True, id="api-key")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Project directory:", classes="field-label")
+        yield Input(placeholder="/path/to/project", id="dir")
+        yield Label("Google API Key:", classes="field-label")
+        yield Input(placeholder="AIza...", password=True, id="api-key")
 
     def on_mount(self) -> None:
         from automation_tools.core.config import get_env_var
@@ -1055,29 +979,18 @@ class ReadmeScreen(ToolScreen):
 # ── 10. Metadata Extractor ─────────────────────────────────────────────────
 class MetadataScreen(ToolScreen):
     TOOL_TITLE = "🔎  Metadata Extractor"
+    TOOL_DESC = "Reveal EXIF data from images and PDF information"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🔎  Metadata Extractor[/]\n"
-                "[dim #64748b]Reveal EXIF data from images and PDF information[/]",
-                classes="tool-panel",
-            )
-            yield Label("File to inspect (PDF, JPG, PNG, …):", classes="field-label")
-            yield Input(placeholder="/path/to/file.jpg", id="filepath")
-            yield Label("Export metadata to file?", classes="field-label")
-            yield Switch(id="export", value=False)
-            with Vertical(id="sec-export", classes="sub-section"):
-                yield Label("Output path (.json or .csv):", classes="field-label")
-                yield Input(placeholder="metadata.json", id="export-path")
-            yield Label("Create a copy without EXIF data (images only)?", classes="field-label")
-            yield Switch(id="clean", value=False)
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("File to inspect (PDF, JPG, PNG, …):", classes="field-label")
+        yield Input(placeholder="/path/to/file.jpg", id="filepath")
+        yield Label("Export metadata to file?", classes="field-label")
+        yield Switch(id="export", value=False)
+        with Vertical(id="sec-export", classes="sub-section"):
+            yield Label("Output path (.json or .csv):", classes="field-label")
+            yield Input(placeholder="metadata.json", id="export-path")
+        yield Label("Create a copy without EXIF data (images only)?", classes="field-label")
+        yield Switch(id="clean", value=False)
 
     def on_mount(self) -> None:
         self.query_one("#sec-export").display = False
@@ -1103,31 +1016,20 @@ class MetadataScreen(ToolScreen):
 # ── 11. Downloads Organizer ────────────────────────────────────────────────
 class OrganizerScreen(ToolScreen):
     TOOL_TITLE = "📦  Organize Downloads"
+    TOOL_DESC = "Move files in Downloads into subfolders by type"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]📦  Organize Downloads[/]\n"
-                "[dim #64748b]Move files in Downloads into subfolders by type[/]",
-                classes="tool-panel",
-            )
-            yield Label("Action:", classes="field-label")
-            with RadioSet(id="action"):
-                yield RadioButton("📦  Organize now", id="rb-run", value=True)
-                yield RadioButton("↩️   Undo last organization", id="rb-undo")
-                yield RadioButton("🗂️   List history", id="rb-list")
-            with Vertical(id="sec-policy", classes="sub-section"):
-                yield Label("If file already exists in destination:", classes="field-label")
-                with RadioSet(id="policy"):
-                    yield RadioButton("📝  Rename  (file_1.ext)", id="rb-rename", value=True)
-                    yield RadioButton("⏭️   Skip", id="rb-skip")
-                    yield RadioButton("⚠️   Overwrite", id="rb-overwrite")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Action:", classes="field-label")
+        with RadioSet(id="action"):
+            yield RadioButton("📦  Organize now", id="rb-run", value=True)
+            yield RadioButton("↩️   Undo last organization", id="rb-undo")
+            yield RadioButton("🗂️   List history", id="rb-list")
+        with Vertical(id="sec-policy", classes="sub-section"):
+            yield Label("If file already exists in destination:", classes="field-label")
+            with RadioSet(id="policy"):
+                yield RadioButton("📝  Rename  (file_1.ext)", id="rb-rename", value=True)
+                yield RadioButton("⏭️   Skip", id="rb-skip")
+                yield RadioButton("⚠️   Overwrite", id="rb-overwrite")
 
     @on(RadioSet.Changed, "#action")
     def _action_changed(self, e: RadioSet.Changed) -> None:
@@ -1162,62 +1064,51 @@ class OrganizerScreen(ToolScreen):
 # ── 12. Password Manager ───────────────────────────────────────────────────
 class PasswordScreen(ToolScreen):
     TOOL_TITLE = "🔐  Password Manager"
+    TOOL_DESC = "Generate passwords, passphrases, and evaluate strength"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🔐  Password Manager[/]\n"
-                "[dim #64748b]Generate passwords, passphrases, and evaluate strength[/]",
-                classes="tool-panel",
-            )
-            yield Label("Action:", classes="field-label")
-            with RadioSet(id="action"):
-                yield RadioButton("🎲  Generate secure password", id="rb-secure", value=True)
-                yield RadioButton("🧠  Generate memorable passphrase", id="rb-phrase")
-                yield RadioButton("🛡️   Evaluate password strength", id="rb-strength")
-            # Secure password section
-            with Vertical(id="sec-secure", classes="sub-section"):
-                yield Static("[dim #4b5563]── Secure Password ──────────────────[/]", classes="section-sep")
-                yield Label("Length (4–128):", classes="field-label")
-                yield Input(placeholder="16", id="length")
-                yield Label("Include symbols (!@#$…)?", classes="field-label")
-                yield Switch(id="symbols", value=True)
-                yield Label("Exclude ambiguous chars (I/l/1, O/0)?", classes="field-label")
-                yield Switch(id="no-ambiguous", value=False)
-                yield Label("How many to generate?", classes="field-label")
-                yield Input(placeholder="5", id="count-pwd")
-            # Passphrase section
-            with Vertical(id="sec-phrase", classes="sub-section"):
-                yield Static("[dim #4b5563]── Passphrase ───────────────────────[/]", classes="section-sep")
-                yield Label("Number of words (2–10):", classes="field-label")
-                yield Input(placeholder="4", id="num-words")
-                yield Label("Word separator:", classes="field-label")
-                with RadioSet(id="sep"):
-                    yield RadioButton("Hyphen  (-)", id="rb-sep-dash", value=True)
-                    yield RadioButton("Dot  (.)", id="rb-sep-dot")
-                    yield RadioButton("Underscore  (_)", id="rb-sep-us")
-                    yield RadioButton("Space", id="rb-sep-space")
-                yield Label("Capitalize words?", classes="field-label")
-                yield Switch(id="capitalize", value=True)
-                yield Label("Add number at end?", classes="field-label")
-                yield Switch(id="add-number", value=True)
-                yield Label("Add symbol at end?", classes="field-label")
-                yield Switch(id="add-special", value=False)
-                yield Label("How many to generate?", classes="field-label")
-                yield Input(placeholder="5", id="count-phrase")
-            # Strength section
-            with Vertical(id="sec-strength", classes="sub-section"):
-                yield Static("[dim #4b5563]── Strength Check ───────────────────[/]", classes="section-sep")
-                yield Label("Password to evaluate:", classes="field-label")
-                yield Input(placeholder="••••••••", password=True, id="check-pwd")
-                yield Label("Check HaveIBeenPwned? (k-anonymity, secure)", classes="field-label")
-                yield Switch(id="check-breach", value=True)
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Action:", classes="field-label")
+        with RadioSet(id="action"):
+            yield RadioButton("🎲  Generate secure password", id="rb-secure", value=True)
+            yield RadioButton("🧠  Generate memorable passphrase", id="rb-phrase")
+            yield RadioButton("🛡️   Evaluate password strength", id="rb-strength")
+        # Secure password section
+        with Vertical(id="sec-secure", classes="sub-section"):
+            yield Static("[dim #4b5563]── Secure Password ──────────────────[/]", classes="section-sep")
+            yield Label("Length (4–128):", classes="field-label")
+            yield Input(placeholder="16", id="length")
+            yield Label("Include symbols (!@#$…)?", classes="field-label")
+            yield Switch(id="symbols", value=True)
+            yield Label("Exclude ambiguous chars (I/l/1, O/0)?", classes="field-label")
+            yield Switch(id="no-ambiguous", value=False)
+            yield Label("How many to generate?", classes="field-label")
+            yield Input(placeholder="5", id="count-pwd")
+        # Passphrase section
+        with Vertical(id="sec-phrase", classes="sub-section"):
+            yield Static("[dim #4b5563]── Passphrase ───────────────────────[/]", classes="section-sep")
+            yield Label("Number of words (2–10):", classes="field-label")
+            yield Input(placeholder="4", id="num-words")
+            yield Label("Word separator:", classes="field-label")
+            with RadioSet(id="sep"):
+                yield RadioButton("Hyphen  (-)", id="rb-sep-dash", value=True)
+                yield RadioButton("Dot  (.)", id="rb-sep-dot")
+                yield RadioButton("Underscore  (_)", id="rb-sep-us")
+                yield RadioButton("Space", id="rb-sep-space")
+            yield Label("Capitalize words?", classes="field-label")
+            yield Switch(id="capitalize", value=True)
+            yield Label("Add number at end?", classes="field-label")
+            yield Switch(id="add-number", value=True)
+            yield Label("Add symbol at end?", classes="field-label")
+            yield Switch(id="add-special", value=False)
+            yield Label("How many to generate?", classes="field-label")
+            yield Input(placeholder="5", id="count-phrase")
+        # Strength section
+        with Vertical(id="sec-strength", classes="sub-section"):
+            yield Static("[dim #4b5563]── Strength Check ───────────────────[/]", classes="section-sep")
+            yield Label("Password to evaluate:", classes="field-label")
+            yield Input(placeholder="••••••••", password=True, id="check-pwd")
+            yield Label("Check HaveIBeenPwned? (k-anonymity, secure)", classes="field-label")
+            yield Switch(id="check-breach", value=True)
 
     def on_mount(self) -> None:
         self.query_one("#sec-phrase").display = False
@@ -1289,46 +1180,35 @@ class PasswordScreen(ToolScreen):
 # ── 13. Space Cleaner ──────────────────────────────────────────────────────
 class CleanerScreen(ToolScreen):
     TOOL_TITLE = "🧹  Space Cleaner"
+    TOOL_DESC = "Detect cache, large, and old files (dry-run by default)"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🧹  Space Cleaner[/]\n"
-                "[dim #64748b]Detect cache, large, and old files (dry-run by default)[/]",
-                classes="tool-panel",
-            )
-            yield Label("Directory to analyze:", classes="field-label")
-            yield Input(placeholder="/path/to/folder", id="dir")
-            yield Static("[dim #4b5563]── What to detect ───────────────────[/]", classes="section-sep")
-            yield Label("Find junk/cache files?", classes="field-label")
-            yield Switch(id="find-junk", value=True)
-            yield Label("Find large files?", classes="field-label")
-            yield Switch(id="find-large", value=True)
-            with Vertical(id="sec-large", classes="sub-section"):
-                yield Label("Large file threshold (MB):", classes="field-label")
-                yield Input(placeholder="100", id="large-mb")
-            yield Label("Find old files?", classes="field-label")
-            yield Switch(id="find-old", value=True)
-            with Vertical(id="sec-old", classes="sub-section"):
-                yield Label("Age threshold (days since last modification):", classes="field-label")
-                yield Input(placeholder="365", id="old-days")
-            yield Static("[dim #4b5563]── Actions ──────────────────────────[/]", classes="section-sep")
-            yield Label("Apply deletion? (off = simulation only)", classes="field-label")
-            yield Switch(id="apply", value=False)
-            with Vertical(id="sec-delete-all", classes="sub-section"):
-                yield Label("Include large/old files in deletion?", classes="field-label")
-                yield Switch(id="delete-all", value=False)
-            yield Label("Export scan report to file?", classes="field-label")
-            yield Switch(id="export", value=False)
-            with Vertical(id="sec-export", classes="sub-section"):
-                yield Label("Output path (.json or .csv):", classes="field-label")
-                yield Input(placeholder="cleaning_report.json", id="export-path")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Directory to analyze:", classes="field-label")
+        yield Input(placeholder="/path/to/folder", id="dir")
+        yield Static("[dim #4b5563]── What to detect ───────────────────[/]", classes="section-sep")
+        yield Label("Find junk/cache files?", classes="field-label")
+        yield Switch(id="find-junk", value=True)
+        yield Label("Find large files?", classes="field-label")
+        yield Switch(id="find-large", value=True)
+        with Vertical(id="sec-large", classes="sub-section"):
+            yield Label("Large file threshold (MB):", classes="field-label")
+            yield Input(placeholder="100", id="large-mb")
+        yield Label("Find old files?", classes="field-label")
+        yield Switch(id="find-old", value=True)
+        with Vertical(id="sec-old", classes="sub-section"):
+            yield Label("Age threshold (days since last modification):", classes="field-label")
+            yield Input(placeholder="365", id="old-days")
+        yield Static("[dim #4b5563]── Actions ──────────────────────────[/]", classes="section-sep")
+        yield Label("Apply deletion? (off = simulation only)", classes="field-label")
+        yield Switch(id="apply", value=False)
+        with Vertical(id="sec-delete-all", classes="sub-section"):
+            yield Label("Include large/old files in deletion?", classes="field-label")
+            yield Switch(id="delete-all", value=False)
+        yield Label("Export scan report to file?", classes="field-label")
+        yield Switch(id="export", value=False)
+        with Vertical(id="sec-export", classes="sub-section"):
+            yield Label("Output path (.json or .csv):", classes="field-label")
+            yield Input(placeholder="cleaning_report.json", id="export-path")
 
     @on(Switch.Changed, "#find-large")
     def _large_changed(self, e: Switch.Changed) -> None:
@@ -1387,84 +1267,72 @@ class CleanerScreen(ToolScreen):
 # ── 14. PDF Toolkit ────────────────────────────────────────────────────────
 class PdfToolkitScreen(ToolScreen):
     TOOL_TITLE = "📑  PDF Toolkit"
+    TOOL_DESC = "Merge, split, extract, rotate, encrypt or decrypt PDF files"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]📑  PDF Toolkit[/]\n"
-                "[dim #64748b]Merge, split, extract, rotate, encrypt or decrypt PDF files[/]",
-                classes="tool-panel",
-            )
-            yield Label("Operation:", classes="field-label")
-            with RadioSet(id="op"):
-                yield RadioButton("🔗  Merge several PDFs into one", id="rb-merge", value=True)
-                yield RadioButton("✂️   Split into one file per page", id="rb-split")
-                yield RadioButton("📑  Extract selected pages", id="rb-extract")
-                yield RadioButton("🔄  Rotate pages", id="rb-rotate")
-                yield RadioButton("🔒  Encrypt (set a password)", id="rb-encrypt")
-                yield RadioButton("🔓  Decrypt (remove password)", id="rb-decrypt")
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Operation:", classes="field-label")
+        with RadioSet(id="op"):
+            yield RadioButton("🔗  Merge several PDFs into one", id="rb-merge", value=True)
+            yield RadioButton("✂️   Split into one file per page", id="rb-split")
+            yield RadioButton("📑  Extract selected pages", id="rb-extract")
+            yield RadioButton("🔄  Rotate pages", id="rb-rotate")
+            yield RadioButton("🔒  Encrypt (set a password)", id="rb-encrypt")
+            yield RadioButton("🔓  Decrypt (remove password)", id="rb-decrypt")
 
-            # Merge
-            with Vertical(id="sec-merge", classes="sub-section"):
-                yield Label("PDF files (comma-separated) or a folder:", classes="field-label")
-                yield Input(placeholder="/a.pdf, /b.pdf    or    /folder", id="merge-input")
-                yield Label("Output PDF path:", classes="field-label")
-                yield Input(placeholder="/path/to/merged.pdf", id="merge-out")
+        # Merge
+        with Vertical(id="sec-merge", classes="sub-section"):
+            yield Label("PDF files (comma-separated) or a folder:", classes="field-label")
+            yield Input(placeholder="/a.pdf, /b.pdf    or    /folder", id="merge-input")
+            yield Label("Output PDF path:", classes="field-label")
+            yield Input(placeholder="/path/to/merged.pdf", id="merge-out")
 
-            # Split
-            with Vertical(id="sec-split", classes="sub-section"):
-                yield Label("PDF file to split:", classes="field-label")
-                yield Input(placeholder="/path/to/file.pdf", id="split-input")
-                yield Label("Output folder (optional):", classes="field-label")
-                yield Input(placeholder="default: <name>_pages", id="split-out")
+        # Split
+        with Vertical(id="sec-split", classes="sub-section"):
+            yield Label("PDF file to split:", classes="field-label")
+            yield Input(placeholder="/path/to/file.pdf", id="split-input")
+            yield Label("Output folder (optional):", classes="field-label")
+            yield Input(placeholder="default: <name>_pages", id="split-out")
 
-            # Extract
-            with Vertical(id="sec-extract", classes="sub-section"):
-                yield Label("PDF file:", classes="field-label")
-                yield Input(placeholder="/path/to/file.pdf", id="extract-input")
-                yield Label("Pages to keep (1-based, e.g. 1-3,5,8-10):", classes="field-label")
-                yield Input(placeholder="1-3,5", id="extract-pages")
-                yield Label("Output PDF (optional):", classes="field-label")
-                yield Input(placeholder="default: <name>_extract.pdf", id="extract-out")
+        # Extract
+        with Vertical(id="sec-extract", classes="sub-section"):
+            yield Label("PDF file:", classes="field-label")
+            yield Input(placeholder="/path/to/file.pdf", id="extract-input")
+            yield Label("Pages to keep (1-based, e.g. 1-3,5,8-10):", classes="field-label")
+            yield Input(placeholder="1-3,5", id="extract-pages")
+            yield Label("Output PDF (optional):", classes="field-label")
+            yield Input(placeholder="default: <name>_extract.pdf", id="extract-out")
 
-            # Rotate
-            with Vertical(id="sec-rotate", classes="sub-section"):
-                yield Label("PDF file:", classes="field-label")
-                yield Input(placeholder="/path/to/file.pdf", id="rotate-input")
-                yield Label("Angle (clockwise):", classes="field-label")
-                with RadioSet(id="rotate-angle"):
-                    yield RadioButton("90°", id="rb-90", value=True)
-                    yield RadioButton("180°", id="rb-180")
-                    yield RadioButton("270°", id="rb-270")
-                yield Label("Pages (optional, blank = all pages):", classes="field-label")
-                yield Input(placeholder="all pages", id="rotate-pages")
-                yield Label("Output PDF (optional):", classes="field-label")
-                yield Input(placeholder="default: <name>_rotated.pdf", id="rotate-out")
+        # Rotate
+        with Vertical(id="sec-rotate", classes="sub-section"):
+            yield Label("PDF file:", classes="field-label")
+            yield Input(placeholder="/path/to/file.pdf", id="rotate-input")
+            yield Label("Angle (clockwise):", classes="field-label")
+            with RadioSet(id="rotate-angle"):
+                yield RadioButton("90°", id="rb-90", value=True)
+                yield RadioButton("180°", id="rb-180")
+                yield RadioButton("270°", id="rb-270")
+            yield Label("Pages (optional, blank = all pages):", classes="field-label")
+            yield Input(placeholder="all pages", id="rotate-pages")
+            yield Label("Output PDF (optional):", classes="field-label")
+            yield Input(placeholder="default: <name>_rotated.pdf", id="rotate-out")
 
-            # Encrypt
-            with Vertical(id="sec-encrypt", classes="sub-section"):
-                yield Label("PDF file:", classes="field-label")
-                yield Input(placeholder="/path/to/file.pdf", id="encrypt-input")
-                yield Label("Password to set:", classes="field-label")
-                yield Input(placeholder="••••••••", password=True, id="encrypt-pwd")
-                yield Label("Output PDF (optional):", classes="field-label")
-                yield Input(placeholder="default: <name>_encrypted.pdf", id="encrypt-out")
+        # Encrypt
+        with Vertical(id="sec-encrypt", classes="sub-section"):
+            yield Label("PDF file:", classes="field-label")
+            yield Input(placeholder="/path/to/file.pdf", id="encrypt-input")
+            yield Label("Password to set:", classes="field-label")
+            yield Input(placeholder="••••••••", password=True, id="encrypt-pwd")
+            yield Label("Output PDF (optional):", classes="field-label")
+            yield Input(placeholder="default: <name>_encrypted.pdf", id="encrypt-out")
 
-            # Decrypt
-            with Vertical(id="sec-decrypt", classes="sub-section"):
-                yield Label("Encrypted PDF file:", classes="field-label")
-                yield Input(placeholder="/path/to/file.pdf", id="decrypt-input")
-                yield Label("Current password:", classes="field-label")
-                yield Input(placeholder="••••••••", password=True, id="decrypt-pwd")
-                yield Label("Output PDF (optional):", classes="field-label")
-                yield Input(placeholder="default: <name>_decrypted.pdf", id="decrypt-out")
-
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+        # Decrypt
+        with Vertical(id="sec-decrypt", classes="sub-section"):
+            yield Label("Encrypted PDF file:", classes="field-label")
+            yield Input(placeholder="/path/to/file.pdf", id="decrypt-input")
+            yield Label("Current password:", classes="field-label")
+            yield Input(placeholder="••••••••", password=True, id="decrypt-pwd")
+            yield Label("Output PDF (optional):", classes="field-label")
+            yield Input(placeholder="default: <name>_decrypted.pdf", id="decrypt-out")
 
     _SECTIONS = ("merge", "split", "extract", "rotate", "encrypt", "decrypt")
 
@@ -1555,34 +1423,23 @@ class PdfToolkitScreen(ToolScreen):
 # ── 15. Web Clipper ────────────────────────────────────────────────────────
 class WebClipperScreen(ToolScreen):
     TOOL_TITLE = "📰  Web Clipper"
+    TOOL_DESC = "Save a web page's main article as clean Markdown or text"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]📰  Web Clipper[/]\n"
-                "[dim #64748b]Save a web page's main article as clean Markdown or text[/]",
-                classes="tool-panel",
-            )
-            yield Label("Page URL:", classes="field-label")
-            yield Input(placeholder="https://example.com/article", id="url")
-            yield Label("Output format:", classes="field-label")
-            with RadioSet(id="fmt"):
-                yield RadioButton("📝  Markdown", id="rb-md", value=True)
-                yield RadioButton("📄  Plain text", id="rb-txt")
-            with Vertical(id="sec-img", classes="sub-section"):
-                yield Label("Include images? (Markdown only)", classes="field-label")
-                yield Switch(id="images", value=True)
-            yield Label("Save to a file?", classes="field-label")
-            yield Switch(id="save", value=True)
-            with Vertical(id="sec-out", classes="sub-section"):
-                yield Label("Output path (leave empty for auto-name):", classes="field-label")
-                yield Input(placeholder="article.md", id="out-path")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Page URL:", classes="field-label")
+        yield Input(placeholder="https://example.com/article", id="url")
+        yield Label("Output format:", classes="field-label")
+        with RadioSet(id="fmt"):
+            yield RadioButton("📝  Markdown", id="rb-md", value=True)
+            yield RadioButton("📄  Plain text", id="rb-txt")
+        with Vertical(id="sec-img", classes="sub-section"):
+            yield Label("Include images? (Markdown only)", classes="field-label")
+            yield Switch(id="images", value=True)
+        yield Label("Save to a file?", classes="field-label")
+        yield Switch(id="save", value=True)
+        with Vertical(id="sec-out", classes="sub-section"):
+            yield Label("Output path (leave empty for auto-name):", classes="field-label")
+            yield Input(placeholder="article.md", id="out-path")
 
     @on(RadioSet.Changed, "#fmt")
     def _fmt_changed(self, e: RadioSet.Changed) -> None:
@@ -1613,56 +1470,45 @@ class WebClipperScreen(ToolScreen):
 
 class ImageProcessorScreen(ToolScreen):
     TOOL_TITLE = "🪄  Image Processor"
+    TOOL_DESC = "Batch resize, compress or watermark images. Originals are kept"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🪄  Image Processor[/]\n"
-                "[dim #64748b]Batch resize, compress or watermark images. Originals are kept[/]",
-                classes="tool-panel",
-            )
-            yield Label("Operation:", classes="field-label")
-            with RadioSet(id="op"):
-                yield RadioButton("📐  Resize", id="rb-resize", value=True)
-                yield RadioButton("🗜️   Compress", id="rb-compress")
-                yield RadioButton("🪄  Watermark", id="rb-watermark")
-            yield Label("Image file or folder:", classes="field-label")
-            yield Input(placeholder="/path/to/image_or_folder", id="path")
-            # Resize options
-            with Vertical(id="sec-resize", classes="sub-section"):
-                yield Label("Max dimension — longest side, px (leave empty if using %):",
-                            classes="field-label")
-                yield Input(placeholder="1920", id="max-size")
-                yield Label("Or scale by percentage (e.g. 50):", classes="field-label")
-                yield Input(placeholder="(optional)", id="scale")
-            # Compress options
-            with Vertical(id="sec-compress", classes="sub-section"):
-                yield Label("Quality (1–100, lower = smaller file):", classes="field-label")
-                yield Input(placeholder="80", id="quality")
-            # Watermark options
-            with Vertical(id="sec-watermark", classes="sub-section"):
-                yield Label("Watermark text:", classes="field-label")
-                yield Input(placeholder="© My Name 2026", id="wm-text")
-                yield Label("Position:", classes="field-label")
-                with RadioSet(id="wm-pos"):
-                    yield RadioButton("Bottom-right", id="rb-br", value=True)
-                    yield RadioButton("Bottom-left", id="rb-bl")
-                    yield RadioButton("Top-right", id="rb-tr")
-                    yield RadioButton("Top-left", id="rb-tl")
-                    yield RadioButton("Center", id="rb-center")
-                yield Label("Opacity (0–100):", classes="field-label")
-                yield Input(placeholder="50", id="wm-opacity")
-            yield Label("Recurse into subfolders?", classes="field-label")
-            yield Switch(id="recursive", value=False)
-            yield Label("Output folder (leave empty for '<input>/processed'):",
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Operation:", classes="field-label")
+        with RadioSet(id="op"):
+            yield RadioButton("📐  Resize", id="rb-resize", value=True)
+            yield RadioButton("🗜️   Compress", id="rb-compress")
+            yield RadioButton("🪄  Watermark", id="rb-watermark")
+        yield Label("Image file or folder:", classes="field-label")
+        yield Input(placeholder="/path/to/image_or_folder", id="path")
+        # Resize options
+        with Vertical(id="sec-resize", classes="sub-section"):
+            yield Label("Max dimension — longest side, px (leave empty if using %):",
                         classes="field-label")
-            yield Input(placeholder="(optional)", id="out-dir")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+            yield Input(placeholder="1920", id="max-size")
+            yield Label("Or scale by percentage (e.g. 50):", classes="field-label")
+            yield Input(placeholder="(optional)", id="scale")
+        # Compress options
+        with Vertical(id="sec-compress", classes="sub-section"):
+            yield Label("Quality (1–100, lower = smaller file):", classes="field-label")
+            yield Input(placeholder="80", id="quality")
+        # Watermark options
+        with Vertical(id="sec-watermark", classes="sub-section"):
+            yield Label("Watermark text:", classes="field-label")
+            yield Input(placeholder="© My Name 2026", id="wm-text")
+            yield Label("Position:", classes="field-label")
+            with RadioSet(id="wm-pos"):
+                yield RadioButton("Bottom-right", id="rb-br", value=True)
+                yield RadioButton("Bottom-left", id="rb-bl")
+                yield RadioButton("Top-right", id="rb-tr")
+                yield RadioButton("Top-left", id="rb-tl")
+                yield RadioButton("Center", id="rb-center")
+            yield Label("Opacity (0–100):", classes="field-label")
+            yield Input(placeholder="50", id="wm-opacity")
+        yield Label("Recurse into subfolders?", classes="field-label")
+        yield Switch(id="recursive", value=False)
+        yield Label("Output folder (leave empty for '<input>/processed'):",
+                    classes="field-label")
+        yield Input(placeholder="(optional)", id="out-dir")
 
     def on_mount(self) -> None:
         self.query_one("#sec-compress").display = False
@@ -1742,40 +1588,29 @@ class ImageProcessorScreen(ToolScreen):
 
 class VaultScreen(ToolScreen):
     TOOL_TITLE = "🔒  Encryption Vault"
+    TOOL_DESC = "Encrypt or decrypt files and folders with a password (AES)"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🔒  Encryption Vault[/]\n"
-                "[dim #64748b]Encrypt or decrypt files and folders with a password (AES)[/]",
-                classes="tool-panel",
-            )
-            yield Label("Action:", classes="field-label")
-            with RadioSet(id="action"):
-                yield RadioButton("🔒  Encrypt", id="rb-encrypt", value=True)
-                yield RadioButton("🔓  Decrypt", id="rb-decrypt")
-            yield Label("File or folder:", classes="field-label")
-            yield Input(placeholder="/path/to/file_or_folder", id="path")
-            yield Label("Password:", classes="field-label")
-            yield Input(placeholder="••••••••", password=True, id="password")
-            # Only shown for encryption: confirm to avoid locking yourself out.
-            with Vertical(id="sec-confirm", classes="sub-section"):
-                yield Label("Confirm password:", classes="field-label")
-                yield Input(placeholder="••••••••", password=True, id="password2")
-            yield Label("Recurse into subfolders?", classes="field-label")
-            yield Switch(id="recursive", value=True)
-            yield Label("Delete originals after? (irreversible — asks to confirm)",
-                        classes="field-label")
-            yield Switch(id="remove", value=False)
-            yield Label("Output folder (leave empty to write next to each file):",
-                        classes="field-label")
-            yield Input(placeholder="(optional)", id="out-dir")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Action:", classes="field-label")
+        with RadioSet(id="action"):
+            yield RadioButton("🔒  Encrypt", id="rb-encrypt", value=True)
+            yield RadioButton("🔓  Decrypt", id="rb-decrypt")
+        yield Label("File or folder:", classes="field-label")
+        yield Input(placeholder="/path/to/file_or_folder", id="path")
+        yield Label("Password:", classes="field-label")
+        yield Input(placeholder="••••••••", password=True, id="password")
+        # Only shown for encryption: confirm to avoid locking yourself out.
+        with Vertical(id="sec-confirm", classes="sub-section"):
+            yield Label("Confirm password:", classes="field-label")
+            yield Input(placeholder="••••••••", password=True, id="password2")
+        yield Label("Recurse into subfolders?", classes="field-label")
+        yield Switch(id="recursive", value=True)
+        yield Label("Delete originals after? (irreversible — asks to confirm)",
+                    classes="field-label")
+        yield Switch(id="remove", value=False)
+        yield Label("Output folder (leave empty to write next to each file):",
+                    classes="field-label")
+        yield Input(placeholder="(optional)", id="out-dir")
 
     @on(RadioSet.Changed, "#action")
     def _action_changed(self, e: RadioSet.Changed) -> None:
@@ -1815,60 +1650,48 @@ class VaultScreen(ToolScreen):
 # ── 18. Archiver ───────────────────────────────────────────────────────────
 class ArchiverScreen(ToolScreen):
     TOOL_TITLE = "💾  Archiver"
+    TOOL_DESC = "Bundle files into a zip/tar backup, list it, or extract it"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]💾  Archiver[/]\n"
-                "[dim #64748b]Bundle files into a zip/tar backup, list it, or extract it[/]",
-                classes="tool-panel",
-            )
-            yield Label("Action:", classes="field-label")
-            with RadioSet(id="action"):
-                yield RadioButton("📦  Create a backup archive", id="rb-create", value=True)
-                yield RadioButton("📋  List an archive's contents", id="rb-list")
-                yield RadioButton("📂  Extract an archive", id="rb-extract")
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Action:", classes="field-label")
+        with RadioSet(id="action"):
+            yield RadioButton("📦  Create a backup archive", id="rb-create", value=True)
+            yield RadioButton("📋  List an archive's contents", id="rb-list")
+            yield RadioButton("📂  Extract an archive", id="rb-extract")
 
-            # Create
-            with Vertical(id="sec-create", classes="sub-section"):
-                yield Label("Sources — files/folders (comma-separated):", classes="field-label")
-                yield Input(placeholder="/path/to/folder, /path/to/file.txt", id="create-sources")
-                yield Label("Output archive (optional):", classes="field-label")
-                yield Input(placeholder="default: <source>_<timestamp>", id="create-output")
-                yield Label("Format:", classes="field-label")
-                with RadioSet(id="create-format"):
-                    yield RadioButton("zip", id="rb-zip", value=True)
-                    yield RadioButton("tar.gz", id="rb-targz")
-                    yield RadioButton("tar.bz2", id="rb-tarbz2")
-                yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
-                yield Input(placeholder="*.log, __pycache__, node_modules", id="create-exclude")
-                yield Label("Include hidden dotfiles?", classes="field-label")
-                yield Switch(id="create-hidden", value=False)
-                yield Label("Apply? (off = preview only)", classes="field-label")
-                yield Switch(id="create-apply", value=False)
+        # Create
+        with Vertical(id="sec-create", classes="sub-section"):
+            yield Label("Sources — files/folders (comma-separated):", classes="field-label")
+            yield Input(placeholder="/path/to/folder, /path/to/file.txt", id="create-sources")
+            yield Label("Output archive (optional):", classes="field-label")
+            yield Input(placeholder="default: <source>_<timestamp>", id="create-output")
+            yield Label("Format:", classes="field-label")
+            with RadioSet(id="create-format"):
+                yield RadioButton("zip", id="rb-zip", value=True)
+                yield RadioButton("tar.gz", id="rb-targz")
+                yield RadioButton("tar.bz2", id="rb-tarbz2")
+            yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
+            yield Input(placeholder="*.log, __pycache__, node_modules", id="create-exclude")
+            yield Label("Include hidden dotfiles?", classes="field-label")
+            yield Switch(id="create-hidden", value=False)
+            yield Label("Apply? (off = preview only)", classes="field-label")
+            yield Switch(id="create-apply", value=False)
 
-            # List
-            with Vertical(id="sec-list", classes="sub-section"):
-                yield Label("Archive to inspect:", classes="field-label")
-                yield Input(placeholder="/path/to/backup.zip", id="list-archive")
+        # List
+        with Vertical(id="sec-list", classes="sub-section"):
+            yield Label("Archive to inspect:", classes="field-label")
+            yield Input(placeholder="/path/to/backup.zip", id="list-archive")
 
-            # Extract
-            with Vertical(id="sec-extract", classes="sub-section"):
-                yield Label("Archive to extract:", classes="field-label")
-                yield Input(placeholder="/path/to/backup.zip", id="extract-archive")
-                yield Label("Destination folder (optional):", classes="field-label")
-                yield Input(placeholder="default: archive name", id="extract-dest")
-                yield Label("Overwrite existing files?", classes="field-label")
-                yield Switch(id="extract-overwrite", value=False)
-                yield Label("Apply? (off = preview only)", classes="field-label")
-                yield Switch(id="extract-apply", value=False)
-
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+        # Extract
+        with Vertical(id="sec-extract", classes="sub-section"):
+            yield Label("Archive to extract:", classes="field-label")
+            yield Input(placeholder="/path/to/backup.zip", id="extract-archive")
+            yield Label("Destination folder (optional):", classes="field-label")
+            yield Input(placeholder="default: archive name", id="extract-dest")
+            yield Label("Overwrite existing files?", classes="field-label")
+            yield Switch(id="extract-overwrite", value=False)
+            yield Label("Apply? (off = preview only)", classes="field-label")
+            yield Switch(id="extract-apply", value=False)
 
     _SECTIONS = ("create", "list", "extract")
 
@@ -1935,32 +1758,21 @@ class ArchiverScreen(ToolScreen):
 # ── 19. Image OCR ──────────────────────────────────────────────────────────
 class OcrScreen(ToolScreen):
     TOOL_TITLE = "🔡  Image OCR"
+    TOOL_DESC = "Extract text from images or scans with Gemini Vision"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🔡  Image OCR[/]\n"
-                "[dim #64748b]Extract text from images or scans with Gemini Vision[/]",
-                classes="tool-panel",
-            )
-            yield Label("Image file or folder:", classes="field-label")
-            yield Input(placeholder="/path/to/scan.png  or  /path/to/folder", id="path")
-            yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
-            yield Input(placeholder="AIza...", password=True, id="api-key")
-            yield Label("Reconstruct layout as Markdown? (off = plain text)", classes="field-label")
-            yield Switch(id="markdown", value=False)
-            yield Label("Language hint (optional):", classes="field-label")
-            yield Input(placeholder="e.g. Spanish, English…", id="language")
-            yield Label("Recurse into subfolders? (when a folder is given)", classes="field-label")
-            yield Switch(id="recursive", value=False)
-            yield Label("Output file (single image) or folder (batch) — optional:", classes="field-label")
-            yield Input(placeholder="leave empty to auto-name / save next to source", id="out-path")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Image file or folder:", classes="field-label")
+        yield Input(placeholder="/path/to/scan.png  or  /path/to/folder", id="path")
+        yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
+        yield Input(placeholder="AIza...", password=True, id="api-key")
+        yield Label("Reconstruct layout as Markdown? (off = plain text)", classes="field-label")
+        yield Switch(id="markdown", value=False)
+        yield Label("Language hint (optional):", classes="field-label")
+        yield Input(placeholder="e.g. Spanish, English…", id="language")
+        yield Label("Recurse into subfolders? (when a folder is given)", classes="field-label")
+        yield Switch(id="recursive", value=False)
+        yield Label("Output file (single image) or folder (batch) — optional:", classes="field-label")
+        yield Input(placeholder="leave empty to auto-name / save next to source", id="out-path")
 
     def on_mount(self) -> None:
         from automation_tools.core.config import get_env_var
@@ -1988,49 +1800,38 @@ class OcrScreen(ToolScreen):
 # ── 20. Integrity Checker ──────────────────────────────────────────────────
 class IntegrityScreen(ToolScreen):
     TOOL_TITLE = "🧾  Integrity Checker"
+    TOOL_DESC = "Create a checksum manifest of a folder and verify it later"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🧾  Integrity Checker[/]\n"
-                "[dim #64748b]Create a checksum manifest of a folder and verify it later[/]",
-                classes="tool-panel",
-            )
-            yield Label("Action:", classes="field-label")
-            with RadioSet(id="action"):
-                yield RadioButton("🧾  Create a checksum manifest", id="rb-create", value=True)
-                yield RadioButton("✅  Verify a folder against a manifest", id="rb-verify")
-            yield Label("Directory:", classes="field-label")
-            yield Input(placeholder="/path/to/folder", id="dir")
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Action:", classes="field-label")
+        with RadioSet(id="action"):
+            yield RadioButton("🧾  Create a checksum manifest", id="rb-create", value=True)
+            yield RadioButton("✅  Verify a folder against a manifest", id="rb-verify")
+        yield Label("Directory:", classes="field-label")
+        yield Input(placeholder="/path/to/folder", id="dir")
 
-            # Create
-            with Vertical(id="sec-create", classes="sub-section"):
-                yield Label("Hash algorithm:", classes="field-label")
-                with RadioSet(id="algorithm"):
-                    yield RadioButton("SHA-256  (recommended)", id="rb-sha256", value=True)
-                    yield RadioButton("SHA-512", id="rb-sha512")
-                    yield RadioButton("MD5  (fast, legacy)", id="rb-md5")
-                yield Label("Manifest output path (optional):", classes="field-label")
-                yield Input(placeholder="default: <directory>/checksums.sha256", id="output")
+        # Create
+        with Vertical(id="sec-create", classes="sub-section"):
+            yield Label("Hash algorithm:", classes="field-label")
+            with RadioSet(id="algorithm"):
+                yield RadioButton("SHA-256  (recommended)", id="rb-sha256", value=True)
+                yield RadioButton("SHA-512", id="rb-sha512")
+                yield RadioButton("MD5  (fast, legacy)", id="rb-md5")
+            yield Label("Manifest output path (optional):", classes="field-label")
+            yield Input(placeholder="default: <directory>/checksums.sha256", id="output")
 
-            # Verify
-            with Vertical(id="sec-verify", classes="sub-section"):
-                yield Label("Manifest file (optional — auto-detects checksums.*):", classes="field-label")
-                yield Input(placeholder="default: auto-detect inside the folder", id="manifest")
-                yield Label("Also report new files not in the manifest?", classes="field-label")
-                yield Switch(id="extra", value=True)
+        # Verify
+        with Vertical(id="sec-verify", classes="sub-section"):
+            yield Label("Manifest file (optional — auto-detects checksums.*):", classes="field-label")
+            yield Input(placeholder="default: auto-detect inside the folder", id="manifest")
+            yield Label("Also report new files not in the manifest?", classes="field-label")
+            yield Switch(id="extra", value=True)
 
-            yield Static("[dim #4b5563]── Options ──────────────────────────[/]", classes="section-sep")
-            yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
-            yield Input(placeholder="*.log, __pycache__", id="excludes")
-            yield Label("Include hidden dotfiles?", classes="field-label")
-            yield Switch(id="hidden", value=False)
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+        yield Static("[dim #4b5563]── Options ──────────────────────────[/]", classes="section-sep")
+        yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
+        yield Input(placeholder="*.log, __pycache__", id="excludes")
+        yield Label("Include hidden dotfiles?", classes="field-label")
+        yield Switch(id="hidden", value=False)
 
     def on_mount(self) -> None:
         self.query_one("#sec-verify").display = False
@@ -2080,31 +1881,20 @@ class IntegrityScreen(ToolScreen):
 # ── 21. A/V Transcriber ────────────────────────────────────────────────────
 class TranscriberScreen(ToolScreen):
     TOOL_TITLE = "🎤  A/V Transcriber"
+    TOOL_DESC = "Transcribe audio and video files using Gemini AI"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🎤  A/V Transcriber[/]\n"
-                "[dim #64748b]Transcribe audio and video files using Gemini AI[/]",
-                classes="tool-panel",
-            )
-            yield Label("File path (audio or video):", classes="field-label")
-            yield Input(placeholder="/path/to/media.mp3", id="filepath")
-            yield Label("Output format:", classes="field-label")
-            with RadioSet(id="mode"):
-                yield RadioButton("SRT Subtitles", id="rb-srt", value=True)
-                yield RadioButton("Plain Text", id="rb-txt")
-            yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
-            yield Input(placeholder="AIza...", password=True, id="api-key")
-            with Vertical(id="sec-outpath", classes="sub-section"):
-                yield Label("Output path (leave empty for auto):", classes="field-label")
-                yield Input(placeholder="transcription.srt", id="out-path")
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("File path (audio or video):", classes="field-label")
+        yield Input(placeholder="/path/to/media.mp3", id="filepath")
+        yield Label("Output format:", classes="field-label")
+        with RadioSet(id="mode"):
+            yield RadioButton("SRT Subtitles", id="rb-srt", value=True)
+            yield RadioButton("Plain Text", id="rb-txt")
+        yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
+        yield Input(placeholder="AIza...", password=True, id="api-key")
+        with Vertical(id="sec-outpath", classes="sub-section"):
+            yield Label("Output path (leave empty for auto):", classes="field-label")
+            yield Input(placeholder="transcription.srt", id="out-path")
 
     def on_mount(self) -> None:
         from automation_tools.core.config import get_env_var
@@ -2128,36 +1918,24 @@ class TranscriberScreen(ToolScreen):
 # ── 22. Log Analyzer ─────────────────────────────────────────────────────────
 class LogAnalyzerScreen(ToolScreen):
     TOOL_TITLE = "🔍  Log Analyzer"
+    TOOL_DESC = "Scan log files for errors, exceptions or specific patterns"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]🔍  Log Analyzer[/]\n"
-                "[dim #64748b]Scan log files for errors, exceptions or specific patterns[/]",
-                classes="tool-panel",
-            )
-            yield Label("File or Directory path:", classes="field-label")
-            yield Input(placeholder="/var/log/ OR /path/to/app.log", id="path")
-            yield Label("Keywords (comma separated) or Regex pattern:", classes="field-label")
-            yield Input(placeholder="Error, Exception, Fatal", id="keywords")
-            
-            yield Label("Search mode:", classes="field-label")
-            with RadioSet(id="mode"):
-                yield RadioButton("Normal text (comma separated)", id="rb-text", value=True)
-                yield RadioButton("Regex pattern", id="rb-regex")
-                
-            yield Label("Case Sensitive?", classes="field-label")
-            yield Switch(id="case-sensitive", value=False)
-            
-            yield Label("Save report to file? (Optional):", classes="field-label")
-            yield Input(placeholder="report.txt", id="out-path")
-            
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("File or Directory path:", classes="field-label")
+        yield Input(placeholder="/var/log/ OR /path/to/app.log", id="path")
+        yield Label("Keywords (comma separated) or Regex pattern:", classes="field-label")
+        yield Input(placeholder="Error, Exception, Fatal", id="keywords")
+
+        yield Label("Search mode:", classes="field-label")
+        with RadioSet(id="mode"):
+            yield RadioButton("Normal text (comma separated)", id="rb-text", value=True)
+            yield RadioButton("Regex pattern", id="rb-regex")
+
+        yield Label("Case Sensitive?", classes="field-label")
+        yield Switch(id="case-sensitive", value=False)
+
+        yield Label("Save report to file? (Optional):", classes="field-label")
+        yield Input(placeholder="report.txt", id="out-path")
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import log_analyzer
@@ -2186,37 +1964,25 @@ class LogAnalyzerScreen(ToolScreen):
 # ── 23. Dotenv & Config Manager ──────────────────────────────────────────────
 class EnvManagerScreen(ToolScreen):
     TOOL_TITLE = "⚙️  Dotenv Manager"
+    TOOL_DESC = "Manage, scan, and validate your .env files"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with ScrollableContainer(classes="tool-body"):
-            yield Static(
-                "[bold #22d3ee]⚙️  Dotenv Manager[/]\n"
-                "[dim #64748b]Manage, scan, and validate your .env files[/]",
-                classes="tool-panel",
-            )
-            yield Label("Action:", classes="field-label")
-            with RadioSet(id="action"):
-                yield RadioButton("Generate .env.example template", id="rb-generate", value=True)
-                yield RadioButton("Scan directory for exposed .env files", id="rb-scan")
-                yield RadioButton("Validate .env against template", id="rb-validate")
-                
-            yield Label("Target Path (.env file or directory):", classes="field-label")
-            yield Input(placeholder="/path/to/.env OR /path/to/project/", id="target-path")
-            
-            with Vertical(id="sec-example-path", classes="sub-section"):
-                yield Label("Template Path (e.g. .env.example) [For Validate]:", classes="field-label")
-                yield Input(placeholder="/path/to/.env.example", id="example-path")
-                
-            with Vertical(id="sec-out-path", classes="sub-section"):
-                yield Label("Output Path [For Generate]:", classes="field-label")
-                yield Input(placeholder="Leave empty for <target>.example", id="out-path")
-                
-            yield Static("", id="error-msg", classes="error-msg")
-            with Horizontal(classes="btn-row"):
-                yield Button("▶  RUN", id="run-btn")
-                yield Button("← BACK", id="back-btn")
-        yield Footer()
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Action:", classes="field-label")
+        with RadioSet(id="action"):
+            yield RadioButton("Generate .env.example template", id="rb-generate", value=True)
+            yield RadioButton("Scan directory for exposed .env files", id="rb-scan")
+            yield RadioButton("Validate .env against template", id="rb-validate")
+
+        yield Label("Target Path (.env file or directory):", classes="field-label")
+        yield Input(placeholder="/path/to/.env OR /path/to/project/", id="target-path")
+
+        with Vertical(id="sec-example-path", classes="sub-section"):
+            yield Label("Template Path (e.g. .env.example) [For Validate]:", classes="field-label")
+            yield Input(placeholder="/path/to/.env.example", id="example-path")
+
+        with Vertical(id="sec-out-path", classes="sub-section"):
+            yield Label("Output Path [For Generate]:", classes="field-label")
+            yield Input(placeholder="Leave empty for <target>.example", id="out-path")
 
     def on_mount(self) -> None:
         self.query_one("#sec-example-path").display = False

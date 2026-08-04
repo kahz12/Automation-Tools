@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "automation-tools"
+version = "1.0.0"
+description = "A unified command-line toolkit of Python utilities for everyday automation."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Ale", email = "alejo96az@gmail.com" }]
+keywords = ["automation", "cli", "tui", "textual", "gemini", "files"]
+
+# 3.10 is the effective floor: requests, google-genai, python-dotenv, Pillow and
+# yt-dlp all dropped 3.9 in their current releases.
+requires-python = ">=3.10"
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Utilities",
+]
+
+# Floors are the majors this project is actually exercised against; the upper
+# caps stop the next major's breaking changes from landing unannounced.
+dependencies = [
+    "textual>=8,<9",
+    "rich>=13,<16",
+    "questionary>=2,<3",
+    "requests>=2.31,<3",
+    "beautifulsoup4>=4.12,<5",
+    "google-genai>=1,<3",
+    "pypdf>=4,<7",
+    "python-dotenv>=1,<2",
+    "Pillow>=10,<13",
+    "yt-dlp>=2024.1",
+    "cryptography>=42,<51",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pyflakes>=3",
+]
+
+[project.urls]
+Homepage = "https://github.com/kahz12/Automation-Tools"
+Repository = "https://github.com/kahz12/Automation-Tools"
+
+[project.scripts]
+automation-tools = "automation_tools.cli.menu:main_menu"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -16,18 +16,23 @@ def run_log_analyzer(
     use_regex: bool = False,
     ignore_case: bool = True,
     out_path: Optional[str] = None
-) -> None:
+) -> bool:
     """
     Scans a log file or a directory of log files for specific keywords or regex patterns.
-    Outputs a summary of matches found.
+    Outputs a summary of the matches found.
+
+    Returns True when the scan ran to completion — finding zero matches still
+    counts as a successful scan. Returns False when it could not run at all: a
+    bad path, no patterns, an invalid regex, nothing to scan, or an unwritable
+    report destination.
     """
     if not os.path.exists(path):
         print_error(f"Path '{path}' does not exist.")
-        return
+        return False
 
     if not keywords:
         print_error("You must provide at least one keyword or regex pattern to search for.")
-        return
+        return False
 
     # Parse keywords
     if use_regex:
@@ -46,7 +51,7 @@ def run_log_analyzer(
                 compiled_regexes.append(re.compile(re.escape(pat), flags))
         except re.error as e:
             print_error(f"Invalid regex '{pat}': {e}")
-            return
+            return False
 
     # Gather files
     files_to_scan = []
@@ -61,7 +66,7 @@ def run_log_analyzer(
     
     if not files_to_scan:
         print_warning("No .log files found to analyze.")
-        return
+        return False
 
     print_step(f"Analyzing {len(files_to_scan)} file(s) for {len(patterns)} pattern(s)...")
 
@@ -73,7 +78,7 @@ def run_log_analyzer(
             report = open(out_path, "w", encoding="utf-8")
         except OSError as e:
             print_error(f"Error saving report to {out_path}: {e}")
-            return
+            return False
 
     console.print(f"\n[cyan]{'='*50}[/cyan]")
     console.print("[bold]LOG ANALYSIS REPORT[/bold]")
@@ -134,8 +139,10 @@ def run_log_analyzer(
     if out_path:
         console.print(f"[dim]Full report saved to: {out_path}[/dim]")
 
+    return True
 
-def main():
+
+def main() -> None:
     parser = argparse.ArgumentParser(description="Log Analyzer - Scan logs for errors or patterns")
     parser.add_argument("path", help="Path to a .log file or directory containing .log files")
     parser.add_argument("--keywords", required=True, help="Comma-separated keywords, or a regex pattern")
@@ -145,13 +152,14 @@ def main():
     
     args = parser.parse_args()
     
-    run_log_analyzer(
+    ok = run_log_analyzer(
         path=args.path,
         keywords=args.keywords,
         use_regex=args.regex,
         ignore_case=not args.case_sensitive,
         out_path=args.out
     )
+    raise SystemExit(0 if ok else 1)
 
 if __name__ == "__main__":
     main()

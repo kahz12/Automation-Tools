@@ -119,7 +119,8 @@ info "Installing Python dependencies..."
 # shellcheck disable=SC1091
 source "${VENV_DIR}/bin/activate"
 pip install --quiet --upgrade pip
-pip install --quiet -r "${INSTALL_DIR}/requirements.txt"
+# Installs the package itself (and its dependencies) from pyproject.toml.
+pip install --quiet -e "${INSTALL_DIR}"
 deactivate
 
 # ---------------------------------------------------------------------------

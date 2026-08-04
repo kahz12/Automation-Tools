@@ -1,28 +1,8 @@
-# Herramientas de Automatización - Dependencias
+# Dependencies live in pyproject.toml — this file just points at them so the
+# familiar `pip install -r requirements.txt` keeps working. Run it from the
+# project root.
+#
+# Runtime only:  pip install -e .
+# With tests:    pip install -e ".[dev]"
 
-# Interfaz y Menú
-textual
-rich
-questionary
-
-# Web Scraping (Monitor de Precios)
-requests
-beautifulsoup4
-
-# Procesamiento de Documentos e IA (Resumidor)
-google-genai
-pypdf
-python-dotenv
-
-# Manipulación de Imágenes (Renombrador)
-Pillow
-
-# Utilidades Varias
-yt-dlp
-
-# Cifrado de archivos (Bóveda)
-cryptography
-
-# Tests
-pytest
-pyflakes
+-e .[dev]

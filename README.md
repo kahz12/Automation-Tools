@@ -2,11 +2,11 @@
 
 # Automation Tools
 
-**A unified command-line toolkit of twenty Python utilities for everyday automation.**
+**A unified command-line toolkit of twenty-three Python utilities for everyday automation.**
 
 Files · Conversion · AI (Gemini) · Web & Multimedia · Encryption · Utilities
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20Termux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 [![Made with](https://img.shields.io/badge/Made%20with-Textual%20%2B%20Gemini-purple.svg)]()
@@ -30,7 +30,7 @@ Files · Conversion · AI (Gemini) · Web & Multimedia · Encryption · Utilitie
 
 ## Overview
 
-**Automation Tools** bundles twenty standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
+**Automation Tools** bundles twenty-three standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
 
 - **Unified launcher** — one `automation-tools` command, arrow-key navigation, a recent-tools list
 - **Standalone scripts** — every tool also works on its own with a conventional CLI (`--help` everywhere)
@@ -66,10 +66,12 @@ bash install.sh
 git clone https://github.com/kahz12/Automation-Tools.git
 cd Automation-Tools
 python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+pip install -e .            # add ".[dev]" to get pytest and pyflakes too
 ```
 
-> **Optional dependencies:** [LibreOffice](https://www.libreoffice.org/) (office → PDF conversion) and a **Google API key** (AI tools).
+Installing the package registers the `automation-tools` command inside the virtual environment.
+
+> **Requires Python 3.10+.** Optional extras: [LibreOffice](https://www.libreoffice.org/) (office → PDF conversion) and a **Google API key** (AI tools).
 
 ---
 
@@ -126,6 +128,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 | Duplicate Finder | `duplicate_finder.py` | Find byte-identical files by MD5 hash; optional CSV report and auto-delete. |
 | Space Cleaner | `space_cleaner.py` | Reclaim space from caches, large files, and stale files (dry-run by default). |
 | Archiver | `archiver.py` | Bundle files/folders into a timestamped zip/tar backup, list it, or extract it — pure Python, dry-run by default, Zip Slip-safe. |
+| Log Analyzer | `log_analyzer.py` | Scan a log file or folder of `.log` files for keywords or a regex; streams results into a report. |
 
 ### Conversion
 
@@ -144,6 +147,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 | File Translator | `translator.py` | Translate files while preserving structure (code comments, subtitles, JSON, Markdown). |
 | README Generator | `readme_generator.py` | Analyze a project's structure and code, then draft a professional `README.md`. |
 | Image OCR | `ocr.py` | Extract text from images or scans with Gemini Vision — single file or batch, as plain text or Markdown. |
+| A/V Transcriber | `transcriber.py` | Transcribe audio or video into SRT subtitles or a plain-text transcript with Gemini. |
 
 ### Web & Multimedia
 
@@ -161,6 +165,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 | Password Manager | `password_generator.py` | Generate passwords/passphrases and score strength (HaveIBeenPwned check). |
 | Encryption Vault | `vault.py` | Encrypt/decrypt files & folders with a password (AES, authenticated). |
 | Integrity Checker | `integrity.py` | Create a checksum manifest (MD5/SHA-1/SHA-256/SHA-512) of a folder and verify it later — `sha256sum -c` compatible. |
+| Dotenv Manager | `env_manager.py` | Generate a `.env.example` template, scan a tree for exposed `.env` files, and validate a `.env` against its template. |
 
 ---
 
@@ -184,13 +189,15 @@ cp productos_a_monitorear.example.json productos_a_monitorear.json
 
 ## Testing
 
-The test dependencies (`pytest`) ship in `requirements.txt`. Run the suite from the project root:
+Install the dev extra, then run the suite from the project root:
 
 ```bash
+pip install -e ".[dev]"
 pytest
+pyflakes src/ tests/
 ```
 
-Tests live in `tests/`, exercise temporary directories only (your real files are never touched), and mock all network/API paths (HaveIBeenPwned, Gemini, yt-dlp) — so the suite runs fully offline.
+Tests live in `tests/`, exercise temporary directories only (your real files are never touched), and mock all network/API paths (HaveIBeenPwned, Gemini, yt-dlp) — so the suite runs fully offline. The same two commands run in CI on Python 3.10, 3.12 and 3.13 for every push and pull request.
 
 ---
 
@@ -199,14 +206,16 @@ Tests live in `tests/`, exercise temporary directories only (your real files are
 ```
 Automation-Tools/
 ├── run.py                              # User entry point
-├── requirements.txt                    # Runtime + test dependencies
+├── pyproject.toml                      # Packaging, dependencies, entry point
+├── requirements.txt                    # Points at pyproject (pip install -r still works)
 ├── pytest.ini                          # Test configuration
 ├── productos_a_monitorear.example.json # Price-monitor config template
 ├── README.md  ·  GUIDE_CONFIG.md       # Documentation
+├── .github/workflows/ci.yml            # pytest + pyflakes on 3.10 / 3.12 / 3.13
 ├── src/automation_tools/
 │   ├── core/                           # logger (Rich output) · config (settings & paths)
 │   ├── cli/                            # menu · tui (Textual dashboard) · screens
-│   └── tools/                          # 20 tool modules (one per utility)
+│   └── tools/                          # 23 tool modules (one per utility)
 └── tests/                              # pytest suite (one file per module)
 ```
 
@@ -214,7 +223,7 @@ Automation-Tools/
 
 ## License
 
-Released under the **MIT License**.
+Released under the **MIT License** — see [LICENSE](LICENSE).
 
 <div align="center">
 

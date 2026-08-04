@@ -89,6 +89,55 @@ def test_scans_log_files_in_a_directory(tmp_path):
     assert "ignored" not in report
 
 
+# ── exit contract ───────────────────────────────────────────────────────────
+# Like every other tool here, run_* returns True only when the operation
+# actually ran, so `main()` can turn that into a usable exit code. Finding zero
+# matches is still a successful scan.
+
+def test_returns_true_on_a_successful_scan(tmp_path):
+    log = tmp_path / "app.log"
+    log.write_text("ERROR bad\n", encoding="utf-8")
+    assert log_analyzer.run_log_analyzer(str(log), keywords="ERROR") is True
+
+
+def test_returns_true_when_nothing_matches(tmp_path):
+    log = tmp_path / "app.log"
+    log.write_text("all quiet\n", encoding="utf-8")
+    assert log_analyzer.run_log_analyzer(str(log), keywords="ERROR") is True
+
+
+def test_returns_false_for_a_missing_path(tmp_path):
+    assert log_analyzer.run_log_analyzer(str(tmp_path / "nope.log"), keywords="ERROR") is False
+
+
+def test_returns_false_without_keywords(tmp_path):
+    log = tmp_path / "app.log"
+    log.write_text("x\n", encoding="utf-8")
+    assert log_analyzer.run_log_analyzer(str(log), keywords="") is False
+
+
+def test_returns_false_for_an_invalid_regex(tmp_path):
+    log = tmp_path / "app.log"
+    log.write_text("x\n", encoding="utf-8")
+    assert log_analyzer.run_log_analyzer(str(log), keywords="([bad", use_regex=True) is False
+
+
+def test_returns_false_when_a_directory_holds_no_log_files(tmp_path):
+    (tmp_path / "notes.txt").write_text("ERROR\n", encoding="utf-8")
+    assert log_analyzer.run_log_analyzer(str(tmp_path), keywords="ERROR") is False
+
+
+def test_returns_false_when_the_report_cannot_be_written(tmp_path):
+    log = tmp_path / "app.log"
+    log.write_text("ERROR bad\n", encoding="utf-8")
+    # A directory is never a writable report destination.
+    unwritable = tmp_path / "adir"
+    unwritable.mkdir()
+    assert log_analyzer.run_log_analyzer(
+        str(log), keywords="ERROR", out_path=str(unwritable)
+    ) is False
+
+
 # ── the actual defect ───────────────────────────────────────────────────────
 def test_memory_does_not_grow_with_the_number_of_matches(tmp_path):
     """A log with many matches must not be buffered whole in memory."""
