@@ -26,17 +26,7 @@ def convert_single_file(
     output_format: str,
     quality: int = 85,
 ) -> bool:
-    """
-    Converts a single image file to the specified format.
-    
-    Args:
-        input_path (str): Path to the source image file.
-        output_format (str): The target format (e.g., 'png', 'jpg', 'webp').
-        quality (int): Quality setting for JPEG and WebP output (1-100).
-        
-    Returns:
-        bool: True if conversion was successful, False otherwise.
-    """
+    """Converts one image file to `output_format`. False if it could not be read or written."""
     try:
         pillow_format = FORMAT_MAP.get(output_format.lower())
         if not pillow_format:
@@ -73,14 +63,7 @@ def convert_single_file(
 
 
 def run_image_converter(input_path: str, output_format: str, quality: int = 85) -> None:
-    """
-    Core function to convert an image or a directory of images.
-    
-    Args:
-        input_path (str): Path to an image file or a directory containing images.
-        output_format (str): The target format for the images.
-        quality (int): Quality setting for JPEG/WebP (1-100).
-    """
+    """Converts an image, or every image in a directory, to `output_format`."""
     if not os.path.exists(input_path):
         print_error(f"The path '{input_path}' is not valid.")
         return
@@ -108,12 +91,7 @@ def run_image_converter(input_path: str, output_format: str, quality: int = 85) 
 
 
 def run_pdf_converter(input_path: str) -> None:
-    """
-    Converts a document (docx, odt, etc.) to PDF using LibreOffice headless mode.
-    
-    Args:
-        input_path (str): Path to the source document.
-    """
+    """Converts a document (docx, odt…) to PDF through LibreOffice in headless mode."""
     import subprocess
 
     if not os.path.exists(input_path):
@@ -145,15 +123,7 @@ def run_pdf_converter(input_path: str) -> None:
 
 
 def run_pdf_to_image(input_path: str, output_format: str = "png", dpi: int = 200) -> None:
-    """
-    Converts each page of a PDF file to an image.
-    Requires `pdf2image` library and `poppler` binaries.
-    
-    Args:
-        input_path (str): Path to the PDF file.
-        output_format (str): The target image format (default: 'png').
-        dpi (int): Dots per inch for rendering (default: 200).
-    """
+    """Renders each page of a PDF as an image. Needs `pdf2image` and the poppler binaries."""
     if not os.path.exists(input_path):
         print_error(f"The file '{input_path}' does not exist.")
         return
@@ -193,8 +163,7 @@ def run_pdf_to_image(input_path: str, output_format: str = "png", dpi: int = 200
 
 
 def main():
-    """
-    Main entry point for the converter tool CLI.
+    """Main entry point for the converter tool CLI.
     Parses arguments and dispatches to appropriate conversion function.
     """
     parser = argparse.ArgumentParser(description="Converts an image or directory to a different format.")

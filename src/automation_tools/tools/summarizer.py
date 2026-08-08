@@ -3,14 +3,13 @@ import argparse
 from typing import List, Optional
 import pypdf
 
+from automation_tools.ai import AIProviderError, Capability, get_provider
 from automation_tools.core.logger import console, print_error, print_step, print_warning
-from automation_tools.tools.gemini_utils import get_gemini_client, generate_content
 
-# --- AI Document Summarizer Tool ---
-# This tool extracts text from PDF or TXT files and uses the Gemini AI model
-# to generate concise executive summaries and key bullet points.
+# Pulls text out of a PDF or TXT and asks the configured AI provider for an
+# executive summary plus key bullets.
 
-# Maximum characters to process in a single Gemini request.
+# Anything longer than this is split and summarised chunk by chunk.
 CHUNK_CHARS = 28000
 
 
@@ -38,8 +37,7 @@ def extract_text_from_txt(filepath: str) -> Optional[str]:
 
 
 def _chunk_text(text: str, max_chars: int = CHUNK_CHARS) -> List[str]:
-    """
-    Splits long text into smaller chunks to fit within AI model limits.
+    """Splits long text into smaller chunks to fit within AI model limits.
     Attempts to break text at paragraph or sentence boundaries for better context.
     """
     if len(text) <= max_chars:
@@ -62,9 +60,11 @@ def _chunk_text(text: str, max_chars: int = CHUNK_CHARS) -> List[str]:
     return chunks
 
 
-def run_summarizer(filepath: str, api_key: Optional[str] = None, out_path: Optional[str] = None) -> None:
-    """
-    Orchestrates the summarization workflow:
+def run_summarizer(filepath: str, api_key: Optional[str] = None,
+                   out_path: Optional[str] = None,
+                   provider: Optional[str] = None,
+                   model: Optional[str] = None) -> None:
+    """Orchestrates the summarization workflow:
     1. Extracts text from the document.
     2. Chunks text if it is too long.
     3. Summarizes individual chunks (Map phase).
@@ -90,9 +90,11 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None, out_path: Optio
         print_error("Could not extract text from file.")
         return
 
-    # Initialize Gemini client.
-    client = get_gemini_client(api_key)
-    if not client:
+    # Resolve the AI provider.
+    try:
+        ai = get_provider(Capability.TEXT, name=provider, api_key=api_key, model=model)
+    except AIProviderError as e:
+        print_error(str(e))
         return
 
     chunks = _chunk_text(text)
@@ -117,11 +119,10 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None, out_path: Optio
     partials: List[str] = []
     if len(chunks) == 1:
         # Simple case: Document fits in one request.
-        print_step("Generating summary with Gemini...")
-        summary = generate_content(
-            client,
+        print_step("Generating summary with AI...")
+        summary = ai.generate_text(
             f"Text:\n{chunks[0]}",
-            system_instruction=(
+            system=(
                 "You are an expert analyst. Please read the following text and generate:\n"
                 "1. A 1-paragraph executive summary.\n"
                 "2. A list of key points (bullet points).\n"
@@ -133,10 +134,9 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None, out_path: Optio
         print_step(f"Long document: processing {len(chunks)} fragments (map-reduce).")
         for i, chunk in enumerate(chunks, 1):
             console.print(f"[dim]  • Fragment {i}/{len(chunks)}…[/dim]")
-            part = generate_content(
-                client,
+            part = ai.generate_text(
                 f"Fragment {i}/{len(chunks)}:\n{chunk}",
-                system_instruction=chunk_instruction,
+                system=chunk_instruction,
             )
             if part:
                 partials.append(f"### Fragment {i}\n{part}")
@@ -149,10 +149,9 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None, out_path: Optio
 
         print_step("Consolidating final summary…")
         combined = "\n\n".join(partials)
-        summary = generate_content(
-            client,
+        summary = ai.generate_text(
             f"Partial summaries:\n{combined}",
-            system_instruction=final_instruction,
+            system=final_instruction,
         )
 
     # Output the result.
@@ -174,13 +173,16 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None, out_path: Optio
 
 def main():
     """CLI entry point for the Document Summarizer."""
-    parser = argparse.ArgumentParser(description="Document Summarizer with Gemini")
+    parser = argparse.ArgumentParser(description="Document Summarizer with AI")
     parser.add_argument("filepath", help="Path to the PDF or TXT file")
-    parser.add_argument("--key", help="Google API Key (optional)")
+    parser.add_argument("--key", help="API key for the chosen provider (optional)")
     parser.add_argument("--out", help="Save summary to this file")
+    parser.add_argument("--provider", help="AI provider (default: $AI_PROVIDER, or gemini)")
+    parser.add_argument("--model", help="Override the provider's default model")
     args = parser.parse_args()
 
-    run_summarizer(args.filepath, args.key, args.out)
+    run_summarizer(args.filepath, args.key, args.out,
+                   provider=args.provider, model=args.model)
 
 
 if __name__ == "__main__":

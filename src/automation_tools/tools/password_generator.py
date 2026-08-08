@@ -14,13 +14,11 @@ from automation_tools.core.logger import console, print_error, print_success, pr
 
 
 def check_pwned(password: str, timeout: float = 5.0) -> Optional[int]:
-    """
-    Check a password against Have I Been Pwned (k-anonymity API).
-    
-    Returns the number of times the password was seen in breaches,
-    0 if not seen, None if the check could not be performed.
-    Only the first 5 chars of the SHA-1 hash are sent — the password
-    itself never leaves the machine.
+    """Check a password against Have I Been Pwned (k-anonymity API).
+
+    Returns how many times it shows up in known breaches, 0 if it does not, or
+    None if the check could not run. Only the first 5 chars of the SHA-1 hash
+    go over the wire; the password itself never leaves the machine.
     """
     try:
         import requests
@@ -50,15 +48,7 @@ def check_pwned(password: str, timeout: float = 5.0) -> Optional[int]:
 
 
 def copy_to_clipboard(text: str) -> bool:
-    """
-    Best-effort copy to clipboard across platforms (Termux, Linux, macOS, Windows).
-    
-    Args:
-        text (str): The text to copy.
-        
-    Returns:
-        bool: True if copying was successful, False otherwise.
-    """
+    """Best-effort clipboard copy across Termux, Linux, macOS and Windows."""
     candidates = [
         ["termux-clipboard-set"],
         ["wl-copy"],
@@ -143,19 +133,10 @@ def generate_password(
     use_special: bool = True,
     exclude_ambiguous: bool = False,
 ) -> Optional[str]:
-    """
-    Generates a secure random password using the `secrets` module.
-    
-    Args:
-        length (int): Password length.
-        use_uppercase (bool): Include uppercase letters.
-        use_lowercase (bool): Include lowercase letters.
-        use_digits (bool): Include numeric digits.
-        use_special (bool): Include special characters.
-        exclude_ambiguous (bool): If True, excludes characters like Il1O0o.
-        
-    Returns:
-        Optional[str]: The generated password, or None if no characters were selected.
+    """Builds a random password with `secrets`.
+
+    None when every character class is switched off. `exclude_ambiguous` drops the
+    Il1O0o family.
     """
     charset = ""
     required = []
@@ -216,19 +197,7 @@ def generate_passphrase(
     add_number: bool = True,
     add_special: bool = False,
 ) -> str:
-    """
-    Generates a memorable passphrase using random words from a list.
-    
-    Args:
-        num_words (int): Number of words to include.
-        separator (str): Separator between words.
-        capitalize (bool): Whether to capitalize each word.
-        add_number (bool): Append a random number at the end.
-        add_special (bool): Append a random symbol at the end.
-        
-    Returns:
-        str: The generated passphrase.
-    """
+    """Builds a memorable passphrase from random words."""
     words = [secrets.choice(WORD_LIST) for _ in range(num_words)]
 
     if capitalize:
@@ -257,15 +226,7 @@ COMMON_PASSWORDS = {
 
 
 def calculate_entropy(password: str) -> float:
-    """
-    Calculates the entropy of a password in bits.
-    
-    Args:
-        password (str): The password to evaluate.
-        
-    Returns:
-        float: Calculated entropy.
-    """
+    """Entropy of a password, in bits."""
     charset_size = 0
     if re.search(r"[a-z]", password):
         charset_size += 26
@@ -282,15 +243,7 @@ def calculate_entropy(password: str) -> float:
 
 
 def evaluate_strength(password: str) -> Dict[str, Any]:
-    """
-    Evaluates password strength and returns a detailed report.
-    
-    Args:
-        password (str): The password to test.
-        
-    Returns:
-        Dict[str, Any]: A dictionary containing score, level, entropy, feedback, etc.
-    """
+    """Scores a password: entropy, level and feedback."""
     score = 0
     feedback: List[str] = []
     details: Dict[str, str] = {}
@@ -407,8 +360,7 @@ def evaluate_strength(password: str) -> Dict[str, Any]:
 # ─── Visualization Functions ───
 
 def display_strength(result: Dict[str, Any]) -> None:
-    """
-    Displays the strength analysis result using Rich components.
+    """Displays the strength analysis result using Rich components.
     """
     score = result["score"]
     filled = int(score / 100 * 30)
@@ -444,8 +396,7 @@ def display_strength(result: Dict[str, Any]) -> None:
 
 
 def display_passwords(passwords: List[str], title: str = "Generated Passwords") -> None:
-    """
-    Displays a list of generated passwords along with their strength evaluation.
+    """Displays a list of generated passwords along with their strength evaluation.
     """
     table = Table(title=title, title_style="bold magenta", border_style="cyan")
     table.add_column("#", style="dim", width=3)
@@ -474,8 +425,7 @@ def run_generate_password(
     exclude_ambiguous: bool = False,
     count: int = 5,
 ) -> None:
-    """
-    Generates and displays multiple secure passwords.
+    """Generates and displays multiple secure passwords.
     """
     passwords = []
     for _ in range(count):
@@ -503,8 +453,7 @@ def run_generate_passphrase(
     add_special: bool = False,
     count: int = 5,
 ) -> None:
-    """
-    Generates and displays multiple memorable passphrases.
+    """Generates and displays multiple memorable passphrases.
     """
     phrases = []
     for _ in range(count):
@@ -525,8 +474,7 @@ def run_generate_passphrase(
 
 
 def run_evaluate_strength(password: str, check_breach: bool = True) -> None:
-    """
-    Evaluates and displays the strength of a password, optionally checking HIBP.
+    """Evaluates and displays the strength of a password, optionally checking HIBP.
     """
     if not password:
         print_error("No password provided.")
@@ -549,8 +497,7 @@ def run_evaluate_strength(password: str, check_breach: bool = True) -> None:
 
 
 def run_copy_password(password: str) -> None:
-    """
-    Copies a password to the system clipboard.
+    """Copies a password to the system clipboard.
     """
     if copy_to_clipboard(password):
         print_success("Password copied to clipboard.")

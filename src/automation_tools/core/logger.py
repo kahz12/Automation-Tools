@@ -4,14 +4,9 @@ import os
 from rich.console import Console
 from rich.text import Text
 
-# --- Logging & UI Utilities Module ---
-# Central application logger plus small helpers for consistent, styled terminal
-# output using the 'rich' library.
-
-# Global console instance for rendering all project output.
 console = Console()
 
-# Visual palette: Centralized color scheme for a consistent look and feel.
+# Every colour the project uses, in one place so the CLI and the TUI agree.
 PALETTE = {
     "primary": "#7c3aed",      # Purple: Main theme color.
     "primary_soft": "#a78bfa",  # Soft Purple: Used for dividers and secondary UI.
@@ -36,8 +31,7 @@ ASCII_TITLE = r"""
 
 
 def setup_logger(log_file: str = "automation_tools.log", level: int = logging.INFO) -> logging.Logger:
-    """
-    Configures and returns the application's central logger.
+    """Configures and returns the application's central logger.
     Logs are saved to a file in the project root.
     """
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -54,8 +48,7 @@ def setup_logger(log_file: str = "automation_tools.log", level: int = logging.IN
 
 
 def _gradient_text(text: str, start: str, end: str) -> Text:
-    """
-    Creates a vertical color gradient effect for ASCII art.
+    """Creates a vertical color gradient effect for ASCII art.
     Interpolates between two hex colors across lines.
     """
     from rich.color import Color

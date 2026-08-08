@@ -19,9 +19,8 @@ from automation_tools.core.logger import (
     print_warning,
 )
 
-# --- Space Cleaner Tool ---
-# This tool identifies and optionally deletes junk files (cache, build artifacts),
-# large files, and old files to free up disk space.
+# Finds junk (caches, build artifacts), oversized files and stale ones, and can
+# delete them. Dry-run unless told otherwise.
 
 # Caches and build artifacts that are safe to delete (they get regenerated).
 JUNK_DIRS = {
@@ -116,8 +115,7 @@ class ScanReport:
         return self.junk + self.large + self.old
 
     def total_bytes(self) -> int:
-        """
-        Calculates the total size of all items.
+        """Calculates the total size of all items.
         Avoids double-counting: if a large/old file sits inside a junk dir,
         it is only counted once as part of the junk dir.
         """
@@ -163,8 +161,7 @@ def scan(
     find_large: bool = True,
     find_old: bool = True,
 ) -> ScanReport:
-    """
-    Crawls the directory tree to identify items that match the cleaning criteria.
+    """Crawls the directory tree to identify items that match the cleaning criteria.
     - find_junk: Look for known temporary/cache files.
     - find_large: Look for files exceeding a size threshold.
     - find_old: Look for files not modified within a certain timeframe.
@@ -341,8 +338,7 @@ def run_space_cleaner(
     delete_large_and_old: bool = False,
     export_path: Optional[str] = None,
 ) -> None:
-    """
-    Core workflow for the Space Cleaner:
+    """Core workflow for the Space Cleaner:
     1. Scans the directory based on user criteria.
     2. Displays or exports the report.
     3. If 'apply' is True, prompts user to confirm deletion of identified items.

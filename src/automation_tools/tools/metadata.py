@@ -18,15 +18,7 @@ except ImportError:
 
 
 def format_bytes(size: float) -> str:
-    """
-    Formats bytes into a human-readable format (KB, MB, GB, TB).
-    
-    Args:
-        size (float): The size in bytes.
-        
-    Returns:
-        str: A formatted string representing the size.
-    """
+    """Formats a byte count as KB/MB/GB/TB."""
     for unit in ['B', 'KB', 'MB', 'GB']:
         if size < 1024.0:
             return f"{size:.2f} {unit}"
@@ -35,15 +27,7 @@ def format_bytes(size: float) -> str:
 
 
 def get_basic_info(filepath: str) -> Dict[str, str]:
-    """
-    Gets basic file system information for a file.
-    
-    Args:
-        filepath (str): Path to the file.
-        
-    Returns:
-        Dict[str, str]: Dictionary containing basic file info.
-    """
+    """Basic filesystem information for a file."""
     stat = os.stat(filepath)
     return {
         "Size": format_bytes(stat.st_size),
@@ -54,13 +38,7 @@ def get_basic_info(filepath: str) -> Dict[str, str]:
 
 
 def print_metadata_table(title: str, metadata_dict: Dict[str, Any]) -> None:
-    """
-    Prints a dictionary of metadata as a formatted table using Rich.
-    
-    Args:
-        title (str): The title of the table.
-        metadata_dict (Dict[str, Any]): The metadata to display.
-    """
+    """Prints a metadata dict as a Rich table."""
     if not metadata_dict:
         print_warning(f"No specific metadata found for {title}")
         return
@@ -81,15 +59,7 @@ def print_metadata_table(title: str, metadata_dict: Dict[str, Any]) -> None:
 
 
 def extract_pdf_metadata(filepath: str) -> Dict[str, Any]:
-    """
-    Extracts metadata from a PDF file using pypdf.
-    
-    Args:
-        filepath (str): Path to the PDF file.
-        
-    Returns:
-        Dict[str, Any]: Dictionary containing PDF metadata.
-    """
+    """Metadata of a PDF, via pypdf."""
     metadata: Dict[str, Any] = {}
     try:
         reader = pypdf.PdfReader(filepath)
@@ -113,15 +83,7 @@ def extract_pdf_metadata(filepath: str) -> Dict[str, Any]:
 
 
 def extract_image_metadata(filepath: str) -> Dict[str, Any]:
-    """
-    Extracts EXIF metadata and basic properties of an image using Pillow.
-    
-    Args:
-        filepath (str): Path to the image file.
-        
-    Returns:
-        Dict[str, Any]: Dictionary containing image metadata.
-    """
+    """EXIF plus basic image properties, via Pillow."""
     metadata: Dict[str, Any] = {}
     if not HAS_PILLOW:
         print_error("Pillow is not installed. Required for reading image metadata.")
@@ -149,14 +111,7 @@ def extract_image_metadata(filepath: str) -> Dict[str, Any]:
 
 
 def export_metadata(basic: Dict[str, Any], specific: Dict[str, Any], out_path: str) -> None:
-    """
-    Exports metadata to a JSON or CSV file based on the file extension.
-    
-    Args:
-        basic (Dict[str, Any]): Basic file information.
-        specific (Dict[str, Any]): Specific file metadata (PDF/Image).
-        out_path (str): The destination file path.
-    """
+    """Writes the metadata to `out_path`, as JSON or CSV depending on its extension."""
     ext = os.path.splitext(out_path)[1].lower()
     try:
         if ext == ".csv":
@@ -177,15 +132,9 @@ def export_metadata(basic: Dict[str, Any], specific: Dict[str, Any], out_path: s
 
 
 def clean_image_exif(filepath: str, out_path: Optional[str] = None) -> Optional[str]:
-    """
-    Removes EXIF metadata (GPS, camera info, dates) from an image by rewriting pixels.
-    
-    Args:
-        filepath (str): Path to the source image.
-        out_path (Optional[str]): Path to the output clean image. Defaults to filename_clean.ext.
-        
-    Returns:
-        Optional[str]: The output path on success, None otherwise.
+    """Strips EXIF (GPS, camera, dates) by rewriting the pixels into a new file.
+
+    Defaults to filename_clean.ext. Returns the output path, or None on failure.
     """
     if not HAS_PILLOW:
         print_error("Pillow is not installed.")
@@ -210,14 +159,7 @@ def clean_image_exif(filepath: str, out_path: Optional[str] = None) -> Optional[
 
 
 def run_metadata_extractor(filepath: str, export_path: Optional[str] = None, clean_exif: bool = False) -> None:
-    """
-    Core function to extract, display, and optionally export or clean file metadata.
-    
-    Args:
-        filepath (str): Path to the file to analyze.
-        export_path (Optional[str]): Path where metadata should be exported.
-        clean_exif (bool): Whether to create a copy of the image without EXIF metadata.
-    """
+    """Extracts and displays a file's metadata, optionally exporting it or writing an EXIF-free copy."""
     if not os.path.exists(filepath):
         print_error(f"The file '{filepath}' does not exist.")
         return
@@ -251,8 +193,7 @@ def run_metadata_extractor(filepath: str, export_path: Optional[str] = None, cle
 
 
 def main():
-    """
-    Main entry point for the metadata extractor CLI.
+    """Main entry point for the metadata extractor CLI.
     """
     parser = argparse.ArgumentParser(description="File Metadata Extractor (PDF, Images)")
     parser.add_argument("filepath", help="Path to the file to analyze")

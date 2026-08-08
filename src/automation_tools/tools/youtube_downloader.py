@@ -6,9 +6,8 @@ import sys
 from automation_tools.core.logger import console, print_error, print_step, print_success
 from automation_tools.core.config import get_downloads_folder
 
-# --- YouTube Downloader Tool ---
-# This tool uses the 'yt-dlp' library to download videos or extract audio from YouTube.
-# It supports individual videos, playlists, and can resume interrupted downloads.
+# Wraps yt-dlp: single videos or whole playlists, video or audio-only, and it
+# picks up interrupted downloads where they stopped.
 
 
 def _is_playlist(url: str) -> bool:
@@ -22,8 +21,7 @@ def run_youtube_downloader(
     playlist: bool = False,
     resume: bool = True,
 ) -> None:
-    """
-    Core download function:
+    """Core download function:
     - Sets up the output directory (defaults to system Downloads).
     - Configures yt-dlp commands for video (MP4) or audio (MP3).
     - Handles playlist organization into subfolders.

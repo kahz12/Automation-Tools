@@ -15,8 +15,10 @@ from textual.containers import Horizontal, Vertical, ScrollableContainer
 from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Button, Footer, Header, Input, Label,
-    RadioButton, RadioSet, RichLog, Static, Switch,
+    RadioButton, RadioSet, RichLog, Select, Static, Switch,
 )
+
+from automation_tools.ai.base import Capability
 
 
 # ── Shared CSS ─────────────────────────────────────────────────────────────
@@ -69,6 +71,24 @@ Input:focus {
 }
 Input.-invalid {
     border: tall #ef4444;
+}
+Select {
+    margin: 0 2 1 2;
+    height: auto;
+}
+Select SelectCurrent {
+    border: tall #475569;
+    background: #11111d;
+    color: #e2e8f0;
+}
+Select:focus SelectCurrent {
+    border: tall #22d3ee;
+    background: #1a1a2e;
+}
+Select SelectOverlay {
+    border: tall #22d3ee;
+    background: #11111d;
+    color: #e2e8f0;
 }
 RadioSet {
     background: #080810;
@@ -481,7 +501,7 @@ class ToolScreen(Screen):
     TOOL_DESC = ""
 
     # The default selector ("*") focuses the first focusable widget, which is
-    # the ScrollableContainer itself — keystrokes then drive scrolling instead
+    # the ScrollableContainer itself, and keystrokes then drive scrolling instead
     # of reaching the form fields. Restrict to actual form widgets.
     AUTO_FOCUS = "Input, RadioSet"
 
@@ -677,16 +697,95 @@ class MonitorScreen(ToolScreen):
             await self._run_tool(monitor.run_price_monitor_job)
 
 
+# ── Provider field mixin ────────────────────────────────────────────────────
+class ProviderFieldMixin:
+    """The provider picker plus its key field, shared by the five AI screens.
+
+    Each screen declares which capability it needs; the dropdown then only
+    offers providers that have it, so the unsupported combination cannot be
+    selected in the first place.
+
+    The `refresh_provider_key_field` call each screen makes in `on_mount` is
+    redundant today: Textual's `Select._on_mount` assigns `self.value`, which
+    posts a `Select.Changed` that lands on `on_select_changed` and does the
+    same work. Keep it anyway. That path is an undocumented Textual internal,
+    and the explicit call is what stops init from depending on it.
+
+    Note the bubbled `Changed` arrives *after* `on_mount`, so anything a screen
+    writes into `#api-key` there gets overwritten. Nothing does that today, but
+    it will matter to whoever adds a "remember the last key" feature.
+    """
+
+    PROVIDER_CAPABILITY = None  # set by each screen
+
+    def compose_provider_fields(self) -> ComposeResult:
+        from automation_tools.ai.base import UnknownProviderError
+        from automation_tools.ai.registry import PROVIDERS, providers_with, resolve_name
+
+        names = providers_with(self.PROVIDER_CAPABILITY)
+        # `resolve_name` raises on a name it does not recognise, and a typo in
+        # $AI_PROVIDER would otherwise take the whole TUI down the moment this
+        # screen is opened. Anything unusable (unknown, or known but lacking
+        # this screen's capability) quietly falls back to the first that fits.
+        try:
+            default = resolve_name()
+        except UnknownProviderError:
+            default = ""
+        current = default if default in names else names[0]
+
+        yield Label("AI provider:", classes="field-label")
+        yield Select(
+            [(PROVIDERS[n].label, n) for n in names],
+            value=current, allow_blank=False, id="provider",
+        )
+        yield Label("API key (or set the provider's env var):",
+                    classes="field-label", id="api-key-label")
+        yield Input(placeholder=PROVIDERS[current].key_hint,
+                    password=True, id="api-key")
+
+    def refresh_provider_key_field(self, name: str) -> None:
+        """Re-labels and re-fills the key field for the selected provider."""
+        from automation_tools.ai.registry import PROVIDERS
+        from automation_tools.core.config import get_env_var
+
+        spec = PROVIDERS[name]
+        self.query_one("#api-key-label", Label).update(
+            f"API key (or set {spec.env_key}):"
+        )
+        field = self.query_one("#api-key", Input)
+        field.placeholder = spec.key_hint
+        field.value = get_env_var(spec.env_key, "") or ""
+
+    # Deliberately the `on_<message>` naming convention rather than `@on`:
+    # `@on` handlers are collected by Textual's MessagePump metaclass, which
+    # never runs on a plain mixin, so a decorated handler here would be
+    # silently dropped. The convention is resolved by walking the MRO, so it
+    # survives the mixin. Hence the manual id check `@on` would have done.
+    def on_select_changed(self, e: Select.Changed) -> None:
+        if e.select.id == "provider":
+            self.refresh_provider_key_field(str(e.value))
+
+    def _provider_values(self) -> "tuple[str, Optional[str]]":
+        """Returns (provider_name, api_key_or_None) from the two fields.
+
+        The name is always a real provider: `allow_blank=False` on the Select
+        means it can never hold a blank sentinel.
+        """
+        name = str(self.query_one("#provider", Select).value)
+        key = self._ival(self.query_one("#api-key", Input)) or None
+        return name, key
+
+
 # ── 3. AI Summarizer ───────────────────────────────────────────────────────
-class SummarizerScreen(ToolScreen):
+class SummarizerScreen(ProviderFieldMixin, ToolScreen):
     TOOL_TITLE = "📝  Document Summarizer"
-    TOOL_DESC = "Generate an executive summary of PDF or TXT files with Gemini AI"
+    TOOL_DESC = "Generate an executive summary of PDF or TXT files with AI"
+    PROVIDER_CAPABILITY = Capability.TEXT
 
     def compose_fields(self) -> ComposeResult:
         yield Label("File path (PDF or TXT):", classes="field-label")
         yield Input(placeholder="/path/to/file.pdf", id="filepath")
-        yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
-        yield Input(placeholder="AIza...", password=True, id="api-key")
+        yield from self.compose_provider_fields()
         yield Label("Save summary to file?", classes="field-label")
         yield Switch(id="save", value=False)
         with Vertical(id="sec-outpath", classes="sub-section"):
@@ -694,10 +793,7 @@ class SummarizerScreen(ToolScreen):
             yield Input(placeholder="summary.txt", id="out-path")
 
     def on_mount(self) -> None:
-        from automation_tools.core.config import get_env_var
-        key = get_env_var("GOOGLE_API_KEY", "")
-        if key:
-            self.query_one("#api-key", Input).value = key
+        self.refresh_provider_key_field(str(self.query_one("#provider", Select).value))
         self.query_one("#sec-outpath").display = False
 
     @on(Switch.Changed, "#save")
@@ -710,14 +806,15 @@ class SummarizerScreen(ToolScreen):
         if not filepath:
             self._err("File path is required.")
             return
-        api_key = self._ival(self.query_one("#api-key", Input)) or None
+        provider_name, api_key = self._provider_values()
         save = self._bval(self.query_one("#save", Switch))
         out_path = None
         if save:
             raw = self._ival(self.query_one("#out-path", Input))
             out_path = raw or (os.path.splitext(filepath)[0] + "_summary.txt")
         await self._run_tool(summarizer.run_summarizer, filepath=filepath,
-                             api_key=api_key, out_path=out_path)
+                             api_key=api_key, out_path=out_path,
+                             provider=provider_name)
 
 
 # ── 4. Image / PDF Converter ───────────────────────────────────────────────
@@ -814,9 +911,10 @@ class PdfConverterScreen(ToolScreen):
 
 
 # ── 6. File Translator ─────────────────────────────────────────────────────
-class TranslatorScreen(ToolScreen):
+class TranslatorScreen(ProviderFieldMixin, ToolScreen):
     TOOL_TITLE = "🌐  File Translator"
-    TOOL_DESC = "Translate text, subtitles, or code files with Gemini AI"
+    TOOL_DESC = "Translate text, subtitles, or code files with AI"
+    PROVIDER_CAPABILITY = Capability.TEXT
 
     def compose_fields(self) -> ComposeResult:
         yield Label("File to translate:", classes="field-label")
@@ -832,16 +930,12 @@ class TranslatorScreen(ToolScreen):
         with Vertical(id="sec-other", classes="sub-section"):
             yield Label("Language name:", classes="field-label")
             yield Input(placeholder="Japanese", id="other-lang")
-        yield Label("Google API Key:", classes="field-label")
-        yield Input(placeholder="AIza...", password=True, id="api-key")
+        yield from self.compose_provider_fields()
         yield Label("Save translation to file?", classes="field-label")
         yield Switch(id="save", value=False)
 
     def on_mount(self) -> None:
-        from automation_tools.core.config import get_env_var
-        key = get_env_var("GOOGLE_API_KEY", "")
-        if key:
-            self.query_one("#api-key", Input).value = key
+        self.refresh_provider_key_field(str(self.query_one("#provider", Select).value))
         self.query_one("#sec-other").display = False
 
     @on(RadioSet.Changed, "#lang")
@@ -868,14 +962,15 @@ class TranslatorScreen(ToolScreen):
                 return
         else:
             lang = lang_map.get(rid, "english")
-        api_key = self._ival(self.query_one("#api-key", Input)) or None
+        provider_name, api_key = self._provider_values()
         save = self._bval(self.query_one("#save", Switch))
         out_path = None
         if save:
             base, ext = os.path.splitext(filepath)
             out_path = f"{base}_{lang}{ext}"
         await self._run_tool(translator.run_translator, filepath=filepath,
-                             target_lang=lang, api_key=api_key, out_path=out_path)
+                             target_lang=lang, api_key=api_key, out_path=out_path,
+                             provider=provider_name)
 
 
 # ── 7. Duplicate Detector ──────────────────────────────────────────────────
@@ -949,21 +1044,18 @@ class YoutubeScreen(ToolScreen):
 
 
 # ── 9. README Generator ────────────────────────────────────────────────────
-class ReadmeScreen(ToolScreen):
+class ReadmeScreen(ProviderFieldMixin, ToolScreen):
     TOOL_TITLE = "📘  README Generator"
-    TOOL_DESC = "Analyze a project and draft its README using Gemini AI"
+    TOOL_DESC = "Analyze a project and draft its README using AI"
+    PROVIDER_CAPABILITY = Capability.TEXT
 
     def compose_fields(self) -> ComposeResult:
         yield Label("Project directory:", classes="field-label")
         yield Input(placeholder="/path/to/project", id="dir")
-        yield Label("Google API Key:", classes="field-label")
-        yield Input(placeholder="AIza...", password=True, id="api-key")
+        yield from self.compose_provider_fields()
 
     def on_mount(self) -> None:
-        from automation_tools.core.config import get_env_var
-        key = get_env_var("GOOGLE_API_KEY", "")
-        if key:
-            self.query_one("#api-key", Input).value = key
+        self.refresh_provider_key_field(str(self.query_one("#provider", Select).value))
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import readme_generator
@@ -971,9 +1063,10 @@ class ReadmeScreen(ToolScreen):
         if not directory:
             self._err("Project directory is required.")
             return
-        api_key = self._ival(self.query_one("#api-key", Input)) or None
+        provider_name, api_key = self._provider_values()
         await self._run_tool(readme_generator.run_readme_generator,
-                             directory=directory, api_key=api_key)
+                             directory=directory, api_key=api_key,
+                             provider=provider_name)
 
 
 # ── 10. Metadata Extractor ─────────────────────────────────────────────────
@@ -1756,15 +1849,15 @@ class ArchiverScreen(ToolScreen):
 
 
 # ── 19. Image OCR ──────────────────────────────────────────────────────────
-class OcrScreen(ToolScreen):
+class OcrScreen(ProviderFieldMixin, ToolScreen):
     TOOL_TITLE = "🔡  Image OCR"
-    TOOL_DESC = "Extract text from images or scans with Gemini Vision"
+    TOOL_DESC = "Extract text from images or scans with AI vision"
+    PROVIDER_CAPABILITY = Capability.VISION
 
     def compose_fields(self) -> ComposeResult:
         yield Label("Image file or folder:", classes="field-label")
         yield Input(placeholder="/path/to/scan.png  or  /path/to/folder", id="path")
-        yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
-        yield Input(placeholder="AIza...", password=True, id="api-key")
+        yield from self.compose_provider_fields()
         yield Label("Reconstruct layout as Markdown? (off = plain text)", classes="field-label")
         yield Switch(id="markdown", value=False)
         yield Label("Language hint (optional):", classes="field-label")
@@ -1775,10 +1868,7 @@ class OcrScreen(ToolScreen):
         yield Input(placeholder="leave empty to auto-name / save next to source", id="out-path")
 
     def on_mount(self) -> None:
-        from automation_tools.core.config import get_env_var
-        key = get_env_var("GOOGLE_API_KEY", "")
-        if key:
-            self.query_one("#api-key", Input).value = key
+        self.refresh_provider_key_field(str(self.query_one("#provider", Select).value))
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import ocr
@@ -1786,14 +1876,16 @@ class OcrScreen(ToolScreen):
         if not path:
             self._err("An image file or folder is required.")
             return
+        provider_name, api_key = self._provider_values()
         await self._run_tool(
             ocr.run_ocr,
             path=path,
-            api_key=self._ival(self.query_one("#api-key", Input)) or None,
+            api_key=api_key,
             out_path=self._ival(self.query_one("#out-path", Input)) or None,
             markdown=self._bval(self.query_one("#markdown", Switch)),
             language=self._ival(self.query_one("#language", Input)) or None,
             recursive=self._bval(self.query_one("#recursive", Switch)),
+            provider=provider_name,
         )
 
 
@@ -1879,9 +1971,10 @@ class IntegrityScreen(ToolScreen):
             )
 
 # ── 21. A/V Transcriber ────────────────────────────────────────────────────
-class TranscriberScreen(ToolScreen):
+class TranscriberScreen(ProviderFieldMixin, ToolScreen):
     TOOL_TITLE = "🎤  A/V Transcriber"
-    TOOL_DESC = "Transcribe audio and video files using Gemini AI"
+    TOOL_DESC = "Transcribe audio and video files using AI"
+    PROVIDER_CAPABILITY = Capability.AUDIO
 
     def compose_fields(self) -> ComposeResult:
         yield Label("File path (audio or video):", classes="field-label")
@@ -1890,17 +1983,13 @@ class TranscriberScreen(ToolScreen):
         with RadioSet(id="mode"):
             yield RadioButton("SRT Subtitles", id="rb-srt", value=True)
             yield RadioButton("Plain Text", id="rb-txt")
-        yield Label("Google API Key (or set GOOGLE_API_KEY env var):", classes="field-label")
-        yield Input(placeholder="AIza...", password=True, id="api-key")
+        yield from self.compose_provider_fields()
         with Vertical(id="sec-outpath", classes="sub-section"):
             yield Label("Output path (leave empty for auto):", classes="field-label")
             yield Input(placeholder="transcription.srt", id="out-path")
 
     def on_mount(self) -> None:
-        from automation_tools.core.config import get_env_var
-        key = get_env_var("GOOGLE_API_KEY", "")
-        if key:
-            self.query_one("#api-key", Input).value = key
+        self.refresh_provider_key_field(str(self.query_one("#provider", Select).value))
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import transcriber
@@ -1909,11 +1998,12 @@ class TranscriberScreen(ToolScreen):
             self._err("File path is required.")
             return
         mode = "srt" if self._rval(self.query_one("#mode", RadioSet)) == "rb-srt" else "txt"
-        api_key = self._ival(self.query_one("#api-key", Input)) or None
+        provider_name, api_key = self._provider_values()
         out_path = self._ival(self.query_one("#out-path", Input)) or None
-        
+
         await self._run_tool(transcriber.run_transcriber, filepath=filepath,
-                             mode=mode, api_key=api_key, out_path=out_path)
+                             mode=mode, api_key=api_key, out_path=out_path,
+                             provider=provider_name)
 
 # ── 22. Log Analyzer ─────────────────────────────────────────────────────────
 class LogAnalyzerScreen(ToolScreen):

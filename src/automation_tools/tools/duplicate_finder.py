@@ -15,16 +15,7 @@ DEFAULT_EXCLUDES = [".git", "node_modules", "__pycache__", "venv", ".venv", ".ca
 
 
 def hash_file(filepath: str, chunk_size: int = 8192) -> Optional[str]:
-    """
-    Calculates the MD5 hash of a file.
-    
-    Args:
-        filepath (str): Path to the file to hash.
-        chunk_size (int): Size of chunks to read from the file.
-        
-    Returns:
-        Optional[str]: Hexadecimal MD5 hash string, or None if an error occurs.
-    """
+    """MD5 of a file, read in chunks. None if it cannot be read."""
     hasher = hashlib.md5()
     try:
         with open(filepath, 'rb') as f:
@@ -37,16 +28,7 @@ def hash_file(filepath: str, chunk_size: int = 8192) -> Optional[str]:
 
 
 def _matches_any(name: str, patterns: List[str]) -> bool:
-    """
-    Checks if a name matches any of the given glob patterns.
-    
-    Args:
-        name (str): The name (file or directory) to check.
-        patterns (List[str]): A list of glob patterns.
-        
-    Returns:
-        bool: True if it matches any pattern, False otherwise.
-    """
+    """True if `name` matches any of the glob `patterns`."""
     return any(fnmatch.fnmatch(name, p) for p in patterns)
 
 
@@ -54,16 +36,7 @@ def find_duplicates(
     directory: str,
     excludes: Optional[List[str]] = None,
 ) -> Dict[str, List[str]]:
-    """
-    Recursively finds duplicate files in a directory, respecting exclude patterns.
-    
-    Args:
-        directory (str): The root directory to start the search.
-        excludes (Optional[List[str]]): Additional glob patterns to exclude.
-        
-    Returns:
-        Dict[str, List[str]]: A dictionary mapping MD5 hashes to lists of duplicate file paths.
-    """
+    """Walks `directory` and returns {md5: [paths]} for the files that appear more than once."""
     patterns = list(DEFAULT_EXCLUDES) + list(excludes or [])
     print_step(f"Searching for duplicates in: [bold]{directory}[/bold]...")
     if patterns:
@@ -100,13 +73,7 @@ def find_duplicates(
 
 
 def _export_duplicates(duplicates: Dict[str, List[str]], out_path: str) -> None:
-    """
-    Exports the duplicate file report to a CSV file.
-    
-    Args:
-        duplicates (Dict[str, List[str]]): Dictionary of duplicates.
-        out_path (str): Path to the output CSV file.
-    """
+    """Writes the duplicate report to `out_path` as CSV."""
     try:
         with open(out_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
@@ -132,15 +99,7 @@ def run_duplicate_finder(
     excludes: Optional[List[str]] = None,
     export_path: Optional[str] = None,
 ) -> None:
-    """
-    Core function to find and optionally delete duplicate files.
-    
-    Args:
-        directory (str): Directory to scan.
-        auto_delete (bool): If True, delete duplicates without asking.
-        excludes (Optional[List[str]]): List of patterns to exclude.
-        export_path (Optional[str]): Path to export CSV report.
-    """
+    """Finds duplicates under `directory`, optionally exporting a CSV or deleting them."""
     if not os.path.isdir(directory):
         print_error(f"The directory '{directory}' does not exist.")
         return
@@ -194,8 +153,7 @@ def run_duplicate_finder(
 
 
 def main():
-    """
-    Main entry point for the duplicate finder CLI.
+    """Main entry point for the duplicate finder CLI.
     """
     parser = argparse.ArgumentParser(description="Duplicate File Finder")
     parser.add_argument("directory", help="Directory to scan")

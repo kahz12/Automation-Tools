@@ -6,9 +6,8 @@ import questionary
 
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
 
-# --- PDF Toolkit ---
 # Manipulate existing PDF files: merge, split, extract pages, rotate, and
-# encrypt / decrypt. Built entirely on `pypdf` (pure Python — no external
+# encrypt / decrypt. Built entirely on `pypdf` (pure Python, no external
 # binaries), so it runs the same on Linux, Windows and Termux/Android.
 
 try:
@@ -247,7 +246,7 @@ def run_pdf_encrypt(input_path: str, password: str, output_path: Optional[str] =
     try:
         writer.encrypt(user_password=password, algorithm="AES-256")
     except Exception:
-        # Older pypdf or unsupported algorithm — fall back to default cipher.
+        # Older pypdf, or an unsupported algorithm: fall back to the default cipher.
         writer.encrypt(user_password=password)
     if _write(writer, out):
         print_success(f"Encrypted → '{out}'")

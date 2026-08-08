@@ -14,7 +14,6 @@ from bs4 import BeautifulSoup
 from automation_tools.core.logger import setup_logger, console, print_success, print_warning
 from automation_tools.core.config import load_json_config, get_project_root
 
-# Get logger specific to this tool
 logger = setup_logger()
 
 # ─── Paths ───
@@ -27,12 +26,7 @@ _LAST_REQUEST: Dict[str, float] = {}
 
 
 def _throttle(url: str) -> None:
-    """
-    Ensures at least MIN_INTERVAL_PER_HOST seconds between requests per host.
-    
-    Args:
-        url (str): The URL being accessed.
-    """
+    """Sleeps as needed to keep MIN_INTERVAL_PER_HOST seconds between hits on the same host."""
     host = urlparse(url).netloc.lower()
     now = time.monotonic()
     last = _LAST_REQUEST.get(host, 0.0)
@@ -50,11 +44,10 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
 ]
 
-# ─── Database — SQLite ───
+# ─── Database (SQLite) ───
 
 def init_db() -> None:
-    """
-    Initializes the database and creates the tables if they do not exist.
+    """Initializes the database and creates the tables if they do not exist.
     """
     conn = sqlite3.connect(DB_FILE)
     # Price history table
@@ -81,15 +74,7 @@ def init_db() -> None:
 
 
 def get_last_stock(url: str) -> Optional[bool]:
-    """
-    Retrieves the last known stock status for a given URL.
-    
-    Args:
-        url (str): The product URL.
-        
-    Returns:
-        Optional[bool]: True if in stock, False if out of stock, None if no record exists.
-    """
+    """Last known stock state for `url`. None when there is no record yet."""
     conn = sqlite3.connect(DB_FILE)
     row = conn.execute("SELECT disponible FROM stock WHERE url = ?", (url,)).fetchone()
     conn.close()
@@ -97,13 +82,7 @@ def get_last_stock(url: str) -> Optional[bool]:
 
 
 def save_stock(url: str, available: bool) -> None:
-    """
-    Updates the stock status for a given URL in the database.
-    
-    Args:
-        url (str): The product URL.
-        available (bool): Current stock availability.
-    """
+    """Records the current stock state for `url`."""
     conn = sqlite3.connect(DB_FILE)
     conn.execute(
         "INSERT OR REPLACE INTO stock (url, disponible, fecha) VALUES (?, ?, ?)",
@@ -114,15 +93,7 @@ def save_stock(url: str, available: bool) -> None:
 
 
 def guardar_precio(nombre: str, url: str, precio: float, moneda: str) -> None:
-    """
-    Saves a price reading into the history table.
-    
-    Args:
-        nombre (str): Product name.
-        url (str): Product URL.
-        precio (float): Current price.
-        moneda (str): Currency code.
-    """
+    """Saves a price reading into the history table."""
     conn = sqlite3.connect(DB_FILE)
     conn.execute(
         "INSERT INTO historial (nombre, url, precio, moneda, fecha) VALUES (?, ?, ?, ?, ?)",
@@ -134,15 +105,7 @@ def guardar_precio(nombre: str, url: str, precio: float, moneda: str) -> None:
 
 
 def obtener_ultimo_precio(url: str) -> Optional[float]:
-    """
-    Returns the most recent price recorded for a specific URL.
-    
-    Args:
-        url (str): The product URL.
-        
-    Returns:
-        Optional[float]: The last recorded price or None.
-    """
+    """Most recent price recorded for `url`, or None."""
     conn = sqlite3.connect(DB_FILE)
     row = conn.execute(
         "SELECT precio FROM historial WHERE url = ? ORDER BY fecha DESC LIMIT 1",
@@ -153,8 +116,7 @@ def obtener_ultimo_precio(url: str) -> Optional[float]:
 
 
 def mostrar_historial() -> None:
-    """
-    Prints the complete price history (last 50 entries) to the console.
+    """Prints the complete price history (last 50 entries) to the console.
     """
     init_db()
     conn = sqlite3.connect(DB_FILE)
@@ -176,17 +138,10 @@ def mostrar_historial() -> None:
     console.print(f"[cyan]{'─'*60}[/cyan]\n")
 
 
-# ─── Notifications — Telegram ───
+# ─── Notifications (Telegram) ───
 
 def send_telegram(token: str, chat_id: str, message: str) -> None:
-    """
-    Sends a message via Telegram Bot API.
-    
-    Args:
-        token (str): Telegram Bot API token.
-        chat_id (str): Chat ID to send to.
-        message (str): HTML formatted message.
-    """
+    """Sends an HTML message through the Telegram Bot API."""
     if not token or not chat_id:
         return
     try:
@@ -198,14 +153,7 @@ def send_telegram(token: str, chat_id: str, message: str) -> None:
 
 
 def send_notification(title: str, message: str, settings: Dict[str, Any]) -> None:
-    """
-    Utility to send a notification via Telegram and print to console.
-    
-    Args:
-        title (str): Notification title.
-        message (str): Notification body.
-        settings (Dict[str, Any]): Global settings containing Telegram credentials.
-    """
+    """Prints the notification and, if `settings` has Telegram credentials, sends it too."""
     full_msg = f"<b>{title}</b>\n{message}"
     console.print(f"\n[bold yellow]🔔 {title}:[/bold yellow] {message}")
 
@@ -217,16 +165,7 @@ def send_notification(title: str, message: str, settings: Dict[str, Any]) -> Non
 # ─── Price Utilities ───
 
 def clean_price(price_str: str, settings: Dict[str, Any]) -> Optional[float]:
-    """
-    Parses a price string into a float, considering decimal and thousand separators.
-    
-    Args:
-        price_str (str): The raw price string from the web page.
-        settings (Dict[str, Any]): Settings with separator definitions.
-        
-    Returns:
-        Optional[float]: The numeric price or None.
-    """
+    """Parses a raw price string into a float, honouring the separators in `settings`."""
     if not price_str:
         return None
     dec_sep = settings.get("decimal_separator", ".")
@@ -242,16 +181,14 @@ def clean_price(price_str: str, settings: Dict[str, Any]) -> Optional[float]:
 
 
 def format_price(value: float, settings: Dict[str, Any]) -> str:
-    """
-    Formats a numeric price value into a string with the currency code.
+    """Formats a numeric price value into a string with the currency code.
     """
     currency = settings.get("currency_code", "$")
     return f"{value:,.2f} {currency}"
 
 
 def get_headers() -> Dict[str, str]:
-    """
-    Returns HTTP headers with a random User-Agent to help avoid anti-scraping blocks.
+    """Returns HTTP headers with a random User-Agent to help avoid anti-scraping blocks.
     """
     return {
         "User-Agent": random.choice(USER_AGENTS),
@@ -266,16 +203,7 @@ def get_headers() -> Dict[str, str]:
 # ─── Scrapers ───
 
 def check_mercadolibre_api(item_id: str, access_token: str) -> Optional[float]:
-    """
-    Queries the official MercadoLibre API for an item's price.
-    
-    Args:
-        item_id (str): The ML item ID (e.g., MLA12345).
-        access_token (str): OAuth access token.
-        
-    Returns:
-        Optional[float]: Item price or None.
-    """
+    """Asks the official MercadoLibre API for an item's price."""
     try:
         headers = {"Authorization": f"Bearer {access_token}"} if access_token else {}
         url = f"https://api.mercadolibre.com/items/{item_id}"
@@ -290,16 +218,14 @@ def check_mercadolibre_api(item_id: str, access_token: str) -> Optional[float]:
 
 
 def extract_ml_item_id(url: str) -> Optional[str]:
-    """
-    Extracts the item ID from a MercadoLibre URL.
+    """Extracts the item ID from a MercadoLibre URL.
     """
     match = re.search(r"/(MC[A-Z]-\d+)", url, re.IGNORECASE)
     return match.group(1).replace("-", "") if match else None
 
 
 def check_mercadolibre(url: str, soup: BeautifulSoup, settings: Dict[str, Any], access_token: str = "") -> Optional[float]:
-    """
-    Scrapes or API-queries MercadoLibre for a product price.
+    """Scrapes or API-queries MercadoLibre for a product price.
     """
     item_id = extract_ml_item_id(url)
     if item_id and access_token:
@@ -325,8 +251,7 @@ def check_mercadolibre(url: str, soup: BeautifulSoup, settings: Dict[str, Any], 
 
 
 def check_amazon(soup: BeautifulSoup, settings: Dict[str, Any]) -> Optional[float]:
-    """
-    Scrapes Amazon for a product price using common CSS selectors.
+    """Scrapes Amazon for a product price using common CSS selectors.
     """
     selectors = [
         "span.a-price-whole",
@@ -347,8 +272,7 @@ def check_amazon(soup: BeautifulSoup, settings: Dict[str, Any]) -> Optional[floa
 # ─── Alert Logic ───
 
 def evaluar_alertas(product: Dict[str, Any], precio_actual: float, settings: Dict[str, Any]) -> None:
-    """
-    Evaluates if current price triggers any target price or price drop alerts.
+    """Evaluates if current price triggers any target price or price drop alerts.
     """
     nombre       = product.get("name", "Product")
     url          = product.get("url", "")
@@ -384,17 +308,7 @@ def evaluar_alertas(product: Dict[str, Any], precio_actual: float, settings: Dic
 # ─── Main Check Logic ───
 
 def detect_stock(url: str, soup: BeautifulSoup, price: Optional[float]) -> bool:
-    """
-    Simple heuristic for stock availability: price present + no 'out of stock' text.
-    
-    Args:
-        url (str): Product URL.
-        soup (BeautifulSoup): Parsed page content.
-        price (Optional[float]): Detected price.
-        
-    Returns:
-        bool: True if likely in stock, False otherwise.
-    """
+    """Heuristic: in stock when there is a price and no out-of-stock wording on the page."""
     page_text = soup.get_text(" ", strip=True).lower()
     signals_out = [
         "out of stock", "sin stock", "agotado", "no disponible",
@@ -406,8 +320,7 @@ def detect_stock(url: str, soup: BeautifulSoup, price: Optional[float]) -> bool:
 
 
 def evaluar_stock(product: Dict[str, Any], disponible: bool, settings: Dict[str, Any]) -> None:
-    """
-    Notifies about stock changes (In Stock ↔ Out of Stock) and persists the state.
+    """Notifies about stock changes (In Stock ↔ Out of Stock) and persists the state.
     """
     url = product.get("url", "")
     nombre = product.get("name", "Product")
@@ -432,8 +345,7 @@ def evaluar_stock(product: Dict[str, Any], disponible: bool, settings: Dict[str,
 
 
 def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
-    """
-    Fetches the URL, scrapes the price, and triggers alerts/stock checks.
+    """Fetches the URL, scrapes the price, and triggers alerts/stock checks.
     """
     url    = product.get("url", "")
     nombre = product.get("name", "Product")
@@ -485,8 +397,7 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
 
 
 def run_price_monitor_job() -> None:
-    """
-    Executes a single round of price monitoring for all configured products.
+    """Executes a single round of price monitoring for all configured products.
     """
     init_db()
     
@@ -509,8 +420,7 @@ def run_price_monitor_job() -> None:
 
 
 def run_continuous_monitor(interval_minutes: int = 60) -> None:
-    """
-    Runs the monitor in a continuous loop at the specified interval.
+    """Runs the monitor in a continuous loop at the specified interval.
     """
     console.print(f"[bold green]🟢 Monitor started.[/bold green] Checking every {interval_minutes} minute(s)...")
     try:
@@ -523,8 +433,7 @@ def run_continuous_monitor(interval_minutes: int = 60) -> None:
 
 
 def main():
-    """
-    Main entry point for the price monitor CLI.
+    """Main entry point for the price monitor CLI.
     """
     parser = argparse.ArgumentParser(description="Price Monitor v2.0")
     parser.add_argument("--now",       action="store_true", help="Run an immediate check")

@@ -4,12 +4,11 @@ from typing import Optional, Tuple
 
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
 
-# --- Batch Image Processor Tool ---
 # Bulk operations over a single image or a whole folder, built only on Pillow
 # so it runs the same on Linux, Windows and Termux/Android (no extra binaries):
-#   • resize    — shrink by longest side or by percentage (keeps aspect ratio).
-#   • compress  — re-encode at a target quality to reduce file size.
-#   • watermark — stamp a semi-transparent text label onto each image.
+#   resize:    shrink by longest side or by percentage (keeps aspect ratio).
+#   compress:  re-encode at a target quality to reduce file size.
+#   watermark: stamp a semi-transparent text label onto each image.
 # Outputs are always written to a separate folder, so the originals are never
 # touched unless the user explicitly points the output at the source folder.
 
@@ -71,11 +70,10 @@ def _resize_image(
     max_size: Optional[int],
     scale_percent: Optional[int],
 ) -> "Image.Image":
-    """
-    Resizes an image preserving aspect ratio.
+    """Resizes an image preserving aspect ratio.
 
     If `scale_percent` is given it takes priority; otherwise the longest side is
-    capped at `max_size` (images already smaller are left untouched — no upscaling).
+    capped at `max_size` (images already smaller are left alone; it never upscales).
     """
     if scale_percent:
         new_w = max(1, int(img.width * scale_percent / 100))
@@ -160,8 +158,7 @@ def _process_one(
     wm_position: str,
     wm_opacity: int,
 ) -> Tuple[bool, int, int]:
-    """
-    Applies a single operation to one file.
+    """Applies a single operation to one file.
 
     Returns (success, original_bytes, new_bytes).
     """
@@ -175,7 +172,7 @@ def _process_one(
                 img = _resize_image(img, max_size, scale_percent)
             elif operation == "watermark":
                 img = _apply_watermark(img, watermark_text, wm_position, wm_opacity)
-            # "compress" needs no transform — the quality drop happens on save.
+            # "compress" needs no transform; the quality drop happens on save.
 
             _save_image(img, output_path, quality)
 
@@ -227,20 +224,12 @@ def run_batch_image_processor(
     wm_opacity: int = 50,
     recursive: bool = False,
 ) -> None:
-    """
-    Core workflow for the batch image processor.
+    """Core workflow for the batch image processor.
 
-    Args:
-        input_path: An image file or a folder of images.
-        operation: One of "resize", "compress", or "watermark".
-        output_dir: Destination folder (defaults to a 'processed' subfolder).
-        max_size: Longest-side cap in pixels (resize mode).
-        scale_percent: Resize by this percentage instead of max_size (resize mode).
-        quality: JPEG/WebP quality 1-100 (compress mode, also used on save).
-        watermark_text: Text to stamp (watermark mode).
-        wm_position: Watermark anchor (one of WATERMARK_POSITIONS).
-        wm_opacity: Watermark opacity 0-100 (watermark mode).
-        recursive: Recurse into subfolders when input is a directory.
+    `operation` is one of "resize", "compress" or "watermark", and each one reads
+    only its own knobs: resize takes `max_size` or `scale_percent`, compress takes
+    `quality`, watermark takes `watermark_text` / `wm_position` / `wm_opacity`.
+    Results go to a `processed` subfolder unless `output_dir` says otherwise.
     """
     if not HAS_PILLOW:
         print_error("Pillow is not installed. Install it with 'pip install Pillow'.")
@@ -281,7 +270,7 @@ def run_batch_image_processor(
         output_path = os.path.join(out_dir, filename)
 
         # Never silently overwrite the original when the output lands in the
-        # same folder as the source — add an operation suffix instead.
+        # same folder as the source, so add an operation suffix instead.
         if os.path.abspath(output_path) == os.path.abspath(filepath):
             base, ext = os.path.splitext(filename)
             output_path = os.path.join(out_dir, f"{base}_{operation}{ext}")

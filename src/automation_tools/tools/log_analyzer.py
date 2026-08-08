@@ -6,7 +6,7 @@ from typing import Optional
 from automation_tools.core.logger import console, print_error, print_step, print_warning
 
 # Matches beyond this are still written to the report file, just not echoed to
-# the console — a million-hit scan should not scroll for an hour.
+# the console; a million-hit scan should not scroll for an hour.
 MAX_CONSOLE_MATCHES = 100
 
 
@@ -17,14 +17,11 @@ def run_log_analyzer(
     ignore_case: bool = True,
     out_path: Optional[str] = None
 ) -> bool:
-    """
-    Scans a log file or a directory of log files for specific keywords or regex patterns.
-    Outputs a summary of the matches found.
+    """Scans a log file, or a directory of them, for keywords or regex patterns.
 
-    Returns True when the scan ran to completion — finding zero matches still
-    counts as a successful scan. Returns False when it could not run at all: a
-    bad path, no patterns, an invalid regex, nothing to scan, or an unwritable
-    report destination.
+    True when the scan ran to completion; finding zero matches still counts as
+    success. False when it could not run at all: a bad path, no patterns, an
+    invalid regex, nothing to scan, or an unwritable report destination.
     """
     if not os.path.exists(path):
         print_error(f"Path '{path}' does not exist.")

@@ -4,7 +4,6 @@ from typing import List, Optional, Tuple
 
 from automation_tools.core.logger import console, print_error, print_step, print_warning
 
-# --- Dotenv & Config Manager ---
 # Generate a .env.example template, find .env files that should never be
 # committed, and check a .env against its template.
 #
@@ -20,8 +19,7 @@ IGNORE_DIRS = {"node_modules", "venv", ".venv", "__pycache__", ".git", "env"}
 
 
 def _parse_env_file(filepath: str) -> List[Tuple[Optional[str], Optional[str], str]]:
-    """
-    Parses a .env file into (key, value, original_line) tuples.
+    """Parses a .env file into (key, value, original_line) tuples.
 
     Comments, blank lines and anything without an '=' come back with key and
     value set to None, so the original line can still be reproduced verbatim.

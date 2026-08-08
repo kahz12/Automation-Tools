@@ -14,15 +14,7 @@ except ImportError:
 
 
 def get_file_date(filepath: str) -> datetime.datetime:
-    """
-    Gets the original creation date of the file, preferring EXIF data if available.
-    
-    Args:
-        filepath (str): Path to the file.
-        
-    Returns:
-        datetime.datetime: The detected or fallback modification date.
-    """
+    """Original date of a file: EXIF DateTimeOriginal when present, mtime otherwise."""
     date_taken = None
     if HAS_PILLOW:
         try:
@@ -46,8 +38,7 @@ def get_file_date(filepath: str) -> datetime.datetime:
 
 
 def _build_pattern_regex(pattern: str) -> Optional[re.Pattern]:
-    """
-    Builds a regex from a format pattern like 'trip_{:03d}' that captures the numeric index.
+    """Builds a regex from a format pattern like 'trip_{:03d}' that captures the numeric index.
     """
     placeholder_re = re.compile(r'\{[^}]*\}')
     if not placeholder_re.search(pattern):
@@ -58,8 +49,7 @@ def _build_pattern_regex(pattern: str) -> Optional[re.Pattern]:
 
 
 def _split_pattern_files(files: List[str], pattern: str) -> Tuple[List[str], List[str], int]:
-    """
-    Splits files into those already matching the pattern and those pending, 
+    """Splits files into those already matching the pattern and those pending, 
     returning the maximum existing index found.
     """
     regex = _build_pattern_regex(pattern)
@@ -88,8 +78,7 @@ def detect_dominant_pattern(
     ext_filter: Optional[str] = None,
     min_count: int = 2,
 ) -> Tuple[Optional[str], int, int]:
-    """
-    Auto-detects a dominant naming pattern like '<prefix><digits>'.
+    """Auto-detects a dominant naming pattern like '<prefix><digits>'.
 
     Returns (pattern, count, max_index) or (None, 0, 0) if no dominant pattern is found.
     """
@@ -133,11 +122,9 @@ def generate_new_name(
     old_text: Optional[str] = None,
     new_text: str = ""
 ) -> str:
-    """
-    Generates a new filename based on the selected mode.
-    
-    Args:
-        mode (str): 'patron' (sequence), 'fecha' (date-based), or 'reemplazo' (text replacement).
+    """Builds the new filename.
+
+    `mode` is 'patron' (sequence), 'fecha' (date-based) or 'reemplazo' (text replacement).
     """
     name, ext = os.path.splitext(filename)
     
@@ -171,8 +158,7 @@ def generate_new_name(
 
 
 def _auto_version_name(directory: str, desired: str, reserved: set) -> str:
-    """
-    Ensures a unique filename by appending a version number (e.g., _1, _2) if needed.
+    """Ensures a unique filename by appending a version number (e.g., _1, _2) if needed.
     """
     dst = os.path.join(directory, desired)
     if not os.path.exists(dst) and desired not in reserved:
@@ -200,8 +186,7 @@ def run_massive_rename(
     auto_version: bool = True,
     preview: bool = False,
 ) -> None:
-    """
-    Core function to execute massive file renaming.
+    """Renames a batch of files.
 
     continue_sequence behavior:
         - True  → skip files already in sequence and continue from next index.
@@ -340,8 +325,7 @@ def run_massive_rename(
 
 
 def main():
-    """
-    Main entry point for the smart mass renamer CLI.
+    """Main entry point for the smart mass renamer CLI.
     """
     parser = argparse.ArgumentParser(description="Smart Mass File Renamer")
     

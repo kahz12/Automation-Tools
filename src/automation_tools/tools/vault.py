@@ -15,7 +15,6 @@ from automation_tools.core.logger import (
     print_warning,
 )
 
-# --- Encryption Vault Tool ---
 # Encrypt or decrypt any file (or a whole folder) with a password, using only
 # the `cryptography` library so it runs the same on Linux, Windows and
 # Termux/Android (no external binaries).
@@ -71,12 +70,11 @@ def _unique_path(path: str) -> str:
 
 
 def _prompt_password(action: str, prompt: Callable[[str], str] = getpass.getpass) -> Optional[str]:
-    """
-    Asks the user for the vault password.
+    """Asks the user for the vault password.
 
     Encrypting asks twice and requires both entries to match: a typo there seals
     the files under a password nobody knows, and the contents are gone for good.
-    Decrypting asks once — a wrong password is simply rejected by Fernet.
+    Decrypting asks once, since a wrong password is simply rejected by Fernet.
 
     Returns None if the password is empty or the confirmation does not match.
     """
@@ -95,8 +93,7 @@ def _prompt_password(action: str, prompt: Callable[[str], str] = getpass.getpass
 
 
 def _collect_files(path: str, action: str, recursive: bool) -> List[str]:
-    """
-    Gathers the files to process.
+    """Gathers the files to process.
 
     - encrypt: every file except ones we already produced (*.enc).
     - decrypt: only *.enc files.
@@ -145,10 +142,9 @@ def encrypt_file(input_path: str, key: bytes, salt: bytes, iterations: int, outp
 
 
 def decrypt_file(input_path: str, password: str, output_path: str, key_cache: Dict[Tuple[bytes, int], bytes]) -> None:
-    """
-    Decrypts one vault file. Raises:
-        ValueError    — not a vault file (bad/short header).
-        InvalidToken  — wrong password or tampered/corrupted data.
+    """Decrypts one vault file. Raises:
+        ValueError:   not a vault file (bad/short header).
+        InvalidToken: wrong password or tampered/corrupted data.
     """
     with open(input_path, "rb") as f:
         raw = f.read()
@@ -179,18 +175,9 @@ def run_vault(
     remove_originals: bool = False,
     recursive: bool = True,
 ) -> bool:
-    """
-    Core workflow: encrypt or decrypt a file or a folder of files.
+    """Core workflow: encrypt or decrypt a file, or a folder of files.
 
     Returns True only if at least one file was processed and none failed.
-
-    Args:
-        path: A file or a folder.
-        action: "encrypt" or "decrypt".
-        password: The password used to derive the key.
-        output_dir: Where to write results (defaults to alongside each source file).
-        remove_originals: Delete each source file after it is processed successfully.
-        recursive: Recurse into subfolders when `path` is a directory.
     """
     if not HAS_CRYPTO:
         print_error("The 'cryptography' library is not installed. Install it with 'pip install cryptography'.")
@@ -214,7 +201,7 @@ def run_vault(
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
 
-    # Confirm before deleting plaintext/originals — this step is irreversible.
+    # Confirm before deleting the originals; this step is irreversible.
     if remove_originals:
         confirm = questionary.confirm(
             f"Delete the {len(files)} original file(s) after {action}ing? This cannot be undone.",

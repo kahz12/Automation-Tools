@@ -14,9 +14,8 @@ from automation_tools.core.logger import (
 )
 from rich.table import Table
 
-# --- Integrity Checker Tool ---
 # Create a checksum manifest of a folder (one hash per file) and verify it
-# later to detect corrupted, modified, missing, or new files — ideal for
+# later to detect corrupted, modified, missing or new files. Handy for
 # validating backups, SD-card copies, or long-term archives.
 #
 # The manifest uses the GNU coreutils format ("<hash>  <relative/path>"), so
@@ -86,8 +85,7 @@ def collect_files(
     include_hidden: bool = False,
     skip: Optional[List[str]] = None,
 ) -> List[str]:
-    """
-    Returns the sorted relative (forward-slashed) paths of every regular file
+    """Returns the sorted relative (forward-slashed) paths of every regular file
     under `directory`, applying exclude patterns and (unless include_hidden)
     skipping dotfiles. Symlinks are never followed. Paths in `skip` (e.g. the
     manifest itself) are always omitted.
@@ -120,8 +118,7 @@ def build_manifest(
     include_hidden: bool = False,
     skip: Optional[List[str]] = None,
 ) -> Tuple[Dict[str, str], List[str]]:
-    """
-    Hashes every collected file under `directory`.
+    """Hashes every collected file under `directory`.
 
     Returns (entries, unreadable) where entries maps relative path → hex
     digest and unreadable lists files that could not be opened.
@@ -145,8 +142,7 @@ def write_manifest(entries: Dict[str, str], out_path: str) -> None:
 
 
 def parse_manifest(manifest_path: str) -> Tuple[str, Dict[str, str]]:
-    """
-    Reads a coreutils-style manifest, returning (algorithm, entries).
+    """Reads a coreutils-style manifest, returning (algorithm, entries).
 
     The algorithm is inferred from the digest length. Raises ValueError if the
     file has no valid lines or mixes digest lengths.
@@ -159,7 +155,7 @@ def parse_manifest(manifest_path: str) -> Tuple[str, Dict[str, str]]:
             line = line.rstrip("\n")
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
-            # "<hash>  <path>" — coreutils also allows "<hash> *<path>" (binary)
+            # "<hash>  <path>", and coreutils also allows "<hash> *<path>" (binary)
             parts = line.split(None, 1)
             if len(parts) != 2:
                 raise ValueError(f"malformed manifest line: {line!r}")
@@ -196,8 +192,7 @@ def verify_manifest(
     exclude: Optional[List[str]] = None,
     include_hidden: bool = False,
 ) -> VerifyResult:
-    """
-    Re-hashes every file listed in the manifest and compares digests.
+    """Re-hashes every file listed in the manifest and compares digests.
 
     With check_extra, also reports files present on disk but absent from the
     manifest (the manifest file itself is never counted as extra).
@@ -339,12 +334,11 @@ def run_integrity(
     include_hidden: bool = False,
     check_extra: bool = False,
 ) -> bool:
-    """
-    Single entry point shared by the CLI and the interactive menu.
+    """Single entry point shared by the CLI and the interactive menu.
 
     action:
-        "create" — hash `directory` and write a checksum manifest to `output`.
-        "verify" — compare `directory` against `manifest` (auto-detected if omitted).
+        "create": hash `directory` and write a checksum manifest to `output`.
+        "verify": compare `directory` against `manifest` (auto-detected if omitted).
     """
     if action == "create":
         return _run_create(directory, output, algorithm, exclude, include_hidden)

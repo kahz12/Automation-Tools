@@ -25,12 +25,7 @@ HISTORY_DIR = os.path.join(get_project_root(), ".organizer_history")
 
 
 def create_directories_if_not_exist(downloads_path: str) -> None:
-    """
-    Creates the category directories within the specified path if they do not exist.
-    
-    Args:
-        downloads_path (str): The base directory where folders will be created.
-    """
+    """Creates the category folders under `downloads_path` if they are missing."""
     for category in CATEGORIES:
         category_path = os.path.join(downloads_path, category)
         if not os.path.exists(category_path):
@@ -39,15 +34,7 @@ def create_directories_if_not_exist(downloads_path: str) -> None:
 
 
 def get_target_category(filename: str) -> str:
-    """
-    Determines the target category for a file based on its extension.
-    
-    Args:
-        filename (str): The name of the file.
-        
-    Returns:
-        str: The name of the category folder.
-    """
+    """Category folder a file belongs to, from its extension."""
     file_extension = os.path.splitext(filename)[1].lower()
     for category, extensions in CATEGORIES.items():
         if file_extension in extensions:
@@ -56,16 +43,7 @@ def get_target_category(filename: str) -> str:
 
 
 def _resolve_collision(dst: str, policy: str) -> Optional[str]:
-    """
-    Applies a collision policy if a file already exists at the destination.
-    
-    Args:
-        dst (str): Target destination path.
-        policy (str): One of "skip", "overwrite", or "rename".
-        
-    Returns:
-        Optional[str]: The final destination path or None if the operation should be skipped.
-    """
+    """Applies the collision `policy` ("skip", "overwrite" or "rename"). None means skip the move."""
     if not os.path.exists(dst):
         return dst
     if policy == "skip":
@@ -83,16 +61,7 @@ def _resolve_collision(dst: str, policy: str) -> Optional[str]:
 
 
 def _save_history(moves: List[Dict[str, str]], root_path: str) -> Optional[str]:
-    """
-    Persists the list of file moves as a JSON file for future undo operations.
-    
-    Args:
-        moves (List[Dict[str, str]]): List of source and destination paths.
-        root_path (str): The base path where reorganization took place.
-        
-    Returns:
-        Optional[str]: The path to the created history file.
-    """
+    """Writes the moves to a JSON file so the run can be undone later."""
     if not moves:
         return None
     os.makedirs(HISTORY_DIR, exist_ok=True)
@@ -109,12 +78,7 @@ def _save_history(moves: List[Dict[str, str]], root_path: str) -> Optional[str]:
 
 
 def run_download_organizer(collision_policy: str = "rename") -> None:
-    """
-    Organizes files in the downloads folder into categorized subdirectories.
-    
-    Args:
-        collision_policy (str): How to handle existing files ("rename", "skip", or "overwrite").
-    """
+    """Sorts the downloads folder into category subfolders."""
     downloads_path = get_downloads_folder()
 
     print_step(f"Organizing folder: [bold]{downloads_path}[/bold]")
@@ -162,12 +126,7 @@ def run_download_organizer(collision_policy: str = "rename") -> None:
 
 
 def list_history() -> List[str]:
-    """
-    Returns history files sorted by modification time (newest first).
-    
-    Returns:
-        List[str]: List of paths to history JSON files.
-    """
+    """History files, newest first."""
     if not os.path.isdir(HISTORY_DIR):
         return []
     files = [os.path.join(HISTORY_DIR, f) for f in os.listdir(HISTORY_DIR) if f.endswith(".json")]
@@ -176,12 +135,7 @@ def list_history() -> List[str]:
 
 
 def undo_from_file(history_path: str) -> None:
-    """
-    Reverts the moves recorded in a specific history JSON file.
-    
-    Args:
-        history_path (str): Path to the history file.
-    """
+    """Puts every file recorded in a history file back where it came from."""
     if not os.path.isfile(history_path):
         print_error(f"History file not found: {history_path}")
         return
@@ -226,8 +180,7 @@ def undo_from_file(history_path: str) -> None:
 
 
 def undo_last() -> None:
-    """
-    Reverts the most recent reorganization run.
+    """Reverts the most recent reorganization run.
     """
     files = list_history()
     if not files:
@@ -237,8 +190,7 @@ def undo_last() -> None:
 
 
 def main():
-    """
-    Main entry point for the organizer tool.
+    """Main entry point for the organizer tool.
     """
     run_download_organizer()
 

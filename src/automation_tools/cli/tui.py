@@ -11,6 +11,8 @@ from textual.binding import Binding
 from textual.containers import Grid, Vertical, VerticalScroll
 from textual.widgets import Footer, Input, Static
 
+from automation_tools.ai.base import UnknownProviderError
+from automation_tools.ai.registry import PROVIDERS, resolve_name
 from automation_tools.core.config import get_env_var
 from automation_tools.core.logger import ASCII_TITLE, PALETTE, _gradient_text
 
@@ -59,23 +61,23 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
     ),
     "📝  Document Summarizer": (
         "📝", "Document Summarizer",
-        "Generate an executive summary of PDF\nor TXT files using Google Gemini AI.",
+        "Generate an executive summary of PDF\nor TXT files using the AI provider you pick.",
     ),
     "🌐  File Translator": (
         "🌐", "File Translator",
-        "Translate text, subtitles, or code files\nto any language via Google Gemini AI.",
+        "Translate text, subtitles, or code files\nto any language via your AI provider.",
     ),
     "📘  README Generator": (
         "📘", "README Generator",
-        "Analyze a project directory and auto-generate\na professional README using Gemini.",
+        "Analyze a project directory and auto-generate\na professional README with AI.",
     ),
     "🔡  Image OCR": (
         "🔡", "Image OCR",
-        "Extract text from images or scans using\nGoogle Gemini Vision. Plain text or Markdown.",
+        "Extract text from images or scans with AI\nvision. Plain text or Markdown.",
     ),
     "🎤  A/V Transcriber": (
         "🎤", "A/V Transcriber",
-        "Transcribe audio or video into SRT\nsubtitles or plain text via Gemini.",
+        "Transcribe audio or video into SRT\nsubtitles or plain text with AI.",
     ),
     "💰  Price Monitor": (
         "💰", "Price Monitor",
@@ -110,6 +112,25 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "Generate .env.example, scan for exposed\n.env files, validate against a template.",
     ),
 }
+
+
+def _key_status() -> str:
+    """Hero-banner fragment reporting the key for the provider actually in use.
+
+    This read GOOGLE_API_KEY unconditionally and printed "Gemini key", which
+    lied both ways once the AI tools grew past Gemini: it told a correctly
+    configured user they had no key, and told someone whose provider has no key
+    that they were ready, just because a stale Google key was still exported.
+    """
+    try:
+        spec = PROVIDERS[resolve_name()]
+    except UnknownProviderError:
+        # $AI_PROVIDER names a provider that does not exist. Reporting some
+        # other provider's key here would bury the real problem, so name it.
+        return "[#ef4444]✗ unknown $AI_PROVIDER[/]"
+    state = ("[#22c55e]✓ set[/]" if get_env_var(spec.env_key)
+             else "[#ef4444]✗ not set[/]")
+    return f"[#94a3b8]{spec.label} key[/] {state}"
 
 
 # ── Search box ──────────────────────────────────────────────────────────────
@@ -319,12 +340,10 @@ Footer {
     # ── rendering helpers ────────────────────────────────────────────────
     def _set_stats(self) -> None:
         n_tools = sum(len(entries) for _, entries in self._menu_entries)
-        has_key = bool(get_env_var("GOOGLE_API_KEY"))
-        key_txt = "[#22c55e]✓ set[/]" if has_key else "[#ef4444]✗ not set[/]"
         when = datetime.now().strftime("%Y-%m-%d  %H:%M")
         self.query_one("#hero-stats", Static).update(
             f"[#a78bfa]{n_tools} tools[/]   [#374151]·[/]   "
-            f"[#94a3b8]Gemini key[/] {key_txt}   [#374151]·[/]   "
+            f"{_key_status()}   [#374151]·[/]   "
             f"[#64748b]{when}[/]"
         )
 
@@ -342,7 +361,7 @@ Footer {
                              style=f"bold {PALETTE['accent']}", justify="center"))
         else:
             hero.update(_gradient_text(ASCII_TITLE, PALETTE["primary"], PALETTE["accent"]))
-        # Responsive columns — keep each card roughly >= 24 cells wide.
+        # Responsive columns, keeping each card at roughly 24 cells or wider.
         available = max(20, width - 6)
         columns = max(1, available // 24)
         for grid in self.query(".card-grid"):
@@ -390,7 +409,7 @@ Footer {
             best.focus()
             best.scroll_visible()
         elif dy < 0:
-            # Already on the top row — step up into the search box.
+            # Already on the top row, so step up into the search box.
             self.query_one("#search", Input).focus()
 
     def show_detail(self, card: ToolCard) -> None:

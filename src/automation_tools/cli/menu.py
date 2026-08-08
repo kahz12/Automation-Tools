@@ -31,7 +31,7 @@ def _record_use(name: str) -> None:
     _save_history(history)
 
 
-# Each entry: (label, None) — action is handled by SCREEN_MAP in screens.py
+# Each entry: (label, None). The action comes from SCREEN_MAP in screens.py.
 MENU_ENTRIES = [
     ("📂  Files", [
         ("✂️   Massive Renamer",    None),
@@ -47,7 +47,7 @@ MENU_ENTRIES = [
         ("📄  Convert to PDF",      None),
         ("📑  PDF Toolkit",         None),
     ]),
-    ("🧠  AI (Gemini)", [
+    ("🧠  AI", [
         ("📝  Document Summarizer", None),
         ("🌐  File Translator",     None),
         ("📘  README Generator",    None),

@@ -17,9 +17,8 @@ from automation_tools.core.logger import (
 )
 from rich.table import Table
 
-# --- Backup / Archiver Tool ---
 # Bundle files and folders into a single compressed archive (a timestamped
-# backup), inspect an archive's contents, or extract one — using only the
+# backup), inspect an archive's contents, or extract one, using only the
 # standard library (zipfile / tarfile), so it runs the same on Linux, Windows
 # and Termux/Android with no external binaries.
 #
@@ -69,8 +68,7 @@ def _timestamp() -> str:
 
 
 def _matches(patterns: List[str], arcname: str) -> bool:
-    """
-    True if any glob pattern matches the arcname, its basename, or any of its
+    """True if any glob pattern matches the arcname, its basename, or any of its
     path components. Lets a single pattern exclude files (``*.log``) or whole
     folders (``__pycache__``, ``node_modules``).
     """
@@ -87,8 +85,7 @@ def _is_hidden(rel: str) -> bool:
 
 
 def _iter_source_files(source: str):
-    """
-    Yields (absolute_path, arcname) for every regular file under `source`.
+    """Yields (absolute_path, arcname) for every regular file under `source`.
 
     A file source yields itself, rooted at its own name; a directory source is
     walked recursively and each file is rooted under the directory's name, so
@@ -127,8 +124,7 @@ def collect_entries(
     exclude: Optional[List[str]] = None,
     include_hidden: bool = False,
 ) -> List[ArchiveEntry]:
-    """
-    Gathers the files to archive from one or more source paths, applying the
+    """Gathers the files to archive from one or more source paths, applying the
     exclude patterns and (unless include_hidden) skipping dotfiles.
     """
     exclude = exclude or []
@@ -228,8 +224,7 @@ def extract_archive(
     overwrite: bool = False,
     dry_run: bool = False,
 ) -> Tuple[List[str], List[Tuple[str, str]]]:
-    """
-    Extracts an archive into `dest`, returning (written, skipped) where each
+    """Extracts an archive into `dest`, returning (written, skipped) where each
     skipped entry is (name, reason). Guards against path traversal, refuses to
     follow archived symlinks, and (unless overwrite) leaves existing files
     untouched. In dry_run mode nothing is written to disk.
@@ -395,13 +390,12 @@ def run_archiver(
     apply: bool = False,
     overwrite: bool = False,
 ) -> bool:
-    """
-    Single entry point shared by the CLI and the interactive menu.
+    """Single entry point shared by the CLI and the interactive menu.
 
     action:
-        "create"  — bundle `sources` into `output` (dry-run unless apply).
-        "list"    — print the contents of `archive`.
-        "extract" — unpack `archive` into `dest` (dry-run unless apply).
+        "create":  bundle `sources` into `output` (dry-run unless apply).
+        "list":    print the contents of `archive`.
+        "extract": unpack `archive` into `dest` (dry-run unless apply).
     """
     if action == "create":
         if not sources:

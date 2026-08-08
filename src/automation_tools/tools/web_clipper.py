@@ -7,7 +7,6 @@ from urllib.parse import urljoin
 
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
 
-# --- Web Clipper ---
 # Fetch a web page, strip away the chrome (nav, ads, scripts…), isolate the
 # main article and save it as clean Markdown or plain text. Built only on
 # `requests` + `beautifulsoup4` with the stdlib `html.parser`, so it needs no
@@ -169,7 +168,7 @@ def _to_markdown(node, base_url: str, include_images: bool) -> str:
             lines.append(prefix + item.replace("\n", "\n  "))
         body = "\n".join(lines)
         return f"\n\n{body}\n\n" if body else ""
-    # Generic container (div, section, span, li, article…) — render children.
+    # Generic container (div, section, span, li, article…): render the children.
     return children()
 
 
@@ -240,14 +239,8 @@ def run_web_clipper(
 ) -> None:
     """Clip the main article of a web page to clean Markdown or plain text.
 
-    Args:
-        url: Page URL (the scheme defaults to https:// if omitted).
-        out_path: Explicit output file. If empty and `save` is True, a name is
-            derived from the page title.
-        fmt: "markdown" (default) or "text".
-        include_images: Keep image references in Markdown output.
-        save: Save the result to disk (auto-named when `out_path` is empty).
-        timeout: Network timeout in seconds.
+    The scheme defaults to https:// when `url` omits it. With `save` on and no
+    `out_path`, the filename comes from the page title.
     """
     if not HAS_DEPS:
         print_error("Missing dependencies. Install with 'pip install requests beautifulsoup4'.")

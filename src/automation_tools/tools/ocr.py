@@ -3,6 +3,7 @@ import io
 import os
 from typing import List, Optional, Tuple
 
+from automation_tools.ai import AIProviderError, Capability, get_provider
 from automation_tools.core.logger import (
     console,
     print_error,
@@ -10,16 +11,14 @@ from automation_tools.core.logger import (
     print_success,
     print_warning,
 )
-from automation_tools.tools.gemini_utils import get_gemini_client, generate_vision_content
 
-# --- AI OCR Tool ---
-# Extract text from images or scanned documents using Google Gemini's vision
-# models. Works on a single image or a whole folder (batch), and can output
+# Extract text from images or scanned documents using a vision-capable AI
+# provider. Works on a single image or a whole folder (batch), and can output
 # either a faithful plain-text transcription or reconstructed Markdown
 # (headings, lists, tables). It complements the AI Summarizer/Translator, which
-# only handle text-based files — this one reads pixels.
+# only handle text-based files; this one reads pixels.
 
-# Formats Gemini accepts directly, mapped to their MIME type.
+# Formats accepted directly, mapped to their MIME type.
 DIRECT_MIME = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -32,8 +31,7 @@ IMAGE_EXTS = set(DIRECT_MIME) | CONVERTIBLE_EXTS
 
 
 def _image_to_bytes(path: str) -> Tuple[bytes, str]:
-    """
-    Loads an image as (data, mime_type) ready for Gemini.
+    """Loads an image as (data, mime_type) ready for the vision provider.
 
     Formats the API accepts natively are sent as-is; anything else (BMP, GIF,
     TIFF…) is converted to PNG with Pillow so it can still be processed.
@@ -90,7 +88,7 @@ def _build_prompt(markdown: bool = False, language: Optional[str] = None) -> str
 
 
 def ocr_image(
-    client,
+    provider,
     path: str,
     markdown: bool = False,
     language: Optional[str] = None,
@@ -103,7 +101,7 @@ def ocr_image(
         return None
 
     prompt = _build_prompt(markdown=markdown, language=language)
-    return generate_vision_content(client, prompt, image_bytes, mime_type)
+    return provider.generate_vision(prompt, image_bytes, mime_type)
 
 
 def _output_path(src: str, out_dir: Optional[str], ext: str) -> str:
@@ -132,9 +130,10 @@ def run_ocr(
     markdown: bool = False,
     language: Optional[str] = None,
     recursive: bool = False,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> bool:
-    """
-    Core workflow: OCR a single image or every image in a folder.
+    """Core workflow: OCR a single image or every image in a folder.
 
     - Single image: prints the text and, if `out_path` is given, saves it there.
     - Folder: writes each result next to its source (or into `out_path` used as
@@ -151,16 +150,18 @@ def run_ocr(
         print_error(f"No supported images found ({', '.join(sorted(IMAGE_EXTS))}).")
         return False
 
-    client = get_gemini_client(api_key)
-    if not client:
+    try:
+        ai = get_provider(Capability.VISION, name=provider, api_key=api_key, model=model)
+    except AIProviderError as e:
+        print_error(str(e))
         return False
 
     ext = ".md" if markdown else ".txt"
 
     # Single-image mode: print the result, optionally save to a file.
     if os.path.isfile(path):
-        print_step(f"Reading text from '{os.path.basename(path)}' with Gemini…")
-        text = ocr_image(client, path, markdown=markdown, language=language)
+        print_step(f"Reading text from '{os.path.basename(path)}' with {ai.name}…")
+        text = ocr_image(ai, path, markdown=markdown, language=language)
         if not text:
             print_error("No text could be extracted.")
             return False
@@ -178,7 +179,7 @@ def run_ocr(
     done = 0
     for img in images:
         console.print(f"[dim]  • {os.path.basename(img)}…[/dim]")
-        text = ocr_image(client, img, markdown=markdown, language=language)
+        text = ocr_image(ai, img, markdown=markdown, language=language)
         if not text:
             print_warning(f"No text extracted from {os.path.basename(img)}.")
             continue
@@ -197,16 +198,19 @@ def run_ocr(
 def main() -> None:
     """CLI entry point for the AI OCR tool."""
     parser = argparse.ArgumentParser(
-        description="AI OCR: extract text from images or scans using Google Gemini."
+        description="AI OCR: extract text from images or scans using a vision-capable AI provider."
     )
     parser.add_argument("path", help="Image file or a folder of images.")
-    parser.add_argument("--key", help="Google API Key (optional; defaults to GOOGLE_API_KEY).")
+    parser.add_argument("--key", help="API key for the chosen provider (optional)")
     parser.add_argument("--out", help="Output file (single image) or output folder (batch).")
     parser.add_argument("--markdown", action="store_true",
                         help="Reconstruct layout as Markdown instead of plain text.")
     parser.add_argument("--language", help="Hint for the primary language of the text.")
     parser.add_argument("--recursive", action="store_true",
                         help="Recurse into subfolders when a folder is given.")
+    parser.add_argument("--provider",
+                        help="AI provider (default: $AI_PROVIDER, or gemini)")
+    parser.add_argument("--model", help="Override the provider's default model")
     args = parser.parse_args()
 
     ok = run_ocr(
@@ -216,6 +220,8 @@ def main() -> None:
         markdown=args.markdown,
         language=args.language,
         recursive=args.recursive,
+        provider=args.provider,
+        model=args.model,
     )
     raise SystemExit(0 if ok else 1)
 

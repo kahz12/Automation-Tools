@@ -4,8 +4,8 @@ import re
 from collections import Counter
 from typing import Dict, Optional, List, Tuple
 
+from automation_tools.ai import AIProviderError, Capability, get_provider
 from automation_tools.core.logger import console, print_error, print_step, print_success
-from automation_tools.tools.gemini_utils import get_gemini_client, generate_content
 
 
 # Mapping of file extensions to their respective programming languages
@@ -51,15 +51,7 @@ STACK_MARKERS: List[Tuple[str, str]] = [
 
 
 def detect_primary_language(directory: str) -> Optional[str]:
-    """
-    Detects the dominant programming language by counting source files and checking stack markers.
-    
-    Args:
-        directory (str): The project root directory.
-        
-    Returns:
-        Optional[str]: The detected language name or None.
-    """
+    """Dominant language of a project, by source-file count plus stack markers."""
     stack_hits: List[str] = []
     ext_counter: Counter = Counter()
 
@@ -86,16 +78,7 @@ def detect_primary_language(directory: str) -> Optional[str]:
 
 
 def get_project_tree(directory: str, ignore_dirs: Optional[List[str]] = None) -> str:
-    """
-    Generates a text-based tree representation of the directory structure.
-    
-    Args:
-        directory (str): The directory to map.
-        ignore_dirs (Optional[List[str]]): List of directories to skip.
-        
-    Returns:
-        str: A string representing the project tree.
-    """
+    """Text tree of the directory structure."""
     if ignore_dirs is None:
         ignore_dirs = ['.git', '__pycache__', 'venv', 'env', 'node_modules', '.idea', '.vscode', '.venv']
 
@@ -118,16 +101,7 @@ def get_project_tree(directory: str, ignore_dirs: Optional[List[str]] = None) ->
 
 
 def read_key_files(directory: str, max_files: int = 10) -> str:
-    """
-    Reads the content of key files to provide context for project analysis.
-    
-    Args:
-        directory (str): Project root directory.
-        max_files (int): Maximum number of files to read to avoid hitting token limits.
-        
-    Returns:
-        str: Concatenated content of key project files.
-    """
+    """Concatenates the most telling project files, capped at `max_files` so the prompt stays within token limits."""
     key_extensions = ['.py', '.js', '.html', '.md', '.json', '.txt', '.sh', '.yml', '.yaml', '.ts', '.go', '.rs', '.cpp', '.h', '.java']
     important_files = ['requirements.txt', 'package.json', 'Dockerfile', 'main.py', 'app.py', 'index.js', 'cargo.toml', 'go.mod']
 
@@ -162,15 +136,7 @@ def read_key_files(directory: str, max_files: int = 10) -> str:
 
 
 def generate_toc(markdown: str) -> str:
-    """
-    Builds a GitHub-flavored Table of Contents (TOC) from ## and ### headings.
-    
-    Args:
-        markdown (str): The README content.
-        
-    Returns:
-        str: A markdown string containing the TOC.
-    """
+    """Builds a GitHub-flavoured table of contents from the ## and ### headings."""
     lines = markdown.splitlines()
     toc: List[str] = []
     for line in lines:
@@ -191,8 +157,7 @@ def generate_toc(markdown: str) -> str:
 
 
 def _inject_toc(markdown: str) -> str:
-    """
-    Inserts a Table of Contents right after the first H1 title.
+    """Inserts a Table of Contents right after the first H1 title.
     """
     toc = generate_toc(markdown)
     if not toc:
@@ -209,21 +174,19 @@ def _inject_toc(markdown: str) -> str:
     return "\n".join(lines[:insert_at] + ["", toc] + lines[insert_at:])
 
 
-def run_readme_generator(directory: str, api_key: Optional[str] = None, out_path: str = "README_generado.md") -> None:
-    """
-    Analyzes a project and uses Gemini AI to generate a comprehensive README.md.
-    
-    Args:
-        directory (str): The project directory.
-        api_key (Optional[str]): Google API key.
-        out_path (str): The destination file path.
-    """
+def run_readme_generator(directory: str, api_key: Optional[str] = None,
+                         out_path: str = "README_generado.md",
+                         provider: Optional[str] = None,
+                         model: Optional[str] = None) -> None:
+    """Analyses a project and has the AI write a README to `out_path`."""
     if not os.path.isdir(directory):
         print_error(f"The directory '{directory}' does not exist.")
         return
 
-    client = get_gemini_client(api_key)
-    if not client:
+    try:
+        ai = get_provider(Capability.TEXT, name=provider, api_key=api_key, model=model)
+    except AIProviderError as e:
+        print_error(str(e))
         return
 
     print_step(f"Analyzing project at: {directory}...")
@@ -233,7 +196,7 @@ def run_readme_generator(directory: str, api_key: Optional[str] = None, out_path
     tree = get_project_tree(directory)
     code_context = read_key_files(directory)
 
-    print_step("Sending context to Gemini...")
+    print_step("Sending context to AI...")
 
     # Language-specific setup hints
     lang_hint = ""
@@ -269,7 +232,7 @@ Final instructions:
 
     prompt = f"Folder Structure (real tree):\n{tree}\n\nCode and Key Files:\n{code_context[:50000]}"
 
-    readme_content = generate_content(client, prompt, system_instruction=instruction)
+    readme_content = ai.generate_text(prompt, system=instruction)
 
     if readme_content:
         # Clean up potential markdown blocks if AI ignored instructions
@@ -293,16 +256,18 @@ Final instructions:
 
 
 def main():
-    """
-    Main entry point for the README generator CLI.
+    """Main entry point for the README generator CLI.
     """
     parser = argparse.ArgumentParser(description="AI-powered Automatic README Generator")
     parser.add_argument("directory", help="Project directory to analyze")
-    parser.add_argument("--key", help="Google API Key (optional if in GOOGLE_API_KEY env)")
+    parser.add_argument("--key", help="API key for the chosen provider (optional)")
     parser.add_argument("--out", default="README_generado.md", help="Output file path")
+    parser.add_argument("--provider", help="AI provider (default: $AI_PROVIDER, or gemini)")
+    parser.add_argument("--model", help="Override the provider's default model")
     args = parser.parse_args()
 
-    run_readme_generator(args.directory, args.key, args.out)
+    run_readme_generator(args.directory, args.key, args.out,
+                         provider=args.provider, model=args.model)
 
 
 if __name__ == "__main__":

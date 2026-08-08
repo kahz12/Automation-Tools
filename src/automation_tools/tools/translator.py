@@ -3,14 +3,13 @@ import argparse
 import hashlib
 from typing import List, Optional
 
+from automation_tools.ai import AIProviderError, Capability, get_provider
 from automation_tools.core.logger import console, print_error, print_step, print_warning
-from automation_tools.tools.gemini_utils import get_gemini_client, generate_content
 
-# --- AI File Translator Tool ---
-# This tool uses Gemini to translate text files, subtitles, and code comments
-# while preserving the original file structure and formatting.
+# Translates text files, subtitles and code comments through the configured AI
+# provider, keeping the original structure and formatting intact.
 
-# Maximum characters per request to ensure reliability and stay within AI limits.
+# Anything longer than this is split and translated chunk by chunk.
 CHUNK_CHARS = 40000
 
 
@@ -25,8 +24,7 @@ def read_file(filepath: str) -> Optional[str]:
 
 
 def _chunk_text(text: str, max_chars: int = CHUNK_CHARS) -> List[str]:
-    """
-    Splits long text into manageable chunks.
+    """Splits long text into manageable chunks.
     Prefers breaking at paragraph boundaries to maintain translation quality.
     """
     if len(text) <= max_chars:
@@ -56,9 +54,11 @@ def _chunk_cache_key(chunk: str, target_lang: str) -> str:
     return h
 
 
-def run_translator(filepath: str, target_lang: str, api_key: Optional[str] = None, out_path: Optional[str] = None) -> None:
-    """
-    Core translation workflow:
+def run_translator(filepath: str, target_lang: str, api_key: Optional[str] = None,
+                   out_path: Optional[str] = None,
+                   provider: Optional[str] = None,
+                   model: Optional[str] = None) -> None:
+    """Core translation workflow:
     1. Validates file support and reads content.
     2. Chunks text if necessary.
     3. Translates each chunk using specialized system instructions to preserve formatting.
@@ -81,8 +81,10 @@ def run_translator(filepath: str, target_lang: str, api_key: Optional[str] = Non
         print_error("Could not read file content.")
         return
 
-    client = get_gemini_client(api_key)
-    if not client:
+    try:
+        ai = get_provider(Capability.TEXT, name=provider, api_key=api_key, model=model)
+    except AIProviderError as e:
+        print_error(str(e))
         return
 
     # System instruction tailored for precise, formatting-aware translation.
@@ -101,7 +103,7 @@ Strict Rules:
     if len(chunks) > 1:
         print_step(f"Large file: split into {len(chunks)} fragments.")
 
-    print_step(f"Translating to {target_lang} with Gemini...")
+    print_step(f"Translating to {target_lang} with AI...")
 
     # Simple in-memory cache to avoid redundant translations of identical chunks.
     cache: dict = {}
@@ -118,7 +120,7 @@ Strict Rules:
             console.print(f"[dim]  • Fragment {i}/{len(chunks)} ({len(chunk)} chars)…[/dim]")
 
         prompt = f"Text to translate:\n{chunk}"
-        result = generate_content(client, prompt, system_instruction=instruction)
+        result = ai.generate_text(prompt, system=instruction)
         if not result:
             print_warning(f"Could not translate fragment {i}. Keeping original text.")
             translated_parts.append(chunk)
@@ -148,14 +150,17 @@ Strict Rules:
 
 def main():
     """CLI entry point for the File Translator."""
-    parser = argparse.ArgumentParser(description="File Translator with Gemini")
+    parser = argparse.ArgumentParser(description="File Translator with AI")
     parser.add_argument("filepath", help="Path to the file to translate")
     parser.add_argument("--lang", required=True, help="Target language")
-    parser.add_argument("--key", help="Google API Key (optional)")
+    parser.add_argument("--key", help="API key for the chosen provider (optional)")
     parser.add_argument("--out", help="Save translation to this file")
+    parser.add_argument("--provider", help="AI provider (default: $AI_PROVIDER, or gemini)")
+    parser.add_argument("--model", help="Override the provider's default model")
     args = parser.parse_args()
 
-    run_translator(args.filepath, args.lang, args.key, args.out)
+    run_translator(args.filepath, args.lang, args.key, args.out,
+                   provider=args.provider, model=args.model)
 
 
 if __name__ == "__main__":
