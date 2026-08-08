@@ -4,12 +4,12 @@
 
 **A unified command-line toolkit of twenty-three Python utilities for everyday automation.**
 
-Files · Conversion · AI (Gemini) · Web & Multimedia · Encryption · Utilities
+Files · Conversion · AI (8 providers) · Web & Multimedia · Encryption · Utilities
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20Termux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
-[![Made with](https://img.shields.io/badge/Made%20with-Textual%20%2B%20Gemini-purple.svg)]()
+[![Made with](https://img.shields.io/badge/Made%20with-Textual%20%2B%20AI-purple.svg)]()
 
 </div>
 
@@ -34,7 +34,7 @@ Files · Conversion · AI (Gemini) · Web & Multimedia · Encryption · Utilitie
 
 - **Unified launcher** — one `automation-tools` command, arrow-key navigation, a recent-tools list
 - **Standalone scripts** — every tool also works on its own with a conventional CLI (`--help` everywhere)
-- **AI-powered** — Google Gemini for summaries, translation, and README generation
+- **AI-powered** — eight interchangeable providers (Gemini, OpenAI, Groq, Anthropic, Grok, Qwen, MiniMax, DeepSeek) for summaries, translation, OCR, transcription, and README generation
 - **Safe by default** — destructive operations run dry-run first; image/encryption tools never touch originals
 - **Tested** — a `pytest` suite covers every tool plus the menu wiring, and runs fully offline
 
@@ -71,7 +71,7 @@ pip install -e .            # add ".[dev]" to get pytest and pyflakes too
 
 Installing the package registers the `automation-tools` command inside the virtual environment.
 
-> **Requires Python 3.10+.** Optional extras: [LibreOffice](https://www.libreoffice.org/) (office → PDF conversion) and a **Google API key** (AI tools).
+> **Requires Python 3.10+.** Optional extras: [LibreOffice](https://www.libreoffice.org/) (office → PDF conversion) and an **API key for one of the eight AI providers** (AI tools) — see [Configuration](#configuration).
 
 ---
 
@@ -96,11 +96,14 @@ python3 src/automation_tools/tools/image_processor.py ./pics --op resize --max-s
 # Encrypt a folder with a password
 python3 src/automation_tools/tools/vault.py ./secret_docs encrypt --password "myStrongPass"
 
-# Summarize a PDF with Gemini
+# Summarize a PDF with the default provider
 python3 src/automation_tools/tools/summarizer.py report.pdf --out summary.txt
 
-# Extract text from a scanned image with Gemini Vision
+# Extract text from a scanned image
 python3 src/automation_tools/tools/ocr.py scan.png --out scan.txt
+
+# Any AI tool can switch provider and model per run
+python3 src/automation_tools/tools/summarizer.py report.pdf --provider anthropic --model claude-sonnet-4-5
 
 # Merge two PDFs into one
 python3 src/automation_tools/tools/pdf_toolkit.py merge "a.pdf,b.pdf" merged.pdf
@@ -139,15 +142,15 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 | PDF Converter | `converter.py` | Convert office documents (`.docx`, `.odt`, `.pptx`…) to PDF via LibreOffice. |
 | PDF Toolkit | `pdf_toolkit.py` | Merge, split, extract, rotate, encrypt, or decrypt PDFs (pure Python, no binaries). |
 
-### AI (Google Gemini)
+### AI
 
 | Tool | Module | Description |
 |------|--------|-------------|
 | AI Summarizer | `summarizer.py` | Generate an executive summary with bullet points from a PDF or text file. |
 | File Translator | `translator.py` | Translate files while preserving structure (code comments, subtitles, JSON, Markdown). |
 | README Generator | `readme_generator.py` | Analyze a project's structure and code, then draft a professional `README.md`. |
-| Image OCR | `ocr.py` | Extract text from images or scans with Gemini Vision — single file or batch, as plain text or Markdown. |
-| A/V Transcriber | `transcriber.py` | Transcribe audio or video into SRT subtitles or a plain-text transcript with Gemini. |
+| Image OCR | `ocr.py` | Extract text from images or scans — single file or batch, as plain text or Markdown. |
+| A/V Transcriber | `transcriber.py` | Transcribe audio or video into SRT subtitles or a plain-text transcript. |
 
 ### Web & Multimedia
 
@@ -171,10 +174,42 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 
 ## Configuration
 
-**Google API key** (AI tools) — export it or place it in a `.env` file:
+**AI providers** — the five AI tools work with any of eight providers. Pick one
+with `AI_PROVIDER`, or per run with `--provider` (the dashboard has a dropdown).
+Unset means `gemini`, so existing setups keep working unchanged.
+
+Each provider reads its own key. Export it, or copy `.env.example` to `.env` and
+fill in only the ones you use:
 
 ```bash
-export GOOGLE_API_KEY="your-key-here"
+cp .env.example .env
+
+# or, for a single session:
+export AI_PROVIDER="anthropic"
+export ANTHROPIC_API_KEY="your-key-here"
+```
+
+| Provider | Environment variable | Text | Vision | Audio |
+|----------|---------------------|:----:|:------:|:-----:|
+| Gemini | `GOOGLE_API_KEY` | ✅ | ✅ | ✅ |
+| OpenAI | `OPENAI_API_KEY` | ✅ | ✅ | ✅ |
+| Groq | `GROQ_API_KEY` | ✅ | ✅ | ✅ |
+| Anthropic | `ANTHROPIC_API_KEY` | ✅ | ✅ | — |
+| Grok (xAI) | `XAI_API_KEY` | ✅ | ✅ | — |
+| Qwen | `DASHSCOPE_API_KEY` | ✅ | ✅ | — |
+| MiniMax | `MINIMAX_API_KEY` | ✅ | ✅ | — |
+| DeepSeek | `DEEPSEEK_API_KEY` | ✅ | — | — |
+
+Tools only offer providers that can do the job: DeepSeek is text-only, so it
+never appears for OCR, and transcription is limited to Gemini, OpenAI, and Groq.
+Choosing an unsupported combination on the CLI gives a message naming the
+providers that can, rather than a failed API call.
+
+Override the model with `--model` when you want a specific one:
+
+```bash
+python3 src/automation_tools/tools/translator.py notes.md --lang Spanish \
+    --provider groq --model openai/gpt-oss-20b
 ```
 
 **Price Monitor** — copy the template to your own (git-ignored) config, then edit it. See **[GUIDE_CONFIG.md](GUIDE_CONFIG.md)** for the full reference, including Telegram and MercadoLibre API setup.
@@ -197,7 +232,7 @@ pytest
 pyflakes src/ tests/
 ```
 
-Tests live in `tests/`, exercise temporary directories only (your real files are never touched), and mock all network/API paths (HaveIBeenPwned, Gemini, yt-dlp) — so the suite runs fully offline. The same two commands run in CI on Python 3.10, 3.12 and 3.13 for every push and pull request.
+Tests live in `tests/`, exercise temporary directories only (your real files are never touched), and mock all network/API paths (HaveIBeenPwned, the AI providers, yt-dlp) — so the suite runs fully offline. The same two commands run in CI on Python 3.10, 3.12 and 3.13 for every push and pull request.
 
 ---
 
@@ -231,6 +266,6 @@ Released under the **MIT License** — see [LICENSE](LICENSE).
 
 **Crafted by [Ale](https://github.com/kahz12)**
 
-*Built with Python, Textual, Rich, Questionary, Pillow, cryptography, and the Google Gemini API.*
+*Built with Python, Textual, Rich, Questionary, Pillow, cryptography, and eight AI provider APIs.*
 
 </div>

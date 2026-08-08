@@ -4,15 +4,31 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Test caches
+# Test and tooling caches
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 
 # Environments
-.env
 venv/
+venv*/
 .venv/
 env/
 ENV/
+
+# Secrets. `.env*` is broad on purpose: .env.local, .env.bak and friends all
+# turn up in practice and any of them can hold a live key. The example file is
+# the template (empty values only) and has to stay committed.
+.env*
+!.env.example
+*.pem
+*.key
+credentials.json
+token.json
+service-account*.json
 
 # Logs and databases
 *.log
@@ -20,18 +36,49 @@ ENV/
 
 # Project specific
 .menu_history.json
+
 # Holds live credentials (telegram_token, ml_access_token). Use the .example as template.
 productos_a_monitorear.json
+
 # Move history with absolute paths to private files.
 .organizer_history/
 
-# Distribution / packaging
-*.zip
+# Encryption Vault output. These are the user's own private files, just
+# unreadable; .dec is what a decrypt writes when the source had no .enc suffix.
+*.enc
+*.dec
+
+# Default output of the README Generator (--out), written into the CWD.
+README_generado.md
+# Integrity Checker manifests, if it is ever run against the project root.
+checksums.*
+SHA256SUMS
+MD5SUMS
+
+# Distribution / packaging / Archiver output
 dist/
 build/
 *.egg-info/
+*.zip
+*.tar
+*.tar.gz
+*.tar.bz2
 
-# IDEs and editors
+# IDEs, editors and agent tooling
 .vscode/
 .idea/
+*.swp
+*~
 .claude/
+
+# Already ignored via .superpowers/sdd/.gitignore, but only because sdd/ is its
+# sole entry today. Stated here so anything else dropped in stays out too.
+.superpowers/
+
+# Agent-written specs and plans. Scoped to the subdirectory rather than all of
+# docs/ so that real project documentation added later is not silently dropped.
+docs/superpowers/
+
+# OS junk
+.DS_Store
+Thumbs.db

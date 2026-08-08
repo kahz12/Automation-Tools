@@ -1,7 +1,7 @@
 """Inventory of every tool screen's widgets, captured before the shared-chrome
 refactor of screens.py.
 
-Regenerate this only when a screen's fields deliberately change — never to
+Regenerate this only when a screen's fields deliberately change, never to
 make a failing test pass."""
 
 SCREEN_WIDGETS = {
@@ -46,8 +46,8 @@ SCREEN_WIDGETS = {
         "classes": ['btn-row', 'error-msg', 'field-label', 'tool-body', 'tool-panel'],
     },
     'OcrScreen': {
-        "ids": ['api-key', 'back-btn', 'error-msg', 'language', 'markdown', 'out-path', 'path', 'recursive', 'run-btn'],
-        "classes": ['btn-row', 'error-msg', 'field-label', 'tool-body', 'tool-panel'],
+        "ids": ['api-key', 'api-key-label', 'back-btn', 'error-msg', 'label', 'language', 'markdown', 'out-path', 'path', 'provider', 'recursive', 'run-btn'],
+        "classes": ['arrow', 'btn-row', 'down-arrow', 'error-msg', 'field-label', 'tool-body', 'tool-panel', 'up-arrow'],
     },
     'OrganizerScreen': {
         "ids": ['action', 'back-btn', 'error-msg', 'policy', 'rb-list', 'rb-overwrite', 'rb-rename', 'rb-run', 'rb-skip', 'rb-undo', 'run-btn', 'sec-policy'],
@@ -66,24 +66,24 @@ SCREEN_WIDGETS = {
         "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
     },
     'ReadmeScreen': {
-        "ids": ['api-key', 'back-btn', 'dir', 'error-msg', 'run-btn'],
-        "classes": ['btn-row', 'error-msg', 'field-label', 'tool-body', 'tool-panel'],
+        "ids": ['api-key', 'api-key-label', 'back-btn', 'dir', 'error-msg', 'label', 'provider', 'run-btn'],
+        "classes": ['arrow', 'btn-row', 'down-arrow', 'error-msg', 'field-label', 'tool-body', 'tool-panel', 'up-arrow'],
     },
     'RenamerScreen': {
         "ids": ['apply', 'back-btn', 'dir', 'error-msg', 'ext', 'keep-name', 'mode', 'new-text', 'old-text', 'pattern', 'preview', 'rb-fecha', 'rb-patron', 'rb-replace', 'run-btn', 'sec-fecha', 'sec-patron', 'sec-preview', 'sec-replace'],
         "classes": ['btn-row', 'error-msg', 'field-label', 'section-sep', 'sub-section', 'tool-body', 'tool-panel'],
     },
     'SummarizerScreen': {
-        "ids": ['api-key', 'back-btn', 'error-msg', 'filepath', 'out-path', 'run-btn', 'save', 'sec-outpath'],
-        "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
+        "ids": ['api-key', 'api-key-label', 'back-btn', 'error-msg', 'filepath', 'label', 'out-path', 'provider', 'run-btn', 'save', 'sec-outpath'],
+        "classes": ['arrow', 'btn-row', 'down-arrow', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel', 'up-arrow'],
     },
     'TranscriberScreen': {
-        "ids": ['api-key', 'back-btn', 'error-msg', 'filepath', 'mode', 'out-path', 'rb-srt', 'rb-txt', 'run-btn', 'sec-outpath'],
-        "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
+        "ids": ['api-key', 'api-key-label', 'back-btn', 'error-msg', 'filepath', 'label', 'mode', 'out-path', 'provider', 'rb-srt', 'rb-txt', 'run-btn', 'sec-outpath'],
+        "classes": ['arrow', 'btn-row', 'down-arrow', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel', 'up-arrow'],
     },
     'TranslatorScreen': {
-        "ids": ['api-key', 'back-btn', 'error-msg', 'filepath', 'lang', 'other-lang', 'rb-de', 'rb-en', 'rb-es', 'rb-fr', 'rb-other', 'rb-pt', 'run-btn', 'save', 'sec-other'],
-        "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
+        "ids": ['api-key', 'api-key-label', 'back-btn', 'error-msg', 'filepath', 'label', 'lang', 'other-lang', 'provider', 'rb-de', 'rb-en', 'rb-es', 'rb-fr', 'rb-other', 'rb-pt', 'run-btn', 'save', 'sec-other'],
+        "classes": ['arrow', 'btn-row', 'down-arrow', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel', 'up-arrow'],
     },
     'VaultScreen': {
         "ids": ['action', 'back-btn', 'error-msg', 'out-dir', 'password', 'password2', 'path', 'rb-decrypt', 'rb-encrypt', 'recursive', 'remove', 'run-btn', 'sec-confirm'],

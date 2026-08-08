@@ -1,5 +1,8 @@
-"""Tests for the non-API parts of the Gemini-backed tools."""
-from automation_tools.tools import summarizer, translator, readme_generator, gemini_utils
+"""Tests for the non-API parts of the AI-backed text tools."""
+import pytest
+
+from automation_tools.ai.base import Capability, CapabilityError
+from automation_tools.tools import summarizer, translator, readme_generator
 
 
 # ── summarizer ──────────────────────────────────────────────────────────────
@@ -66,45 +69,92 @@ def test_generate_toc():
     assert "Sub B" in toc
 
 
-# ── gemini_utils ─────────────────────────────────────────────────────────────
-def test_is_rate_limit():
-    assert gemini_utils._is_rate_limit(Exception("Error 429 too many requests")) is True
-    assert gemini_utils._is_rate_limit(Exception("resource_exhausted")) is True
-    assert gemini_utils._is_rate_limit(Exception("invalid argument")) is False
+# ── provider registry integration ────────────────────────────────────────────
+class _StubProvider:
+    """Records what the tool asked for and returns canned text."""
 
-
-class _FakeResp:
-    def __init__(self, text):
-        self.text = text
-        self.usage_metadata = None
-
-
-class _FakeModels:
     def __init__(self):
-        self.calls = []
+        self.prompts = []
 
-    def generate_content(self, model, contents):
-        self.calls.append((model, contents))
-        return _FakeResp("ok")
-
-
-class _FakeClient:
-    def __init__(self):
-        self.models = _FakeModels()
+    def generate_text(self, prompt, *, system=None, model=None):
+        self.prompts.append({"prompt": prompt, "system": system})
+        return "SUMMARY"
 
 
-def test_generate_content_passes_text_prompt():
-    client = _FakeClient()
-    assert gemini_utils.generate_content(client, "hola") == "ok"
-    _, contents = client.models.calls[0]
-    assert contents == "hola"
+@pytest.fixture
+def captured_provider(monkeypatch):
+    """Intercepts get_provider in all three tools; returns (stub, calls)."""
+    stub = _StubProvider()
+    calls = []
+
+    def fake_get_provider(capability, name=None, api_key=None, model=None):
+        calls.append({"capability": capability, "name": name,
+                      "api_key": api_key, "model": model})
+        return stub
+
+    for module in (summarizer, translator, readme_generator):
+        monkeypatch.setattr(module, "get_provider", fake_get_provider)
+    return stub, calls
 
 
-def test_generate_vision_content_sends_image_and_prompt():
-    client = _FakeClient()
-    out = gemini_utils.generate_vision_content(client, "read this", b"\x89PNG\r\n", "image/png")
-    assert out == "ok"
-    _, contents = client.models.calls[0]
-    # contents is [image_part, prompt] for a multimodal request
-    assert isinstance(contents, list) and len(contents) == 2
-    assert contents[1] == "read this"
+def test_summarizer_asks_for_a_text_provider(tmp_path, captured_provider):
+    _stub, calls = captured_provider
+    doc = tmp_path / "doc.txt"
+    doc.write_text("Some content to summarize.", encoding="utf-8")
+
+    summarizer.run_summarizer(str(doc))
+
+    assert calls[0]["capability"] is Capability.TEXT
+    assert calls[0]["name"] is None, "no provider given means the registry decides"
+
+
+def test_summarizer_forwards_provider_and_model(tmp_path, captured_provider):
+    _stub, calls = captured_provider
+    doc = tmp_path / "doc.txt"
+    doc.write_text("Some content to summarize.", encoding="utf-8")
+
+    summarizer.run_summarizer(str(doc), provider="groq", model="openai/gpt-oss-20b")
+
+    assert calls[0]["name"] == "groq"
+    assert calls[0]["model"] == "openai/gpt-oss-20b"
+
+
+def test_summarizer_reports_a_provider_error_instead_of_raising(tmp_path, monkeypatch, capsys):
+    doc = tmp_path / "doc.txt"
+    doc.write_text("Some content.", encoding="utf-8")
+
+    def boom(capability, name=None, api_key=None, model=None):
+        raise CapabilityError("'deepseek' does not support vision.")
+
+    monkeypatch.setattr(summarizer, "get_provider", boom)
+    summarizer.run_summarizer(str(doc), provider="deepseek")
+
+    assert "does not support" in capsys.readouterr().out
+
+
+def test_translator_asks_for_a_text_provider(tmp_path, captured_provider):
+    _stub, calls = captured_provider
+    doc = tmp_path / "doc.txt"
+    doc.write_text("Hello world.", encoding="utf-8")
+
+    translator.run_translator(str(doc), "Spanish", provider="anthropic")
+
+    assert calls[0]["capability"] is Capability.TEXT
+    assert calls[0]["name"] == "anthropic"
+
+
+def test_readme_generator_asks_for_a_text_provider(tmp_path, captured_provider):
+    stub, calls = captured_provider
+    (tmp_path / "app.py").write_text("print('hi')\n", encoding="utf-8")
+
+    readme_generator.run_readme_generator(
+        str(tmp_path), out_path=str(tmp_path / "README_generado.md"),
+        provider="groq", model="openai/gpt-oss-20b",
+    )
+
+    assert calls[0]["capability"] is Capability.TEXT
+    assert calls[0]["name"] == "groq"
+    assert calls[0]["model"] == "openai/gpt-oss-20b"
+    # The instruction has to reach the provider as `system=`, not the old
+    # `system_instruction=` keyword, where a leftover is a runtime TypeError.
+    assert "README.md" in stub.prompts[0]["system"]
