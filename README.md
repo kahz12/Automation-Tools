@@ -71,7 +71,7 @@ pip install -e .            # add ".[dev]" to get pytest and pyflakes too
 
 Installing the package registers the `automation-tools` command inside the virtual environment.
 
-> **Requires Python 3.10+.** Optional extras: [LibreOffice](https://www.libreoffice.org/) (office → PDF conversion) and an **API key for one of the eight AI providers** (AI tools) — see [Configuration](#configuration).
+> **Requires Python 3.10+.** Optional extras: [LibreOffice](https://www.libreoffice.org/) (used by the PDF Builder for full-layout office → PDF when installed; it falls back to a pure-Python text engine otherwise) and an **API key for one of the eight AI providers** (AI tools) — see [Configuration](#configuration).
 
 ---
 
@@ -139,7 +139,9 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 |------|--------|-------------|
 | Image Converter | `converter.py` | Convert images between formats (PNG/JPG/WebP…) or render PDF pages to images. |
 | Image Processor | `image_processor.py` | Batch resize, compress, or watermark images — originals are never modified. |
-| PDF Converter | `converter.py` | Convert office documents (`.docx`, `.odt`, `.pptx`…) to PDF via LibreOffice. |
+| Similar Photos | `similar_images.py` | Group photos that look the same even when the files differ (resized, re-compressed, re-saved), using a perceptual hash. Dry-run by default. |
+| File Type Check | `file_type.py` | Verify a file really is what its extension claims, by reading its magic number. Flags a `.jpg` that is actually an executable. |
+| PDF Builder | `pdf_builder.py` | Convert a document to PDF, bundle images into one PDF, or merge a mixed batch into a single file. Pure Python by default; uses LibreOffice for full layout when it is installed. |
 | PDF Toolkit | `pdf_toolkit.py` | Merge, split, extract, rotate, encrypt, or decrypt PDFs (pure Python, no binaries). |
 
 ### AI

@@ -193,14 +193,26 @@ def _resolve_output_dir(input_path: str, output_dir: Optional[str]) -> str:
     return os.path.join(parent, "processed")
 
 
-def _collect_files(input_path: str, recursive: bool) -> list:
-    """Returns the list of supported image files for the given path."""
+def _collect_files(input_path: str, recursive: bool,
+                   exclude_dir: Optional[str] = None) -> list:
+    """Returns the list of supported image files for the given path.
+
+    `exclude_dir` is pruned from the walk. The destination defaults to a
+    `processed` subfolder of the source, so without this a recursive second run
+    picked up its own output from the first one and processed it again.
+    """
     if os.path.isfile(input_path):
         return [input_path] if input_path.lower().endswith(SUPPORTED_EXTENSIONS) else []
 
+    skip = os.path.abspath(exclude_dir) if exclude_dir else None
     files = []
     if recursive:
-        for root, _, names in os.walk(input_path):
+        for root, dirs, names in os.walk(input_path):
+            if skip:
+                dirs[:] = [
+                    d for d in dirs
+                    if os.path.abspath(os.path.join(root, d)) != skip
+                ]
             for name in names:
                 if name.lower().endswith(SUPPORTED_EXTENSIONS):
                     files.append(os.path.join(root, name))
@@ -251,12 +263,14 @@ def run_batch_image_processor(
         print_error("Resize mode needs --max-size or --scale.")
         return
 
-    files = _collect_files(input_path, recursive)
+    # Resolve the destination first so the scan can skip it.
+    out_dir = _resolve_output_dir(input_path, output_dir)
+
+    files = _collect_files(input_path, recursive, exclude_dir=out_dir)
     if not files:
         print_error("No supported images found (.png, .jpg, .webp, .bmp, .tiff, .gif).")
         return
 
-    out_dir = _resolve_output_dir(input_path, output_dir)
     os.makedirs(out_dir, exist_ok=True)
 
     labels = {"resize": "Resizing", "compress": "Compressing", "watermark": "Watermarking"}

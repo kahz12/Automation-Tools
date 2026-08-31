@@ -13,21 +13,45 @@ except ImportError:
     HAS_PILLOW = False
 
 
+# Same helper as metadata.read_exif, copied rather than imported so this tool
+# does not pull in pypdf just to read a date. Worth hoisting into core/ if a
+# third caller ever needs it.
+def _read_exif(img: "Image.Image") -> dict:
+    """EXIF tags as {tag_id: value}, main IFD merged with the Exif sub-IFD.
+
+    getexif() is the public API and exists on every image class, unlike the
+    private _getexif() this used to call, which is only defined on JPEG, TIFF
+    and PNG. The sub-IFD merge is not optional: cameras write DateTimeOriginal
+    there, so reading getexif() alone would find nothing and every photo would
+    silently fall back to its mtime.
+    """
+    try:
+        exif = img.getexif()
+    except Exception:
+        return {}
+    tags = dict(exif)
+    try:
+        tags.update(exif.get_ifd(ExifTags.IFD.Exif))
+    except Exception:
+        # Older Pillow without ExifTags.IFD, or an image with no sub-IFD.
+        pass
+    return tags
+
+
 def get_file_date(filepath: str) -> datetime.datetime:
     """Original date of a file: EXIF DateTimeOriginal when present, mtime otherwise."""
     date_taken = None
     if HAS_PILLOW:
         try:
             with Image.open(filepath) as img:
-                exif = img._getexif()
-                if exif:
-                    for tag, value in exif.items():
-                        if tag in ExifTags.TAGS and ExifTags.TAGS[tag] == 'DateTimeOriginal':
-                            # Parse EXIF date format
-                            date_taken = datetime.datetime.strptime(value, '%Y:%m:%d %H:%M:%S')
-                            break
+                exif = _read_exif(img)
+                for tag, value in exif.items():
+                    if ExifTags.TAGS.get(tag) == 'DateTimeOriginal':
+                        # Parse EXIF date format
+                        date_taken = datetime.datetime.strptime(value, '%Y:%m:%d %H:%M:%S')
+                        break
         except Exception:
-            pass 
+            pass
 
     if not date_taken:
         # Fallback to file system modification time

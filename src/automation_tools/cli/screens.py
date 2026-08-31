@@ -546,7 +546,12 @@ class ToolScreen(Screen):
 
     def _err(self, msg: str) -> None:
         try:
-            self.query_one("#error-msg", Static).update(f"[bold #ef4444]✗  {msg}[/]")
+            slot = self.query_one("#error-msg", Static)
+            slot.update(f"[bold #ef4444]✗  {msg}[/]")
+            # The slot sits at the bottom of a scrolling body, so on a long
+            # form in a short terminal it lands below the fold and pressing RUN
+            # looks like nothing happened. Bring it into view.
+            slot.scroll_visible()
         except Exception:
             pass
 
@@ -895,19 +900,105 @@ class ConverterScreen(ToolScreen):
 # ── 5. Convert to PDF ──────────────────────────────────────────────────────
 class PdfConverterScreen(ToolScreen):
     TOOL_TITLE = "📄  Convert to PDF"
-    TOOL_DESC = "Transform Office documents to PDF using LibreOffice"
+    TOOL_DESC = "Convert a document, bundle images, or merge several files into one PDF"
 
     def compose_fields(self) -> ComposeResult:
-        yield Label("File to convert (.docx, .odt, .pptx, …):", classes="field-label")
-        yield Input(placeholder="/path/to/document.docx", id="filepath")
+        yield Label("Action:", classes="field-label")
+        with RadioSet(id="action"):
+            yield RadioButton("📄  Convert one document to PDF", id="rb-document", value=True)
+            yield RadioButton("🖼️   Bundle images into one PDF", id="rb-images")
+            yield RadioButton("🔗  Merge several files into one PDF", id="rb-merge")
+
+        # Document
+        with Vertical(id="sec-document", classes="sub-section"):
+            yield Label("Document (.docx, .odt, .pptx, .txt, .md, .csv):",
+                        classes="field-label")
+            yield Input(placeholder="/path/to/document.docx", id="doc-input")
+            yield Label("Output PDF (optional):", classes="field-label")
+            yield Input(placeholder="default: same name, .pdf", id="doc-out")
+
+        # Images
+        with Vertical(id="sec-images", classes="sub-section"):
+            yield Label("Images — files and/or a folder (comma-separated):",
+                        classes="field-label")
+            yield Input(placeholder="/path/to/scans    or    /a.jpg, /b.png", id="img-inputs")
+            yield Label("Output PDF (optional):", classes="field-label")
+            yield Input(placeholder="default: <source>_images.pdf", id="img-out")
+            yield Label("Fit each image to a page? (off = page matches the image)",
+                        classes="field-label")
+            yield Switch(id="img-fit", value=True)
+
+        # Merge
+        with Vertical(id="sec-merge", classes="sub-section"):
+            yield Label("Files and/or folders, in order (comma-separated):",
+                        classes="field-label")
+            yield Input(placeholder="/report.docx, /slides.pptx, /photos", id="merge-inputs")
+            yield Label("Output PDF (optional):", classes="field-label")
+            yield Input(placeholder="default: <source>_merged.pdf", id="merge-out")
+
+        yield Static("[dim #4b5563]── Options ──────────────────────────[/]", classes="section-sep")
+        yield Label("Page size:", classes="field-label")
+        with RadioSet(id="page-size"):
+            yield RadioButton("A4", id="rb-a4", value=True)
+            yield RadioButton("Letter", id="rb-letter")
+        yield Label("Use LibreOffice for Office files when it is installed?",
+                    classes="field-label")
+        yield Switch(id="use-lo", value=True)
+
+    _SECTIONS = ("document", "images", "merge")
+
+    def on_mount(self) -> None:
+        for name in self._SECTIONS:
+            if name != "document":
+                self.query_one(f"#sec-{name}").display = False
+
+    @on(RadioSet.Changed, "#action")
+    def _action_changed(self, e: RadioSet.Changed) -> None:
+        rid = e.pressed.id if e.pressed else "rb-document"
+        selected = rid.replace("rb-", "")
+        for name in self._SECTIONS:
+            self.query_one(f"#sec-{name}").display = (name == selected)
+
+    @staticmethod
+    def _split(value: str) -> list:
+        return [item.strip() for item in value.split(",") if item.strip()]
 
     async def action_do_run(self) -> None:
-        from automation_tools.tools import converter
-        filepath = self._ival(self.query_one("#filepath", Input))
-        if not filepath:
-            self._err("File path is required.")
-            return
-        await self._run_tool(converter.run_pdf_converter, input_path=filepath)
+        from automation_tools.tools import pdf_builder
+        action = (self._rval(self.query_one("#action", RadioSet)) or "rb-document").replace("rb-", "")
+        page_size = "letter" if self._rval(self.query_one("#page-size", RadioSet)) == "rb-letter" else "a4"
+        use_lo = self._bval(self.query_one("#use-lo", Switch))
+
+        if action == "document":
+            src = self._ival(self.query_one("#doc-input", Input))
+            if not src:
+                self._err("A document path is required.")
+                return
+            inputs, out = [src], self._ival(self.query_one("#doc-out", Input)) or None
+            fit = True
+        elif action == "images":
+            inputs = self._split(self._ival(self.query_one("#img-inputs", Input)))
+            if not inputs:
+                self._err("At least one image file or folder is required.")
+                return
+            out = self._ival(self.query_one("#img-out", Input)) or None
+            fit = self._bval(self.query_one("#img-fit", Switch))
+        else:  # merge
+            inputs = self._split(self._ival(self.query_one("#merge-inputs", Input)))
+            if not inputs:
+                self._err("At least one file or folder is required.")
+                return
+            out, fit = self._ival(self.query_one("#merge-out", Input)) or None, True
+
+        await self._run_tool(
+            pdf_builder.run_pdf_builder,
+            action=action,
+            inputs=inputs,
+            output=out,
+            use_libreoffice=use_lo,
+            page_size=page_size,
+            fit_to_page=fit,
+        )
 
 
 # ── 6. File Translator ─────────────────────────────────────────────────────
@@ -2106,6 +2197,110 @@ class EnvManagerScreen(ToolScreen):
         )
 
 
+
+# ── 24. Similar Photo Finder ────────────────────────────────────────────────
+class SimilarImagesScreen(ToolScreen):
+    TOOL_TITLE = "👯  Similar Photos"
+    TOOL_DESC = "Find photos that look the same even when the files differ"
+
+    def compose_fields(self) -> ComposeResult:
+        yield Label("Directory to scan:", classes="field-label")
+        yield Input(placeholder="/storage/emulated/0/DCIM", id="dir")
+        yield Label("Similarity threshold (0 = strictest, 10 = loose):", classes="field-label")
+        yield Input(placeholder="5", id="threshold")
+        yield Label("Recurse into subfolders?", classes="field-label")
+        yield Switch(id="recursive", value=True)
+        yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
+        yield Input(placeholder="*_thumb.jpg, .thumbnails", id="excludes")
+        yield Static("[dim #4b5563]── Actions ──────────────────────────[/]", classes="section-sep")
+        yield Label("Export CSV report of the groups?", classes="field-label")
+        yield Switch(id="export", value=False)
+        with Vertical(id="sec-export", classes="sub-section"):
+            yield Label("CSV output path:", classes="field-label")
+            yield Input(placeholder="similar_images.csv", id="export-path")
+        yield Label("Delete the extra copies? (off = simulation only)", classes="field-label")
+        yield Switch(id="apply", value=False)
+
+    def on_mount(self) -> None:
+        self.query_one("#sec-export").display = False
+
+    @on(Switch.Changed, "#export")
+    def _export_changed(self, e: Switch.Changed) -> None:
+        self.query_one("#sec-export").display = e.value
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import similar_images
+        directory = self._ival(self.query_one("#dir", Input))
+        if not directory:
+            self._err("Directory is required.")
+            return
+        try:
+            threshold = max(0, min(64, int(self._ival(self.query_one("#threshold", Input)) or "5")))
+        except ValueError:
+            threshold = 5
+        raw_exc = self._ival(self.query_one("#excludes", Input))
+        excludes = [p.strip() for p in raw_exc.split(",") if p.strip()] if raw_exc else None
+        export_path = None
+        if self._bval(self.query_one("#export", Switch)):
+            export_path = self._ival(self.query_one("#export-path", Input)) or "similar_images.csv"
+        await self._run_tool(
+            similar_images.run_similar_images,
+            directory=directory,
+            threshold=threshold,
+            recursive=self._bval(self.query_one("#recursive", Switch)),
+            excludes=excludes,
+            export_path=export_path,
+            apply=self._bval(self.query_one("#apply", Switch)),
+        )
+
+
+# ── 25. File Type Verifier ──────────────────────────────────────────────────
+class FileTypeScreen(ToolScreen):
+    TOOL_TITLE = "🔬  File Type Check"
+    TOOL_DESC = "Check that files really are what their extension claims"
+
+    def compose_fields(self) -> ComposeResult:
+        yield Label("File or directory to check:", classes="field-label")
+        yield Input(placeholder="/path/to/folder", id="path")
+        yield Label("Recurse into subfolders?", classes="field-label")
+        yield Switch(id="recursive", value=True)
+        yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
+        yield Input(placeholder="*.tmp, node_modules", id="excludes")
+        yield Label("Also list files with no known signature?", classes="field-label")
+        yield Switch(id="show-unknown", value=False)
+        yield Label("Export CSV report?", classes="field-label")
+        yield Switch(id="export", value=False)
+        with Vertical(id="sec-export", classes="sub-section"):
+            yield Label("CSV output path:", classes="field-label")
+            yield Input(placeholder="file_types.csv", id="export-path")
+
+    def on_mount(self) -> None:
+        self.query_one("#sec-export").display = False
+
+    @on(Switch.Changed, "#export")
+    def _export_changed(self, e: Switch.Changed) -> None:
+        self.query_one("#sec-export").display = e.value
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import file_type
+        path = self._ival(self.query_one("#path", Input))
+        if not path:
+            self._err("A file or directory is required.")
+            return
+        raw_exc = self._ival(self.query_one("#excludes", Input))
+        excludes = [p.strip() for p in raw_exc.split(",") if p.strip()] if raw_exc else None
+        export_path = None
+        if self._bval(self.query_one("#export", Switch)):
+            export_path = self._ival(self.query_one("#export-path", Input)) or "file_types.csv"
+        await self._run_tool(
+            file_type.run_file_type_check,
+            path=path,
+            recursive=self._bval(self.query_one("#recursive", Switch)),
+            excludes=excludes,
+            export_path=export_path,
+            show_unknown=self._bval(self.query_one("#show-unknown", Switch)),
+        )
+
 # ── Screen map: tool label → Screen class ──────────────────────────────────
 SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "✂️   Massive Renamer":     RenamerScreen,
@@ -2131,4 +2326,6 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "🔒  Encryption Vault":     VaultScreen,
     "🧾  Integrity Checker":    IntegrityScreen,
     "⚙️  Dotenv Manager":      EnvManagerScreen,
+    "👯  Similar Photos":       SimilarImagesScreen,
+    "🔬  File Type Check":      FileTypeScreen,
 }

@@ -82,6 +82,27 @@ def extract_pdf_metadata(filepath: str) -> Dict[str, Any]:
     return metadata
 
 
+def read_exif(img: "Image.Image") -> Dict[Any, Any]:
+    """EXIF tags as {tag_id: value}, main IFD plus the Exif sub-IFD.
+
+    getexif() is the public API and every image class has it. The private
+    _getexif() used before is only defined on JPEG, TIFF and PNG, so a .bmp
+    raised AttributeError and the read reported an error for a format the
+    tool advertises as supported.
+    """
+    try:
+        exif = img.getexif()
+    except Exception:
+        return {}
+    tags: Dict[Any, Any] = dict(exif)
+    try:
+        tags.update(exif.get_ifd(ExifTags.IFD.Exif))
+    except Exception:
+        # Older Pillow without ExifTags.IFD, or an image with no sub-IFD.
+        pass
+    return tags
+
+
 def extract_image_metadata(filepath: str) -> Dict[str, Any]:
     """EXIF plus basic image properties, via Pillow."""
     metadata: Dict[str, Any] = {}
@@ -95,7 +116,7 @@ def extract_image_metadata(filepath: str) -> Dict[str, Any]:
             metadata['Color Mode'] = img.mode
             metadata['Resolution'] = f"{img.width}x{img.height} px"
 
-            exif_data = img._getexif()
+            exif_data = read_exif(img)
             if exif_data:
                 for tag_id, value in exif_data.items():
                     tag_name = ExifTags.TAGS.get(tag_id, tag_id)
@@ -150,6 +171,13 @@ def clean_image_exif(filepath: str, out_path: Optional[str] = None) -> Optional[
             data = list(img.getdata())
             clean = Image.new(img.mode, img.size)
             clean.putdata(data)
+            # In P/PA mode the pixels are palette indexes, so copying them into
+            # a blank image without also copying the palette rendered every
+            # colour as entry 0, i.e. a black picture.
+            if img.mode in ("P", "PA"):
+                palette = img.getpalette()
+                if palette:
+                    clean.putpalette(palette)
             clean.save(out_path)
         print_success(f"EXIF removed. Clean image saved at: {out_path}")
         return out_path

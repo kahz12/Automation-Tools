@@ -25,7 +25,10 @@ def read_file(filepath: str) -> Optional[str]:
 
 def _chunk_text(text: str, max_chars: int = CHUNK_CHARS) -> List[str]:
     """Splits long text into manageable chunks.
+
     Prefers breaking at paragraph boundaries to maintain translation quality.
+    The pieces concatenate back into the original exactly, whitespace included,
+    so the caller can rebuild the file without inventing or losing line breaks.
     """
     if len(text) <= max_chars:
         return [text]
@@ -42,10 +45,21 @@ def _chunk_text(text: str, max_chars: int = CHUNK_CHARS) -> List[str]:
         if cut < max_chars // 2:
             cut = max_chars
         chunks.append(remaining[:cut])
-        remaining = remaining[cut:].lstrip("\n")
+        remaining = remaining[cut:]
     if remaining:
         chunks.append(remaining)
     return chunks
+
+
+def _split_leading_newlines(chunk: str) -> "tuple[str, str]":
+    """Splits a chunk into (leading newlines, body).
+
+    The blank line between two paragraphs belongs to whichever chunk starts
+    after the cut. Sending it to the model would just get it trimmed, so it is
+    held back here and put in front of the translated body again.
+    """
+    body = chunk.lstrip("\n")
+    return chunk[: len(chunk) - len(body)], body
 
 
 def _chunk_cache_key(chunk: str, target_lang: str) -> str:
@@ -110,25 +124,29 @@ Strict Rules:
     translated_parts: List[str] = []
 
     for i, chunk in enumerate(chunks, 1):
-        key = _chunk_cache_key(chunk, target_lang)
+        lead, body = _split_leading_newlines(chunk)
+        key = _chunk_cache_key(body, target_lang)
         if key in cache:
             console.print(f"[dim]  • Fragment {i}/{len(chunks)}: reusing cached translation[/dim]")
-            translated_parts.append(cache[key])
+            translated_parts.append(lead + cache[key])
             continue
 
         if len(chunks) > 1:
             console.print(f"[dim]  • Fragment {i}/{len(chunks)} ({len(chunk)} chars)…[/dim]")
 
-        prompt = f"Text to translate:\n{chunk}"
+        prompt = f"Text to translate:\n{body}"
         result = ai.generate_text(prompt, system=instruction)
         if not result:
             print_warning(f"Could not translate fragment {i}. Keeping original text.")
-            translated_parts.append(chunk)
+            translated_parts.append(lead + body)
             continue
         cache[key] = result
-        translated_parts.append(result)
+        translated_parts.append(lead + result)
 
-    translation = "\n".join(translated_parts)
+    # Straight concatenation: each part already carries the whitespace that
+    # separated it from the one before. Joining on "\n" instead collapsed every
+    # paragraph break the split had consumed.
+    translation = "".join(translated_parts)
 
     # Preview the translation in the terminal.
     console.print(f"\n[cyan]{'=' * 40}[/cyan]")

@@ -37,6 +37,7 @@ MENU_ENTRIES = [
         ("✂️   Massive Renamer",    None),
         ("📦  Organize Downloads",  None),
         ("🧬  Duplicate Detector",  None),
+        ("👯  Similar Photos",      None),
         ("🧹  Space Cleaner",       None),
         ("💾  Archiver",            None),
         ("🔍  Log Analyzer",        None),
@@ -65,6 +66,7 @@ MENU_ENTRIES = [
         ("🔒  Encryption Vault",    None),
         ("🧾  Integrity Checker",   None),
         ("⚙️  Dotenv Manager",      None),
+        ("🔬  File Type Check",     None),
     ]),
 ]
 

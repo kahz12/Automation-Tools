@@ -31,6 +31,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "🧬", "Duplicate Detector",
         "Find identical files by content (MD5).\nOptional CSV export and auto-delete.",
     ),
+    "👯  Similar Photos": (
+        "👯", "Similar Photos",
+        "Group photos that look alike even if the\nfiles differ. Resized, re-sent, re-saved.",
+    ),
     "🧹  Space Cleaner": (
         "🧹", "Space Cleaner",
         "Detect cache, large, and old files.\nDry-run by default — safe to explore.",
@@ -53,7 +57,7 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
     ),
     "📄  Convert to PDF": (
         "📄", "Convert to PDF",
-        "Transform Office documents (.docx, .pptx)\nto PDF using LibreOffice.",
+        "Documents, images or a mixed batch into\nPDF. No external binaries needed.",
     ),
     "📑  PDF Toolkit": (
         "📑", "PDF Toolkit",
@@ -106,6 +110,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
     "🧾  Integrity Checker": (
         "🧾", "Integrity Checker",
         "Create a checksum manifest of a folder\nand verify it later. Detects corruption.",
+    ),
+    "🔬  File Type Check": (
+        "🔬", "File Type Check",
+        "Verify a file really is what its extension\nclaims, by reading its magic number.",
     ),
     "⚙️  Dotenv Manager": (
         "⚙️", "Dotenv Manager",

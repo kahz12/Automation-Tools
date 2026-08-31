@@ -44,8 +44,15 @@ def convert_single_file(
 
             base_name = os.path.splitext(os.path.basename(input_path))[0]
             output_directory = os.path.dirname(input_path) if os.path.dirname(input_path) else '.'
-            output_filename = f"{base_name}.{output_format.lower()}"
-            output_path = os.path.join(output_directory, output_filename)
+            ext = output_format.lower()
+            output_path = os.path.join(output_directory, f"{base_name}.{ext}")
+
+            # Asking for the format a file already has used to write straight
+            # back over the source: converting a folder of .jpg to jpg
+            # re-encoded every original at `quality` with no copy kept. Give
+            # the result its own name instead.
+            if os.path.abspath(output_path) == os.path.abspath(input_path):
+                output_path = os.path.join(output_directory, f"{base_name}_converted.{ext}")
 
             save_kwargs = {'format': pillow_format}
             if pillow_format in ('JPEG', 'WEBP'):
@@ -88,38 +95,6 @@ def run_image_converter(input_path: str, output_format: str, quality: int = 85) 
     elif os.path.isfile(input_path):
         if convert_single_file(input_path, output_format, quality=quality):
             print_success("Image converted.")
-
-
-def run_pdf_converter(input_path: str) -> None:
-    """Converts a document (docx, odt…) to PDF through LibreOffice in headless mode."""
-    import subprocess
-
-    if not os.path.exists(input_path):
-        print_error(f"The file '{input_path}' does not exist.")
-        return
-
-    try:
-        print_step(f"Converting '{input_path}' to PDF...")
-
-        command = [
-            'libreoffice',
-            '--headless',
-            '--convert-to', 'pdf',
-            '--outdir', os.path.dirname(input_path) or '.',
-            input_path
-        ]
-
-        # Execute LibreOffice command
-        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        print_success("The PDF has been saved in the same folder.")
-
-    except FileNotFoundError:
-        print_error("LibreOffice is not installed or not found in PATH.")
-    except subprocess.CalledProcessError as e:
-        print_error(f"An error occurred while converting the document: {e}")
-    except Exception as e:
-        print_error(f"Unexpected error: {e}")
 
 
 def run_pdf_to_image(input_path: str, output_format: str = "png", dpi: int = 200) -> None:

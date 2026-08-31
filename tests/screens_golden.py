@@ -25,6 +25,10 @@ SCREEN_WIDGETS = {
         "ids": ['action', 'back-btn', 'error-msg', 'example-path', 'out-path', 'rb-generate', 'rb-scan', 'rb-validate', 'run-btn', 'sec-example-path', 'sec-out-path', 'target-path'],
         "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
     },
+    'FileTypeScreen': {
+        "ids": ['back-btn', 'error-msg', 'excludes', 'export', 'export-path', 'path', 'recursive', 'run-btn', 'sec-export', 'show-unknown'],
+        "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
+    },
     'ImageProcessorScreen': {
         "ids": ['back-btn', 'error-msg', 'max-size', 'op', 'out-dir', 'path', 'quality', 'rb-bl', 'rb-br', 'rb-center', 'rb-compress', 'rb-resize', 'rb-tl', 'rb-tr', 'rb-watermark', 'recursive', 'run-btn', 'scale', 'sec-compress', 'sec-resize', 'sec-watermark', 'wm-opacity', 'wm-pos', 'wm-text'],
         "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
@@ -58,8 +62,8 @@ SCREEN_WIDGETS = {
         "classes": ['btn-row', 'error-msg', 'field-label', 'section-sep', 'sub-section', 'tool-body', 'tool-panel'],
     },
     'PdfConverterScreen': {
-        "ids": ['back-btn', 'error-msg', 'filepath', 'run-btn'],
-        "classes": ['btn-row', 'error-msg', 'field-label', 'tool-body', 'tool-panel'],
+        "ids": ['action', 'back-btn', 'doc-input', 'doc-out', 'error-msg', 'img-fit', 'img-inputs', 'img-out', 'merge-inputs', 'merge-out', 'page-size', 'rb-a4', 'rb-document', 'rb-images', 'rb-letter', 'rb-merge', 'run-btn', 'sec-document', 'sec-images', 'sec-merge', 'use-lo'],
+        "classes": ['btn-row', 'error-msg', 'field-label', 'section-sep', 'sub-section', 'tool-body', 'tool-panel'],
     },
     'PdfToolkitScreen': {
         "ids": ['back-btn', 'decrypt-input', 'decrypt-out', 'decrypt-pwd', 'encrypt-input', 'encrypt-out', 'encrypt-pwd', 'error-msg', 'extract-input', 'extract-out', 'extract-pages', 'merge-input', 'merge-out', 'op', 'rb-180', 'rb-270', 'rb-90', 'rb-decrypt', 'rb-encrypt', 'rb-extract', 'rb-merge', 'rb-rotate', 'rb-split', 'rotate-angle', 'rotate-input', 'rotate-out', 'rotate-pages', 'run-btn', 'sec-decrypt', 'sec-encrypt', 'sec-extract', 'sec-merge', 'sec-rotate', 'sec-split', 'split-input', 'split-out'],
@@ -71,6 +75,10 @@ SCREEN_WIDGETS = {
     },
     'RenamerScreen': {
         "ids": ['apply', 'back-btn', 'dir', 'error-msg', 'ext', 'keep-name', 'mode', 'new-text', 'old-text', 'pattern', 'preview', 'rb-fecha', 'rb-patron', 'rb-replace', 'run-btn', 'sec-fecha', 'sec-patron', 'sec-preview', 'sec-replace'],
+        "classes": ['btn-row', 'error-msg', 'field-label', 'section-sep', 'sub-section', 'tool-body', 'tool-panel'],
+    },
+    'SimilarImagesScreen': {
+        "ids": ['apply', 'back-btn', 'dir', 'error-msg', 'excludes', 'export', 'export-path', 'recursive', 'run-btn', 'sec-export', 'threshold'],
         "classes": ['btn-row', 'error-msg', 'field-label', 'section-sep', 'sub-section', 'tool-body', 'tool-panel'],
     },
     'SummarizerScreen': {

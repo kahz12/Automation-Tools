@@ -219,8 +219,14 @@ def check_mercadolibre_api(item_id: str, access_token: str) -> Optional[float]:
 
 def extract_ml_item_id(url: str) -> Optional[str]:
     """Extracts the item ID from a MercadoLibre URL.
+
+    Every site prefix, not just MCO: MLA (Argentina), MLB (Brazil), MLC
+    (Chile), MLM (Mexico), MLU, MLV, MPE. The old `MC[A-Z]` pattern matched
+    Colombia alone, so every other country silently skipped the official API
+    and fell through to scraping even with a token configured. The dash is
+    optional because /p/ URLs write the id without one.
     """
-    match = re.search(r"/(MC[A-Z]-\d+)", url, re.IGNORECASE)
+    match = re.search(r"/((?:ML|MC|MP)[A-Z]-?\d+)", url, re.IGNORECASE)
     return match.group(1).replace("-", "") if match else None
 
 
@@ -237,7 +243,6 @@ def check_mercadolibre(url: str, soup: BeautifulSoup, settings: Dict[str, Any], 
     selectors = [
         ("meta", {"itemprop": "price"}, "content"),
         ("span", {"class": "andes-money-amount__fraction"}, "text"),
-        ("span", {"class": " Andean-money-amount__fraction"}, "text"), # Potential typo fix
         ("span", {"class": "price-tag-fraction"}, "text"),
     ]
     for tag, attrs, prop in selectors:
@@ -271,8 +276,14 @@ def check_amazon(soup: BeautifulSoup, settings: Dict[str, Any]) -> Optional[floa
 
 # ─── Alert Logic ───
 
-def evaluar_alertas(product: Dict[str, Any], precio_actual: float, settings: Dict[str, Any]) -> None:
+def evaluar_alertas(product: Dict[str, Any], precio_actual: float, settings: Dict[str, Any],
+                    precio_anterior: Optional[float] = None) -> None:
     """Evaluates if current price triggers any target price or price drop alerts.
+
+    `precio_anterior` is the reading from before this round, and the caller has
+    to fetch it *before* saving the new one. Looking it up in here read back the
+    row that had just been inserted, so every drop came out as 0% and the
+    alert_drop_percent notification could never fire.
     """
     nombre       = product.get("name", "Product")
     url          = product.get("url", "")
@@ -292,7 +303,7 @@ def evaluar_alertas(product: Dict[str, Any], precio_actual: float, settings: Dic
 
     # Check for price drop percentage
     if alert_drop:
-        ultimo = obtener_ultimo_precio(url)
+        ultimo = precio_anterior
         if ultimo and ultimo > 0:
             variacion = ((ultimo - precio_actual) / ultimo) * 100
             if variacion >= alert_drop:
@@ -307,7 +318,7 @@ def evaluar_alertas(product: Dict[str, Any], precio_actual: float, settings: Dic
 
 # ─── Main Check Logic ───
 
-def detect_stock(url: str, soup: BeautifulSoup, price: Optional[float]) -> bool:
+def detect_stock(soup: BeautifulSoup, price: Optional[float]) -> bool:
     """Heuristic: in stock when there is a price and no out-of-stock wording on the page."""
     page_text = soup.get_text(" ", strip=True).lower()
     signals_out = [
@@ -372,7 +383,7 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
         elif "amazon" in url:
             price = check_amazon(soup, settings)
 
-        disponible = detect_stock(url, soup, price)
+        disponible = detect_stock(soup, price)
         evaluar_stock(product, disponible, settings)
 
         if price is None:
@@ -385,8 +396,9 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
 
         console.print(f"     [green]💰 Price:[/green] {format_price(price, settings)}")
 
+        anterior = obtener_ultimo_precio(url)
         guardar_precio(nombre, url, price, moneda)
-        evaluar_alertas(product, price, settings)
+        evaluar_alertas(product, price, settings, precio_anterior=anterior)
 
     except requests.Timeout:
         console.print(f"     [red]⏱️  Timeout accessing {nombre}[/red]")

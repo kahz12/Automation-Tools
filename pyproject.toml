@@ -41,6 +41,7 @@ dependencies = [
     "openai>=1.40,<3",
     "anthropic>=0.40,<1",
     "pypdf>=4,<7",
+    "fpdf2>=2.7,<3",
     "python-dotenv>=1,<2",
     "Pillow>=10,<13",
     "yt-dlp>=2024.1",

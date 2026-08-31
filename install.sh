@@ -81,15 +81,17 @@ fi
 info "All required system dependencies are present."
 
 # ---------------------------------------------------------------------------
-# Optional dependency warning: LibreOffice (needed by the PDF converter tool)
+# Optional enhancement: LibreOffice. The PDF Builder works without it, on a
+# pure-Python engine that recovers the text of a document but not its layout.
+# When LibreOffice is present it is used instead and keeps images and tables.
 # ---------------------------------------------------------------------------
 if ! command -v libreoffice >/dev/null 2>&1 && ! command -v soffice >/dev/null 2>&1; then
     if [ "$IS_TERMUX" -eq 1 ]; then
-        lo_hint="LibreOffice is not available on Termux; the PDF converter tool will not work on this device"
+        lo_hint="not available on Termux, so office files convert as text only"
     else
-        lo_hint="install it with: $(detect_pkg_hint libreoffice)"
+        lo_hint="for full-layout conversion install it with: $(detect_pkg_hint libreoffice)"
     fi
-    warn "LibreOffice not detected (optional, needed by the PDF converter). ${lo_hint}"
+    info "LibreOffice not detected. The PDF Builder still works: ${lo_hint}"
 fi
 
 # ---------------------------------------------------------------------------

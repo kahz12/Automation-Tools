@@ -38,10 +38,10 @@ def test_check_amazon_selector():
 
 def test_detect_stock():
     out = BeautifulSoup("<p>Producto agotado</p>", "html.parser")
-    assert monitor.detect_stock("u", out, 10.0) is False
+    assert monitor.detect_stock(out, 10.0) is False
     ok = BeautifulSoup("<p>En venta</p>", "html.parser")
-    assert monitor.detect_stock("u", ok, 10.0) is True
-    assert monitor.detect_stock("u", ok, None) is False
+    assert monitor.detect_stock(ok, 10.0) is True
+    assert monitor.detect_stock(ok, None) is False
 
 
 def test_database_roundtrip(monkeypatch, tmp_path):

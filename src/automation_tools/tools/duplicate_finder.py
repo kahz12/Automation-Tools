@@ -133,7 +133,13 @@ def run_duplicate_finder(
     if export_path:
         _export_duplicates(duplicates, export_path)
 
-    confirm = True if auto_delete else questionary.confirm("Do you want to delete all copies (keeping the original in each group)?").ask()
+    # default=False matters in the TUI: the menu maps questionary.confirm onto a
+    # modal that focuses whichever button the default names, and this one wipes
+    # files, so it must not open with Yes under the cursor.
+    confirm = True if auto_delete else questionary.confirm(
+        "Do you want to delete all copies (keeping the original in each group)?",
+        default=False,
+    ).ask()
 
     if confirm:
         deleted = 0
