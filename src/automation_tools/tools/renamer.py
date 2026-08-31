@@ -4,6 +4,7 @@ import datetime
 import argparse
 from typing import Optional, List, Tuple
 
+from automation_tools.core import prompt
 from automation_tools.core.logger import console, print_error, print_success, print_warning, print_step
 
 try:
@@ -322,17 +323,10 @@ def run_massive_rename(
     for src_name, dst_name in plan:
         console.print(f"'{src_name}' -> '{dst_name}'")
 
-    # Optional user confirmation via questionary if available
     if preview and apply_changes:
-        try:
-            import questionary
-            if not questionary.confirm(
-                f"Apply these {len(plan)} renames?", default=True
-            ).ask():
-                print_warning("Cancelled by user. No changes applied.")
-                return
-        except ImportError:
-            pass
+        if not prompt.confirm(f"Apply these {len(plan)} renames?", default=True):
+            print_warning("Cancelled by user. No changes applied.")
+            return
 
     # Apply renames
     if apply_changes:

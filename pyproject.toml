@@ -51,7 +51,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
+    "pytest-cov>=5",
     "pyflakes>=3",
+    "mypy>=1.11",
 ]
 
 [project.urls]
@@ -60,6 +62,16 @@ Repository = "https://github.com/kahz12/Automation-Tools"
 
 [project.scripts]
 automation-tools = "automation_tools.cli.menu:main_menu"
+atools = "automation_tools.cli.dispatch:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.mypy]
+# Most of the dependencies ship no stubs, and chasing that is not what this
+# check is for.
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["automation_tools"]
+omit = ["*/__main__.py"]

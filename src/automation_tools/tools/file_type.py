@@ -1,6 +1,4 @@
 import argparse
-import csv
-import fnmatch
 import os
 import zipfile
 from dataclasses import dataclass
@@ -8,6 +6,9 @@ from typing import Dict, List, Optional, Tuple
 
 from rich.table import Table
 
+from automation_tools.core import fs
+
+from automation_tools.core.report import export_rows
 from automation_tools.core.logger import (
     console,
     print_error,
@@ -36,7 +37,7 @@ from automation_tools.core.logger import (
 #   unknown    no signature matched. Most text formats (.txt, .csv, .md, .py)
 #              have none at all, so this is silence, not suspicion.
 
-DEFAULT_EXCLUDES = [".git", "node_modules", "__pycache__", "venv", ".venv", ".cache"]
+DEFAULT_EXCLUDES = list(fs.DEFAULT_EXCLUDES)
 
 # How many bytes to read. One tar block: tar writes its magic 257 bytes in, so
 # anything shorter silently stops recognising tarballs, and every other
@@ -226,32 +227,12 @@ def verify(path: str) -> Verdict:
 
 
 # ── Scanning ─────────────────────────────────────────────────────────────────
-def _matches_any(name: str, patterns: List[str]) -> bool:
-    return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
-
-
 def scan(path: str, recursive: bool = True,
          excludes: Optional[List[str]] = None) -> List[Verdict]:
     """Verifies one file, or every file under a folder."""
     patterns = list(DEFAULT_EXCLUDES) + list(excludes or [])
-
-    if os.path.isfile(path):
-        return [verify(path)]
-
-    results: List[Verdict] = []
-    if recursive:
-        for root, dirs, names in os.walk(path):
-            dirs[:] = [d for d in dirs if not _matches_any(d, patterns)]
-            for name in sorted(names):
-                full = os.path.join(root, name)
-                if not os.path.islink(full) and not _matches_any(name, patterns):
-                    results.append(verify(full))
-    else:
-        for name in sorted(os.listdir(path)):
-            full = os.path.join(path, name)
-            if os.path.isfile(full) and not os.path.islink(full) and not _matches_any(name, patterns):
-                results.append(verify(full))
-    return results
+    return [verify(full) for full in fs.walk_files(
+        path, recursive=recursive, excludes=patterns)]
 
 
 # ── Reporting ────────────────────────────────────────────────────────────────
@@ -291,20 +272,13 @@ def _print_unnamed(verdicts: List[Verdict], limit: int = 20) -> None:
         console.print(f"[dim]  ... and {len(rows) - limit} more.[/dim]")
 
 
-def export_verdicts(verdicts: List[Verdict], out_path: str) -> None:
+def export_verdicts(verdicts: List[Verdict], out_path: str) -> bool:
     """Writes every verdict to `out_path` as CSV."""
-    try:
-        with open(out_path, "w", encoding="utf-8", newline="") as handle:
-            writer = csv.writer(handle)
-            writer.writerow(["status", "extension", "detected", "suggested_extension", "path"])
-            for verdict in verdicts:
-                writer.writerow([
-                    verdict.status, verdict.extension, verdict.detected or "",
-                    verdict.suggestion, verdict.path,
-                ])
-        print_success(f"Report exported to: {out_path}")
-    except OSError as e:
-        print_error(f"Could not export report: {e}")
+    return export_rows(
+        out_path,
+        ["status", "extension", "detected", "suggested_extension", "path"],
+        ([v.status, v.extension, v.detected or "", v.suggestion, v.path] for v in verdicts),
+    )
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────

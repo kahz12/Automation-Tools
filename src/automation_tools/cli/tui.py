@@ -105,7 +105,7 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
     ),
     "🔒  Encryption Vault": (
         "🔒", "Encryption Vault",
-        "Encrypt or decrypt files and folders\nwith a password (AES, authenticated).",
+        "Encrypt or decrypt files and folders\nwith a password (scrypt + AES-256-GCM).",
     ),
     "🧾  Integrity Checker": (
         "🧾", "Integrity Checker",

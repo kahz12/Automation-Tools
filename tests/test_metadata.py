@@ -1,3 +1,6 @@
+import pytest
+from PIL import Image
+
 from automation_tools.tools import metadata
 
 
@@ -33,3 +36,22 @@ def test_clean_image_exif(tmp_path, make_image):
     assert out is not None
     import os
     assert os.path.exists(out)
+
+
+@pytest.mark.parametrize("mode", ["RGB", "RGBA", "L", "P"])
+def test_clean_image_exif_keeps_the_pixels_in_every_mode(tmp_path, mode):
+    """Stripping metadata rewrites the pixels, so it must not change them.
+
+    P mode is the one that used to come out black: the palette lives outside
+    the pixel data, so copying only the indexes loses every colour.
+    """
+    base = Image.new("RGB", (24, 18))
+    base.putdata([((x * 7) % 256, (y * 11) % 256, (x + y) % 256)
+                  for y in range(18) for x in range(24)])
+    src = tmp_path / f"src_{mode}.png"
+    base.convert(mode).save(str(src))
+
+    out = metadata.clean_image_exif(str(src))
+    with Image.open(out) as cleaned, Image.open(str(src)) as original:
+        assert cleaned.mode == original.mode
+        assert cleaned.convert("RGB").tobytes() == original.convert("RGB").tobytes()

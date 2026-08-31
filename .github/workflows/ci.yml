@@ -12,14 +12,26 @@ concurrency:
 
 jobs:
   test:
-    name: Tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} · Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        # Every supported Python on Linux, plus one run each on Windows and
+        # macOS. The package claims to be OS independent and the path handling,
+        # the file permissions and the Downloads-folder lookup are exactly
+        # where that claim breaks, so it has to be tested somewhere other than
+        # ubuntu.
+        #
         # 3.10 is the real floor: requests, google-genai, python-dotenv, Pillow
         # and yt-dlp have all dropped 3.9 in their current releases.
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.13"
 
     steps:
       - uses: actions/checkout@v4
@@ -42,3 +54,33 @@ jobs:
       - name: Test (pytest)
         # The suite mocks every network/API path, so it runs fully offline.
         run: python -m pytest -q
+
+  quality:
+    name: Coverage and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Coverage
+        # The floor is deliberately below where the suite actually sits: it is
+        # here to catch a chunk of the project losing its tests, not to force
+        # the number up one commit at a time.
+        run: python -m pytest -q --cov=automation_tools --cov-report=term-missing --cov-fail-under=60
+
+      - name: Types (core must stay clean)
+        run: python -m mypy src/automation_tools/core/
+
+      - name: Types (rest of the package, informational)
+        continue-on-error: true
+        run: python -m mypy src/automation_tools/

@@ -9,6 +9,8 @@ import zipfile
 
 import pytest
 
+from conftest import needs_symlinks
+
 from automation_tools.tools import file_type as ft
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 24
@@ -158,6 +160,7 @@ def test_scan_skips_default_and_custom_excludes(tmp_path):
     assert names == {"keep.png"}
 
 
+@needs_symlinks
 def test_scan_ignores_symlinks(tmp_path):
     target = _write(tmp_path / "real.png", PNG)
     os.symlink(target, str(tmp_path / "link.png"))

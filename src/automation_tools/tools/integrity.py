@@ -1,10 +1,10 @@
 import argparse
-import fnmatch
 import hashlib
 import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from automation_tools.core import fs
 from automation_tools.core.logger import (
     console,
     print_error,
@@ -65,20 +65,6 @@ def hash_file(filepath: str, algorithm: str = DEFAULT_ALGORITHM,
         return None
 
 
-def _matches(patterns: List[str], rel: str) -> bool:
-    """True if any glob pattern matches the path, its basename, or a component."""
-    if not patterns:
-        return False
-    parts = rel.split("/")
-    candidates = [rel, parts[-1]] + parts[:-1]
-    return any(fnmatch.fnmatch(c, pat) for pat in patterns for c in candidates)
-
-
-def _is_hidden(rel: str) -> bool:
-    """True if any component of the relative path is a dotfile."""
-    return any(part.startswith(".") for part in rel.split("/") if part)
-
-
 def collect_files(
     directory: str,
     exclude: Optional[List[str]] = None,
@@ -95,18 +81,11 @@ def collect_files(
     directory = os.path.abspath(directory)
     files: List[str] = []
 
-    for root, dirs, names in os.walk(directory):
-        dirs.sort()
-        for name in sorted(names):
-            fp = os.path.join(root, name)
-            if os.path.islink(fp) or os.path.abspath(fp) in skip_set:
-                continue
-            rel = os.path.relpath(fp, directory).replace(os.sep, "/")
-            if not include_hidden and _is_hidden(rel):
-                continue
-            if _matches(exclude, rel):
-                continue
-            files.append(rel)
+    for fp in fs.walk_files(directory, excludes=exclude, match_relative=True,
+                            include_hidden=include_hidden):
+        if os.path.abspath(fp) in skip_set:
+            continue
+        files.append(os.path.relpath(fp, directory).replace(os.sep, "/"))
 
     return files
 

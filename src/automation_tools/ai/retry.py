@@ -8,9 +8,9 @@ from __future__ import annotations
 import time
 from typing import Any, Callable, Optional
 
-from automation_tools.core.logger import print_error, print_warning, setup_logger
+from automation_tools.core.logger import print_error, print_warning, get_logger
 
-logger = setup_logger()
+logger = get_logger()
 
 MAX_RETRIES = 4
 BASE_BACKOFF = 2.0  # seconds; doubled each retry

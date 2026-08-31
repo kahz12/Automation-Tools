@@ -2,8 +2,8 @@ import argparse
 import os
 from typing import List, Optional
 
-import questionary
 
+from automation_tools.core import prompt
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
 
 # Manipulate existing PDF files: merge, split, extract pages, rotate, and
@@ -35,9 +35,7 @@ def _confirm_overwrite(path: str) -> bool:
     """Ask before clobbering an existing file (modal in the TUI, prompt in CLI)."""
     if not os.path.exists(path):
         return True
-    return bool(
-        questionary.confirm(f"'{path}' already exists. Overwrite it?", default=False).ask()
-    )
+    return prompt.confirm(f"'{path}' already exists. Overwrite it?", default=False)
 
 
 def _open_reader(path: str) -> Optional["PdfReader"]:

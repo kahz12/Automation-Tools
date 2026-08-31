@@ -11,9 +11,9 @@ from typing import Any, Dict, List, Optional
 
 from automation_tools.ai.base import Capability, ProviderSpec
 from automation_tools.ai.retry import with_retry
-from automation_tools.core.logger import console, print_error, setup_logger
+from automation_tools.core.logger import console, print_error, get_logger
 
-logger = setup_logger()
+logger = get_logger()
 
 # Whisper-style endpoints reject large uploads. Gemini's Files API does not,
 # which is why the transcriber keeps both providers.

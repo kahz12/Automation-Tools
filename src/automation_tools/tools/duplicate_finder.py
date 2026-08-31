@@ -1,14 +1,14 @@
 import os
 import hashlib
 import argparse
-import csv
-import fnmatch
 from typing import Dict, List, Optional
 from collections import defaultdict
 
-import questionary
 
+from automation_tools.core import fs
+from automation_tools.core import prompt
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
+from automation_tools.core.report import export_rows
 
 # Default directory and file patterns to exclude from the scan
 DEFAULT_EXCLUDES = [".git", "node_modules", "__pycache__", "venv", ".venv", ".cache"]
@@ -27,11 +27,6 @@ def hash_file(filepath: str, chunk_size: int = 8192) -> Optional[str]:
         return None
 
 
-def _matches_any(name: str, patterns: List[str]) -> bool:
-    """True if `name` matches any of the glob `patterns`."""
-    return any(fnmatch.fnmatch(name, p) for p in patterns)
-
-
 def find_duplicates(
     directory: str,
     excludes: Optional[List[str]] = None,
@@ -45,21 +40,15 @@ def find_duplicates(
     hashes: Dict[str, List[str]] = defaultdict(list)
     symlinks: List[str] = []
 
-    for root, dirs, files in os.walk(directory):
-        # Prune excluded directories in-place to avoid traversing them.
-        dirs[:] = [d for d in dirs if not _matches_any(d, patterns)]
+    for filepath in fs.walk_files(directory, excludes=patterns, include_symlinks=True):
+        if os.path.islink(filepath):
+            # Reported, never hashed: two names for one file are not copies.
+            symlinks.append(filepath)
+            continue
 
-        for filename in files:
-            if _matches_any(filename, patterns):
-                continue
-            filepath = os.path.join(root, filename)
-            if os.path.islink(filepath):
-                symlinks.append(filepath)
-                continue
-
-            file_hash = hash_file(filepath)
-            if file_hash:
-                hashes[file_hash].append(filepath)
+        file_hash = hash_file(filepath)
+        if file_hash:
+            hashes[file_hash].append(filepath)
 
     if symlinks:
         console.print(f"[dim]🔗 Omitted {len(symlinks)} symlinks (not hashed).[/dim]")
@@ -72,25 +61,21 @@ def find_duplicates(
     return {h: paths for h, paths in hashes.items() if len(paths) > 1}
 
 
-def _export_duplicates(duplicates: Dict[str, List[str]], out_path: str) -> None:
+def _duplicate_rows(duplicates: Dict[str, List[str]]):
+    for digest, paths in duplicates.items():
+        # Oldest first, so the original is the one that keeps its role.
+        for index, path in enumerate(sorted(paths, key=os.path.getmtime)):
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                size = 0
+            yield [digest, size, "original" if index == 0 else "duplicate", path]
+
+
+def _export_duplicates(duplicates: Dict[str, List[str]], out_path: str) -> bool:
     """Writes the duplicate report to `out_path` as CSV."""
-    try:
-        with open(out_path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["hash", "size_bytes", "role", "path"])
-            for h, paths in duplicates.items():
-                # Sort by modification time to identify the 'oldest' as the potential original
-                paths_sorted = sorted(paths, key=os.path.getmtime)
-                for i, p in enumerate(paths_sorted):
-                    try:
-                        size = os.path.getsize(p)
-                    except OSError:
-                        size = 0
-                    role = "original" if i == 0 else "duplicate"
-                    writer.writerow([h, size, role, p])
-        print_success(f"Report exported to: {out_path}")
-    except Exception as e:
-        print_error(f"Could not export report: {e}")
+    return export_rows(out_path, ["hash", "size_bytes", "role", "path"],
+                       _duplicate_rows(duplicates))
 
 
 def run_duplicate_finder(
@@ -133,13 +118,13 @@ def run_duplicate_finder(
     if export_path:
         _export_duplicates(duplicates, export_path)
 
-    # default=False matters in the TUI: the menu maps questionary.confirm onto a
-    # modal that focuses whichever button the default names, and this one wipes
-    # files, so it must not open with Yes under the cursor.
-    confirm = True if auto_delete else questionary.confirm(
+    # default=False matters in the TUI: the modal focuses whichever button the
+    # default names, and this one wipes files, so it must not open with Yes
+    # under the cursor.
+    confirm = auto_delete or prompt.confirm(
         "Do you want to delete all copies (keeping the original in each group)?",
         default=False,
-    ).ask()
+    )
 
     if confirm:
         deleted = 0

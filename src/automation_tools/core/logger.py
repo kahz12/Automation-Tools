@@ -1,10 +1,31 @@
 import logging
 import os
+from contextlib import contextmanager
 
 from rich.console import Console
 from rich.text import Text
 
 console = Console()
+
+
+@contextmanager
+def redirect_console(file, width: int = 100):
+    """Sends everything the tools print into `file` while the block runs.
+
+    Every tool holds a reference to the console object itself, so the TUI
+    cannot simply hand them a different one; the object has to be reconfigured
+    in place. Re-running `__init__` is how rich's own `reconfigure()` does
+    that, which beats reaching into `_file`, `_force_terminal`, `_color_system`
+    and `_width` one by one and hoping they keep those names.
+    """
+    # Re-running __init__ on a live instance is what rich's own reconfigure()
+    # does; type checkers dislike it on principle.
+    console.__init__(file=file, force_terminal=True,  # type: ignore[misc]
+                     color_system="truecolor", width=width)
+    try:
+        yield console
+    finally:
+        console.__init__()  # type: ignore[misc]
 
 # Every colour the project uses, in one place so the CLI and the TUI agree.
 PALETTE = {
@@ -30,21 +51,44 @@ ASCII_TITLE = r"""
 """
 
 
-def setup_logger(log_file: str = "automation_tools.log", level: int = logging.INFO) -> logging.Logger:
-    """Configures and returns the application's central logger.
-    Logs are saved to a file in the project root.
-    """
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(current_dir, "..", "..", ".."))
-    log_path = os.path.join(project_root, log_file)
+LOGGER_NAME = "automation_tools"
 
-    logging.basicConfig(
-        filename=log_path,
-        level=level,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    return logging.getLogger("automation_tools")
+
+def get_logger() -> logging.Logger:
+    """The shared logger, without touching the filesystem.
+
+    Modules take this one at import time. Opening the log file is the entry
+    point's job (`setup_logger`), so importing a tool to use it as a library
+    creates no files and steals nobody's logging config.
+    """
+    return logging.getLogger(LOGGER_NAME)
+
+
+def setup_logger(log_file: str = "automation_tools.log", level: int = logging.INFO) -> logging.Logger:
+    """Attaches the file handler. Called once, by whatever starts the app.
+
+    The log goes to the user data directory, not next to the source: installed
+    with pip there is nothing writable next to the source to begin with. It
+    configures our own logger rather than the root one, so a library that logs
+    does not end up in our file, and calling it twice does not double every line.
+    """
+    from automation_tools.core.config import user_data_dir
+
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.setLevel(level)
+    if any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+        return logger
+
+    log_path = os.path.join(user_data_dir(), log_file)
+    try:
+        handler = logging.FileHandler(log_path, encoding="utf-8")
+    except OSError:
+        # A read-only home is not a reason to refuse to run.
+        return logger
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+    logger.addHandler(handler)
+    return logger
 
 
 def _gradient_text(text: str, start: str, end: str) -> Text:

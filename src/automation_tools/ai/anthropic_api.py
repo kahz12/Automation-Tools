@@ -10,9 +10,9 @@ from typing import Any, Dict, List, Optional
 
 from automation_tools.ai.base import Capability, ProviderSpec
 from automation_tools.ai.retry import with_retry
-from automation_tools.core.logger import console, setup_logger
+from automation_tools.core.logger import console, get_logger
 
-logger = setup_logger()
+logger = get_logger()
 
 
 class AnthropicProvider:

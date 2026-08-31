@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import shutil
 import string
@@ -505,3 +506,69 @@ def run_copy_password(password: str) -> None:
         print_warning(
             "Could not copy to clipboard (ensure 'termux-api', 'xclip', 'wl-copy', 'pbcopy' or 'clip' is installed)."
         )
+
+
+def main() -> None:
+    """CLI entry point for the Password Manager.
+
+    This was the one tool the menu could reach and the command line could not,
+    which also made it the one entry in the README's table nobody could run.
+    """
+    parser = argparse.ArgumentParser(
+        description="Generate passwords or passphrases and score their strength."
+    )
+    sub = parser.add_subparsers(dest="action", required=True)
+
+    gen = sub.add_parser("generate", help="Random character passwords.")
+    gen.add_argument("-l", "--length", type=int, default=16)
+    gen.add_argument("-n", "--count", type=int, default=5)
+    gen.add_argument("--no-upper", action="store_true", help="Leave out A-Z.")
+    gen.add_argument("--no-digits", action="store_true", help="Leave out 0-9.")
+    gen.add_argument("--no-special", action="store_true", help="Leave out symbols.")
+    gen.add_argument("--no-ambiguous", action="store_true",
+                     help="Leave out characters that read alike (l, 1, O, 0).")
+
+    phrase = sub.add_parser("passphrase", help="Word-based passphrases.")
+    phrase.add_argument("-w", "--words", type=int, default=4)
+    phrase.add_argument("-n", "--count", type=int, default=5)
+    phrase.add_argument("-s", "--separator", default="-")
+    phrase.add_argument("--no-capitalize", action="store_true")
+    phrase.add_argument("--no-number", action="store_true")
+    phrase.add_argument("--special", action="store_true", help="Append a symbol.")
+
+    check = sub.add_parser("check", help="Score a password and look it up in HIBP.")
+    check.add_argument("password")
+    check.add_argument("--offline", action="store_true",
+                       help="Skip the HaveIBeenPwned lookup.")
+
+    copy = sub.add_parser("copy", help="Put a password on the clipboard.")
+    copy.add_argument("password")
+
+    args = parser.parse_args()
+
+    if args.action == "generate":
+        run_generate_password(
+            length=args.length,
+            use_uppercase=not args.no_upper,
+            use_digits=not args.no_digits,
+            use_special=not args.no_special,
+            exclude_ambiguous=args.no_ambiguous,
+            count=args.count,
+        )
+    elif args.action == "passphrase":
+        run_generate_passphrase(
+            num_words=args.words,
+            separator=args.separator,
+            capitalize=not args.no_capitalize,
+            add_number=not args.no_number,
+            add_special=args.special,
+            count=args.count,
+        )
+    elif args.action == "check":
+        run_evaluate_strength(args.password, check_breach=not args.offline)
+    else:
+        run_copy_password(args.password)
+
+
+if __name__ == "__main__":
+    main()

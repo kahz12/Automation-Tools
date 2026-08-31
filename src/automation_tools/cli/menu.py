@@ -1,11 +1,10 @@
 import json
-import os
 
-from automation_tools.core.logger import console
-from automation_tools.core.config import load_environment, get_project_root
+from automation_tools.core.logger import console, setup_logger
+from automation_tools.core.config import load_environment, state_path
 from automation_tools.cli.tui import AutomationApp
 
-HISTORY_FILE = os.path.join(get_project_root(), ".menu_history.json")
+HISTORY_FILE = state_path(".menu_history.json")
 HISTORY_MAX = 5
 
 
@@ -72,6 +71,7 @@ MENU_ENTRIES = [
 
 
 def main_menu() -> None:
+    setup_logger()
     load_environment()
     try:
         AutomationApp(MENU_ENTRIES, _load_history(), record_use=_record_use).run()

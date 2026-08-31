@@ -19,9 +19,7 @@ venv*/
 env/
 ENV/
 
-# Secrets. `.env*` is broad on purpose: .env.local, .env.bak and friends all
-# turn up in practice and any of them can hold a live key. The example file is
-# the template (empty values only) and has to stay committed.
+# Secrets. `.env*`
 .env*
 !.env.example
 *.pem
@@ -43,14 +41,13 @@ productos_a_monitorear.json
 # Move history with absolute paths to private files.
 .organizer_history/
 
-# Encryption Vault output. These are the user's own private files, just
-# unreadable; .dec is what a decrypt writes when the source had no .enc suffix.
+# Encryption Vault output.
 *.enc
 *.dec
 
 # Default output of the README Generator (--out), written into the CWD.
 README_generado.md
-# Integrity Checker manifests, if it is ever run against the project root.
+# Integrity Checker manifests.
 checksums.*
 SHA256SUMS
 MD5SUMS
@@ -70,14 +67,6 @@ build/
 *.swp
 *~
 .claude/
-
-# Already ignored via .superpowers/sdd/.gitignore, but only because sdd/ is its
-# sole entry today. Stated here so anything else dropped in stays out too.
-.superpowers/
-
-# Agent-written specs and plans. Scoped to the subdirectory rather than all of
-# docs/ so that real project documentation added later is not silently dropped.
-docs/superpowers/
 
 # OS junk
 .DS_Store

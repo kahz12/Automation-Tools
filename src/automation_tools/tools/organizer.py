@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
-from automation_tools.core.config import get_downloads_folder, get_project_root
+from automation_tools.core.config import get_downloads_folder, state_path
 
 # Define categories and their associated file extensions
 # Note: Keeping Spanish keys to maintain consistency with existing user folders.
@@ -21,7 +21,7 @@ CATEGORIES = {
 }
 
 # Directory to store move history for undo functionality
-HISTORY_DIR = os.path.join(get_project_root(), ".organizer_history")
+HISTORY_DIR = state_path(".organizer_history")
 
 
 def create_directories_if_not_exist(downloads_path: str) -> None:

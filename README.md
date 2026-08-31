@@ -81,46 +81,48 @@ Launch the interactive menu:
 
 ```bash
 automation-tools     # after the quick install
-python3 run.py       # from a manual checkout
+python3 run.py       # from a manual checkout, without installing
 ```
 
-Navigate with the arrow keys and press `Enter` to open a tool. Every utility is also scriptable directly — each one supports `--help`:
+Navigate with the arrow keys and press `Enter` to open a tool.
+
+Every utility is also scriptable through `atools`, which forwards the rest of the command line to that tool's own parser. `atools --list` names them all, and each one supports `--help`:
 
 ```bash
 # Rename a batch of photos with a sequential pattern (dry-run unless --aplicar)
-python3 src/automation_tools/tools/renamer.py ./photos --mode patron --pattern "trip_{:03d}" --aplicar
+atools renamer ./photos --mode patron --pattern "trip_{:03d}" --aplicar
 
 # Resize a folder of images so the longest side is at most 1024 px
-python3 src/automation_tools/tools/image_processor.py ./pics --op resize --max-size 1024
+atools image_processor ./pics --op resize --max-size 1024
 
-# Encrypt a folder with a password
-python3 src/automation_tools/tools/vault.py ./secret_docs encrypt --password "myStrongPass"
+# Encrypt a folder with a password (prompts for it; --password would show up in ps)
+atools vault ./secret_docs encrypt
 
 # Summarize a PDF with the default provider
-python3 src/automation_tools/tools/summarizer.py report.pdf --out summary.txt
+atools summarizer report.pdf --out summary.txt
 
 # Extract text from a scanned image
-python3 src/automation_tools/tools/ocr.py scan.png --out scan.txt
+atools ocr scan.png --out scan.txt
 
 # Any AI tool can switch provider and model per run
-python3 src/automation_tools/tools/summarizer.py report.pdf --provider anthropic --model claude-sonnet-4-5
+atools summarizer report.pdf --provider anthropic --model claude-sonnet-4-5
 
 # Merge two PDFs into one
-python3 src/automation_tools/tools/pdf_toolkit.py merge "a.pdf,b.pdf" merged.pdf
+atools pdf_toolkit merge "a.pdf,b.pdf" merged.pdf
 
 # Back up a folder to a timestamped zip, excluding logs (dry-run unless --apply)
-python3 src/automation_tools/tools/archiver.py create ./project -x "*.log" "__pycache__" --apply
+atools archiver create ./project -x "*.log" "__pycache__" --apply
 
 # Create a checksum manifest of a folder, then verify it later
-python3 src/automation_tools/tools/integrity.py create ./backups
-python3 src/automation_tools/tools/integrity.py verify ./backups --extra
+atools integrity create ./backups
+atools integrity verify ./backups --extra
 ```
 
 ---
 
 ## Tools
 
-All modules live in `src/automation_tools/tools/`. Run any of them with `--help` for the full set of options.
+All modules live in `src/automation_tools/tools/`. Run any of them as `atools <name>`, with `--help` for the full set of options.
 
 ### Files
 
@@ -168,7 +170,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them with `--help`
 |------|--------|-------------|
 | Metadata Extractor | `metadata.py` | Inspect EXIF/PDF metadata; optionally strip EXIF (e.g. GPS) from images. |
 | Password Manager | `password_generator.py` | Generate passwords/passphrases and score strength (HaveIBeenPwned check). |
-| Encryption Vault | `vault.py` | Encrypt/decrypt files & folders with a password (AES, authenticated). |
+| Encryption Vault | `vault.py` | Encrypt/decrypt files & folders with a password (scrypt + AES-256-GCM, chunked so file size does not matter). |
 | Integrity Checker | `integrity.py` | Create a checksum manifest (MD5/SHA-1/SHA-256/SHA-512) of a folder and verify it later — `sha256sum -c` compatible. |
 | Dotenv Manager | `env_manager.py` | Generate a `.env.example` template, scan a tree for exposed `.env` files, and validate a `.env` against its template. |
 
@@ -210,7 +212,7 @@ providers that can, rather than a failed API call.
 Override the model with `--model` when you want a specific one:
 
 ```bash
-python3 src/automation_tools/tools/translator.py notes.md --lang Spanish \
+atools translator notes.md --lang Spanish \
     --provider groq --model openai/gpt-oss-20b
 ```
 
@@ -232,9 +234,11 @@ Install the dev extra, then run the suite from the project root:
 pip install -e ".[dev]"
 pytest
 pyflakes src/ tests/
+pytest --cov=automation_tools      # coverage, as CI measures it
+mypy src/automation_tools/core/    # the shared foundation stays type-clean
 ```
 
-Tests live in `tests/`, exercise temporary directories only (your real files are never touched), and mock all network/API paths (HaveIBeenPwned, the AI providers, yt-dlp) — so the suite runs fully offline. The same two commands run in CI on Python 3.10, 3.12 and 3.13 for every push and pull request.
+Tests live in `tests/`, exercise temporary directories only (your real files are never touched), and mock all network/API paths (HaveIBeenPwned, the AI providers, yt-dlp) — so the suite runs fully offline. CI runs them on Python 3.10, 3.12 and 3.13 on Linux plus one run each on Windows and macOS, since path handling and file permissions are where "OS independent" usually turns out to be wishful.
 
 ---
 
@@ -248,13 +252,17 @@ Automation-Tools/
 ├── pytest.ini                          # Test configuration
 ├── productos_a_monitorear.example.json # Price-monitor config template
 ├── README.md  ·  GUIDE_CONFIG.md       # Documentation
-├── .github/workflows/ci.yml            # pytest + pyflakes on 3.10 / 3.12 / 3.13
+├── .github/workflows/ci.yml            # pyflakes + pytest on Linux/Windows/macOS, coverage, mypy
 ├── src/automation_tools/
-│   ├── core/                           # logger (Rich output) · config (settings & paths)
-│   ├── cli/                            # menu · tui (Textual dashboard) · screens
-│   └── tools/                          # 23 tool modules (one per utility)
+│   ├── core/                           # logger · config · fs (one directory walk) · report · prompt
+│   ├── cli/                            # menu · tui (Textual dashboard) · dispatch (atools) · screens/
+│   └── tools/                          # 25 tool modules (one per utility)
 └── tests/                              # pytest suite (one file per module)
 ```
+
+State the tools write (the price database, the undo history, the log) lives in
+`~/.local/share/automation-tools/`, not in the checkout, so an installed copy
+behaves the same as one run from source.
 
 ---
 

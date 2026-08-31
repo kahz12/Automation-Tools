@@ -17,6 +17,8 @@ cp productos_a_monitorear.example.json productos_a_monitorear.json
 
 Después edita `productos_a_monitorear.json` con tus productos y credenciales siguiendo las secciones de abajo.
 
+El fichero se busca en tres sitios, en este orden: el directorio desde el que ejecutas el comando, `~/.local/share/automation-tools/` (o `%LOCALAPPDATA%\automation-tools` en Windows) y la raíz del repositorio. Si instalaste con `pip` y no trabajas dentro del checkout, el segundo es el sitio.
+
 ---
 
 ## `settings` — Configuración Global
@@ -166,16 +168,16 @@ O directamente por terminal:
 
 ```bash
 # Chequeo inmediato
-python3 src/automation_tools/tools/monitor.py --now
+atools monitor --now
 
 # Ver historial de precios guardados
-python3 src/automation_tools/tools/monitor.py --historial
+atools monitor --historial
 
 # Monitoreo continuo cada 30 minutos
-python3 src/automation_tools/tools/monitor.py --interval 30
+atools monitor --interval 30
 
 # Monitoreo continuo cada hora (por defecto)
-python3 src/automation_tools/tools/monitor.py
+atools monitor
 ```
 
 ---

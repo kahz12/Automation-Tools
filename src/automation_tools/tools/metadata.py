@@ -1,14 +1,13 @@
 import os
 import argparse
-import csv
 import datetime
-import json
 from typing import Dict, Any, Optional
 
 import pypdf
 from rich.table import Table
 
 from automation_tools.core.logger import console, print_error, print_success, print_warning
+from automation_tools.core.report import export_json, export_rows, is_csv
 
 try:
     from PIL import Image, ExifTags
@@ -133,23 +132,15 @@ def extract_image_metadata(filepath: str) -> Dict[str, Any]:
 
 def export_metadata(basic: Dict[str, Any], specific: Dict[str, Any], out_path: str) -> None:
     """Writes the metadata to `out_path`, as JSON or CSV depending on its extension."""
-    ext = os.path.splitext(out_path)[1].lower()
-    try:
-        if ext == ".csv":
-            with open(out_path, "w", encoding="utf-8", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow(["section", "property", "value"])
-                for k, v in basic.items():
-                    writer.writerow(["basic", k, v])
-                for k, v in specific.items():
-                    writer.writerow(["specific", k, str(v)])
-        else:
-            payload = {"basic": basic, "specific": {k: str(v) for k, v in specific.items()}}
-            with open(out_path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=2, ensure_ascii=False)
-        print_success(f"Metadata exported to: {out_path}")
-    except Exception as e:
-        print_error(f"Failed to export metadata: {e}")
+    if is_csv(out_path):
+        rows = ([["basic", k, v] for k, v in basic.items()]
+                + [["specific", k, str(v)] for k, v in specific.items()])
+        export_rows(out_path, ["section", "property", "value"], rows)
+    else:
+        export_json(out_path, {
+            "basic": basic,
+            "specific": {k: str(v) for k, v in specific.items()},
+        })
 
 
 def clean_image_exif(filepath: str, out_path: Optional[str] = None) -> Optional[str]:
@@ -167,10 +158,11 @@ def clean_image_exif(filepath: str, out_path: Optional[str] = None) -> Optional[
     out_path = out_path or (os.path.splitext(filepath)[0] + "_clean" + os.path.splitext(filepath)[1])
     try:
         with Image.open(filepath) as img:
-            # Get pixel data and create a new image without metadata
-            data = list(img.getdata())
-            clean = Image.new(img.mode, img.size)
-            clean.putdata(data)
+            # Copy the pixels into a blank image, which is what leaves the
+            # metadata behind. Going through raw bytes rather than getdata()
+            # skips building a Python list of one tuple per pixel, and
+            # getdata() is deprecated for removal in Pillow 14.
+            clean = Image.frombytes(img.mode, img.size, img.tobytes())
             # In P/PA mode the pixels are palette indexes, so copying them into
             # a blank image without also copying the palette rendered every
             # colour as entry 0, i.e. a black picture.

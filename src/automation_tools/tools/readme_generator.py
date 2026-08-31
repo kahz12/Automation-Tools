@@ -5,6 +5,7 @@ from collections import Counter
 from typing import Dict, Optional, List, Tuple
 
 from automation_tools.ai import AIProviderError, Capability, get_provider
+from automation_tools.core import fs
 from automation_tools.core.logger import console, print_error, print_step, print_success
 
 
@@ -50,24 +51,22 @@ STACK_MARKERS: List[Tuple[str, str]] = [
 ]
 
 
+SOURCE_EXCLUDES = list(fs.DEFAULT_EXCLUDES) + ['dist', 'build', 'env']
+
+
 def detect_primary_language(directory: str) -> Optional[str]:
     """Dominant language of a project, by source-file count plus stack markers."""
     stack_hits: List[str] = []
     ext_counter: Counter = Counter()
 
-    for root, dirs, files in os.walk(directory):
-        # Prune common non-source directories
-        dirs[:] = [d for d in dirs if d not in ('.git', 'venv', '.venv', 'node_modules', '__pycache__', 'dist', 'build')]
-        for f in files:
-            # Check for stack markers (like package.json)
-            if any(f == marker for marker, _ in STACK_MARKERS):
-                for marker, lang in STACK_MARKERS:
-                    if f == marker:
-                        stack_hits.append(lang)
-            # Count extensions
-            ext = os.path.splitext(f)[1].lower()
-            if ext in LANG_EXTENSIONS:
-                ext_counter[LANG_EXTENSIONS[ext]] += 1
+    for full in fs.walk_files(directory, excludes=SOURCE_EXCLUDES):
+        name = os.path.basename(full)
+        for marker, lang in STACK_MARKERS:
+            if name == marker:
+                stack_hits.append(lang)
+        ext = os.path.splitext(name)[1].lower()
+        if ext in LANG_EXTENSIONS:
+            ext_counter[LANG_EXTENSIONS[ext]] += 1
 
     # Stack markers have priority over file counts
     if stack_hits:

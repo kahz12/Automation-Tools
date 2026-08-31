@@ -1,13 +1,14 @@
 import argparse
-import csv
-import fnmatch
 import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-import questionary
 from rich.table import Table
 
+from automation_tools.core import fs
+
+from automation_tools.core.report import export_rows
+from automation_tools.core import prompt
 from automation_tools.core.logger import (
     console,
     print_error,
@@ -41,7 +42,7 @@ except ImportError:
 
 SUPPORTED_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif")
 
-DEFAULT_EXCLUDES = [".git", "node_modules", "__pycache__", "venv", ".venv", ".cache", ".thumbnails"]
+DEFAULT_EXCLUDES = list(fs.DEFAULT_EXCLUDES) + [".thumbnails"]
 
 # Hash side, in pixels. 8 gives the 64-bit hash the thresholds below assume.
 HASH_SIZE = 8
@@ -109,10 +110,6 @@ def hamming(a: int, b: int) -> int:
 
 
 # ── Scanning ─────────────────────────────────────────────────────────────────
-def _matches_any(name: str, patterns: List[str]) -> bool:
-    return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
-
-
 def scan_images(
     directory: str,
     recursive: bool = True,
@@ -126,34 +123,19 @@ def scan_images(
     images: List[ImageInfo] = []
     unreadable = 0
 
-    def consider(full: str, name: str) -> None:
-        nonlocal unreadable
-        if not name.lower().endswith(SUPPORTED_EXTENSIONS):
-            return
-        if _matches_any(name, patterns) or os.path.islink(full):
-            return
+    for full in fs.walk_files(directory, recursive=recursive, excludes=patterns,
+                              extensions=SUPPORTED_EXTENSIONS):
         result = dhash(full)
         if result is None:
             unreadable += 1
-            return
+            continue
         bits, width, height = result
         try:
             size = os.path.getsize(full)
         except OSError:
             unreadable += 1
-            return
+            continue
         images.append(ImageInfo(full, bits, size, width, height))
-
-    if recursive:
-        for root, dirs, names in os.walk(directory):
-            dirs[:] = [d for d in dirs if not _matches_any(d, patterns)]
-            for name in sorted(names):
-                consider(os.path.join(root, name), name)
-    else:
-        for name in sorted(os.listdir(directory)):
-            full = os.path.join(directory, name)
-            if os.path.isfile(full):
-                consider(full, name)
 
     return images, unreadable
 
@@ -253,26 +235,27 @@ def print_groups(groups: List[List[ImageInfo]], limit: int = 20) -> None:
         console.print(f"[dim]... and {len(groups) - limit} more group(s) (hidden).[/dim]")
 
 
-def export_groups(groups: List[List[ImageInfo]], out_path: str) -> None:
+def _group_rows(groups: List[List[ImageInfo]]):
+    for number, group in enumerate(groups, 1):
+        keeper = group[0]
+        for image in group:
+            is_keeper = image is keeper
+            yield [
+                number,
+                "keep" if is_keeper else "duplicate",
+                image.width, image.height, image.size,
+                0 if is_keeper else hamming(keeper.hash, image.hash),
+                image.path,
+            ]
+
+
+def export_groups(groups: List[List[ImageInfo]], out_path: str) -> bool:
     """Writes the groups to `out_path` as CSV."""
-    try:
-        with open(out_path, "w", encoding="utf-8", newline="") as handle:
-            writer = csv.writer(handle)
-            writer.writerow(["group", "role", "width", "height", "size_bytes", "distance", "path"])
-            for number, group in enumerate(groups, 1):
-                keeper = group[0]
-                for image in group:
-                    is_keeper = image is keeper
-                    writer.writerow([
-                        number,
-                        "keep" if is_keeper else "duplicate",
-                        image.width, image.height, image.size,
-                        0 if is_keeper else hamming(keeper.hash, image.hash),
-                        image.path,
-                    ])
-        print_success(f"Report exported to: {out_path}")
-    except OSError as e:
-        print_error(f"Could not export report: {e}")
+    return export_rows(
+        out_path,
+        ["group", "role", "width", "height", "size_bytes", "distance", "path"],
+        _group_rows(groups),
+    )
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
@@ -336,11 +319,11 @@ def run_similar_images(
         return True
 
     doomed = [image for group in groups for image in group[1:]]
-    confirm = questionary.confirm(
+    confirm = prompt.confirm(
         f"Delete {len(doomed)} extra copy/copies ({human_size(reclaimable)})? "
         "The best version of each group is kept. This cannot be undone.",
         default=False,
-    ).ask()
+    )
     if not confirm:
         print_warning("Cancelled. Nothing was deleted.")
         return True

@@ -1,7 +1,6 @@
 import time
 import random
 import sqlite3
-import os
 import re
 import argparse
 from datetime import datetime
@@ -11,13 +10,13 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 
-from automation_tools.core.logger import setup_logger, console, print_success, print_warning
-from automation_tools.core.config import load_json_config, get_project_root
+from automation_tools.core.logger import get_logger, console, print_success, print_warning
+from automation_tools.core.config import load_json_config, state_path
 
-logger = setup_logger()
+logger = get_logger()
 
 # ─── Paths ───
-DB_FILE = os.path.join(get_project_root(), "historial_precios.db")
+DB_FILE = state_path("historial_precios.db")
 
 # ─── Rate limiting by domain ───
 # Minimum time between requests to the same host (seconds).

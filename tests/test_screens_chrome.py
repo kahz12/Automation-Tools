@@ -284,7 +284,9 @@ def test_running_a_tool_forwards_the_chosen_provider(name, monkeypatch):
             captured["fn"] = fn
             captured["kwargs"] = kwargs
 
-    monkeypatch.setattr(screens_mod, "ExecutionScreen", _CaptureExecution)
+    # Patch where the name is looked up: `_run_tool` lives in screens.base,
+    # so the package-level re-export is not the one it resolves.
+    monkeypatch.setattr(screens_mod.base, "ExecutionScreen", _CaptureExecution)
 
     async def go():
         app = _Harness(screen_cls)

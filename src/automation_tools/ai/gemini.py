@@ -10,9 +10,9 @@ from typing import Any, Optional
 
 from automation_tools.ai.base import Capability, ProviderSpec
 from automation_tools.ai.retry import with_retry
-from automation_tools.core.logger import console, print_error, print_warning, setup_logger
+from automation_tools.core.logger import console, print_error, print_warning, get_logger
 
-logger = setup_logger()
+logger = get_logger()
 
 # How long to wait for Gemini to finish processing an uploaded media file, and
 # how often to re-check. A file stuck in PROCESSING must never hang the tool.

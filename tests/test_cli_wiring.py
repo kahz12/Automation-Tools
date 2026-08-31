@@ -5,6 +5,7 @@ with no screen, a screen calling a tool function that doesn't exist, etc.
 """
 import ast
 import importlib
+import pathlib
 
 from automation_tools.cli.menu import MENU_ENTRIES
 from automation_tools.cli.tui import TOOL_INFO
@@ -31,8 +32,10 @@ def test_screen_map_values_are_tool_screens():
 
 
 def test_screen_tool_calls_resolve():
-    """Every `<tool_module>.<func>(...)` reference in screens.py must exist."""
-    tree = ast.parse(open(screens_mod.__file__).read())
+    """Every `<tool_module>.<func>(...)` reference in the screens must exist."""
+    tree = ast.parse("".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted(pathlib.Path(screens_mod.__file__).parent.glob("*.py"))))
 
     tool_aliases = set()
     for node in ast.walk(tree):
@@ -49,4 +52,4 @@ def test_screen_tool_calls_resolve():
             if not callable(getattr(mod, node.attr, None)):
                 missing.append(f"{node.value.id}.{node.attr}")
 
-    assert not missing, f"screens.py references non-existent tool callables: {missing}"
+    assert not missing, f"screens reference non-existent tool callables: {missing}"

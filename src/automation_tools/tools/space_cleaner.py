@@ -8,9 +8,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Iterable, List, Optional, Tuple
 
-import questionary
 from rich.table import Table
 
+from automation_tools.core import fs
+from automation_tools.core import prompt
 from automation_tools.core.logger import (
     console,
     print_error,
@@ -141,15 +142,11 @@ def human_size(n: int) -> str:
 def dir_size(path: str) -> int:
     """Calculates the total size of a directory by summing all its files."""
     total = 0
-    for root, _, files in os.walk(path, onerror=lambda _: None):
-        for f in files:
-            fp = os.path.join(root, f)
-            if os.path.islink(fp):
-                continue
-            try:
-                total += os.path.getsize(fp)
-            except OSError:
-                continue
+    for fp in fs.walk_files(path):
+        try:
+            total += os.path.getsize(fp)
+        except OSError:
+            continue
     return total
 
 
@@ -384,10 +381,10 @@ def run_space_cleaner(
         print_warning("No items selected for deletion.")
         return
 
-    confirm = questionary.confirm(
+    confirm = prompt.confirm(
         f"Delete {len(to_delete)} items ({human_size(sum(i.size for i in to_delete))})?",
         default=False,
-    ).ask()
+    )
     if not confirm:
         print_warning("Cancelled. Nothing was deleted.")
         return

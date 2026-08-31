@@ -94,7 +94,7 @@ SCREEN_WIDGETS = {
         "classes": ['arrow', 'btn-row', 'down-arrow', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel', 'up-arrow'],
     },
     'VaultScreen': {
-        "ids": ['action', 'back-btn', 'error-msg', 'out-dir', 'password', 'password2', 'path', 'rb-decrypt', 'rb-encrypt', 'recursive', 'remove', 'run-btn', 'sec-confirm'],
+        "ids": ['action', 'back-btn', 'error-msg', 'out-dir', 'password', 'password2', 'path', 'rb-decrypt', 'rb-encrypt', 'recursive', 'remove', 'run-btn', 'sec-confirm', 'sec-shred', 'shred'],
         "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
     },
     'WebClipperScreen': {

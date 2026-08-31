@@ -2,6 +2,7 @@ import os
 import argparse
 from typing import List, Optional, Tuple
 
+from automation_tools.core import fs
 from automation_tools.core.logger import console, print_error, print_step, print_warning
 
 # Generate a .env.example template, find .env files that should never be
@@ -78,13 +79,10 @@ def scan_envs(directory: str) -> bool:
     print_step(f"Scanning '{directory}' for exposed .env files...")
     found_files = []
 
-    for root, dirs, files in os.walk(directory):
-        # Mutate dirs in place to skip ignored directories.
-        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
-
-        for file in files:
-            if file == '.env' or file.endswith('.env.local') or file.endswith('.env.development'):
-                found_files.append(os.path.join(root, file))
+    for full in fs.walk_files(directory, excludes=list(IGNORE_DIRS)):
+        name = os.path.basename(full)
+        if name == '.env' or name.endswith('.env.local') or name.endswith('.env.development'):
+            found_files.append(full)
 
     if not found_files:
         console.print("[green]✓ No exposed .env files found in the scanned paths.[/green]")

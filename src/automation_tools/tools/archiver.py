@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple
 
+from automation_tools.core import fs
 from automation_tools.core.logger import (
     console,
     print_error,
@@ -98,14 +99,9 @@ def _iter_source_files(source: str):
         yield source, root_name
         return
 
-    for root, dirs, files in os.walk(source):
-        dirs.sort()
-        for name in sorted(files):
-            fp = os.path.join(root, name)
-            if os.path.islink(fp):
-                continue
-            rel = os.path.relpath(fp, source).replace(os.sep, "/")
-            yield fp, f"{root_name}/{rel}"
+    for fp in fs.walk_files(source):
+        rel = os.path.relpath(fp, source).replace(os.sep, "/")
+        yield fp, f"{root_name}/{rel}"
 
 
 def _unique_arcname(arcname: str, seen: set) -> str:

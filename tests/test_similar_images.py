@@ -4,8 +4,6 @@ The point of the tool is catching what MD5 cannot, so the fixtures are
 deliberately the transformations that change every byte while leaving the
 picture recognisable: rescaling, re-compression and a colour drop.
 """
-import types
-
 import pytest
 from PIL import Image
 
@@ -32,10 +30,7 @@ def photo(tmp_path):
 @pytest.fixture
 def accept_confirm(monkeypatch):
     def _set(answer):
-        monkeypatch.setattr(
-            si.questionary, "confirm",
-            lambda *a, **k: types.SimpleNamespace(ask=lambda: answer),
-        )
+        monkeypatch.setattr(si.prompt, "confirm", lambda *a, **k: answer)
     return _set
 
 

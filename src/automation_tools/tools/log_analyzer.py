@@ -3,6 +3,7 @@ import argparse
 import re
 from typing import Optional
 
+from automation_tools.core import fs
 from automation_tools.core.logger import console, print_error, print_step, print_warning
 
 # Matches beyond this are still written to the report file, just not echoed to
@@ -51,15 +52,11 @@ def run_log_analyzer(
             return False
 
     # Gather files
-    files_to_scan = []
     if os.path.isfile(path):
-        files_to_scan.append(path)
+        files_to_scan = [path]
     else:
         print_step(f"Scanning directory '{path}' for .log files...")
-        for root, _, files in os.walk(path):
-            for file in files:
-                if file.endswith(".log"):
-                    files_to_scan.append(os.path.join(root, file))
+        files_to_scan = list(fs.walk_files(path, extensions=(".log",)))
     
     if not files_to_scan:
         print_warning("No .log files found to analyze.")

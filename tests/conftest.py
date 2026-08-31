@@ -1,4 +1,7 @@
 """Shared pytest fixtures for the Automation-Tools test suite."""
+import os
+import tempfile
+
 import pytest
 from PIL import Image
 from pypdf import PdfWriter
@@ -51,3 +54,35 @@ def make_pdf():
             writer.write(fh)
         return str(path)
     return _make
+
+
+@pytest.fixture
+def data_dir(monkeypatch, tmp_path):
+    """Points the user data directory at a temporary one.
+
+    Patching the function rather than $XDG_DATA_HOME keeps these tests honest
+    on Windows and macOS, which do not read that variable.
+    """
+    from automation_tools.core import config
+
+    target = tmp_path / "state"
+    target.mkdir()
+    monkeypatch.setattr(config, "user_data_dir", lambda: str(target))
+    return target
+
+
+def _symlinks_work() -> bool:
+    """Windows needs Developer Mode or admin rights to create one."""
+    with tempfile.TemporaryDirectory() as tmp:
+        target = os.path.join(tmp, "target")
+        open(target, "w").close()
+        try:
+            os.symlink(target, os.path.join(tmp, "link"))
+        except (OSError, NotImplementedError, AttributeError):
+            return False
+    return True
+
+
+needs_symlinks = pytest.mark.skipif(
+    not _symlinks_work(), reason="this platform will not let us create a symlink"
+)

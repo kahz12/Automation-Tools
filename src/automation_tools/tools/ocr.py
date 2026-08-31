@@ -4,6 +4,7 @@ import os
 from typing import List, Optional, Tuple
 
 from automation_tools.ai import AIProviderError, Capability, get_provider
+from automation_tools.core import fs
 from automation_tools.core.logger import (
     console,
     print_error,
@@ -51,21 +52,8 @@ def _image_to_bytes(path: str) -> Tuple[bytes, str]:
 
 def _collect_images(path: str, recursive: bool = False) -> List[str]:
     """Returns the image files to process for a file or directory `path`."""
-    if os.path.isfile(path):
-        return [path] if os.path.splitext(path)[1].lower() in IMAGE_EXTS else []
-
-    images: List[str] = []
-    if recursive:
-        for root, _, files in os.walk(path):
-            for name in sorted(files):
-                if os.path.splitext(name)[1].lower() in IMAGE_EXTS:
-                    images.append(os.path.join(root, name))
-    else:
-        for name in sorted(os.listdir(path)):
-            full = os.path.join(path, name)
-            if os.path.isfile(full) and os.path.splitext(name)[1].lower() in IMAGE_EXTS:
-                images.append(full)
-    return images
+    return list(fs.walk_files(path, recursive=recursive,
+                             extensions=tuple(sorted(IMAGE_EXTS))))
 
 
 def _build_prompt(markdown: bool = False, language: Optional[str] = None) -> str:

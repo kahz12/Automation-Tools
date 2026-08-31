@@ -2,6 +2,7 @@ import argparse
 import os
 from typing import Optional, Tuple
 
+from automation_tools.core import fs
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
 
 # Bulk operations over a single image or a whole folder, built only on Pillow
@@ -201,27 +202,9 @@ def _collect_files(input_path: str, recursive: bool,
     `processed` subfolder of the source, so without this a recursive second run
     picked up its own output from the first one and processed it again.
     """
-    if os.path.isfile(input_path):
-        return [input_path] if input_path.lower().endswith(SUPPORTED_EXTENSIONS) else []
-
-    skip = os.path.abspath(exclude_dir) if exclude_dir else None
-    files = []
-    if recursive:
-        for root, dirs, names in os.walk(input_path):
-            if skip:
-                dirs[:] = [
-                    d for d in dirs
-                    if os.path.abspath(os.path.join(root, d)) != skip
-                ]
-            for name in names:
-                if name.lower().endswith(SUPPORTED_EXTENSIONS):
-                    files.append(os.path.join(root, name))
-    else:
-        for name in sorted(os.listdir(input_path)):
-            full = os.path.join(input_path, name)
-            if os.path.isfile(full) and name.lower().endswith(SUPPORTED_EXTENSIONS):
-                files.append(full)
-    return files
+    return list(fs.walk_files(input_path, recursive=recursive,
+                             extensions=SUPPORTED_EXTENSIONS,
+                             skip_dir=exclude_dir))
 
 
 def run_batch_image_processor(

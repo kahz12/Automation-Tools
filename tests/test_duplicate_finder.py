@@ -12,11 +12,6 @@ def test_hash_file_identical_and_different(tmp_path):
     assert df.hash_file(str(a)) != df.hash_file(str(c))
 
 
-def test_matches_any():
-    assert df._matches_any("foo.tmp", ["*.tmp"]) is True
-    assert df._matches_any("foo.txt", ["*.tmp"]) is False
-
-
 def test_find_duplicates(tmp_path):
     (tmp_path / "x1.txt").write_text("dup")
     (tmp_path / "x2.txt").write_text("dup")
