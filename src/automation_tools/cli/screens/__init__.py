@@ -10,7 +10,7 @@ from automation_tools.cli.screens.files import ArchiverScreen, CleanerScreen, Du
 from automation_tools.cli.screens.conversion import ConverterScreen, ImageProcessorScreen, PdfConverterScreen, PdfToolkitScreen
 from automation_tools.cli.screens.ai import OcrScreen, ReadmeScreen, SummarizerScreen, TranscriberScreen, TranslatorScreen
 from automation_tools.cli.screens.web import MonitorScreen, WebClipperScreen, YoutubeScreen
-from automation_tools.cli.screens.security import EnvManagerScreen, FileTypeScreen, IntegrityScreen, MetadataScreen, PasswordScreen, VaultScreen
+from automation_tools.cli.screens.security import EnvManagerScreen, FileTypeScreen, FlacCheckScreen, IntegrityScreen, MetadataScreen, PasswordScreen, VaultScreen
 
 
 # ── Screen map: tool label → Screen class ──────────────────────────────────
@@ -40,6 +40,7 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "⚙️  Dotenv Manager":      EnvManagerScreen,
     "👯  Similar Photos":       SimilarImagesScreen,
     "🔬  File Type Check":      FileTypeScreen,
+    "🎼  FLAC Authenticity":    FlacCheckScreen,
 }
 
 __all__ = [
@@ -55,6 +56,7 @@ __all__ = [
     "DuplicatesScreen",
     "EnvManagerScreen",
     "FileTypeScreen",
+    "FlacCheckScreen",
     "ImageProcessorScreen",
     "IntegrityScreen",
     "LogAnalyzerScreen",

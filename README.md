@@ -2,7 +2,7 @@
 
 # Automation Tools
 
-**A unified command-line toolkit of twenty-three Python utilities for everyday automation.**
+**A unified command-line toolkit of twenty-six Python utilities for everyday automation.**
 
 Files · Conversion · AI (8 providers) · Web & Multimedia · Encryption · Utilities
 
@@ -30,7 +30,7 @@ Files · Conversion · AI (8 providers) · Web & Multimedia · Encryption · Uti
 
 ## Overview
 
-**Automation Tools** bundles twenty-three standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
+**Automation Tools** bundles twenty-six standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
 
 - **Unified launcher** — one `automation-tools` command, arrow-key navigation, a recent-tools list
 - **Standalone scripts** — every tool also works on its own with a conventional CLI (`--help` everywhere)
@@ -71,7 +71,7 @@ pip install -e .            # add ".[dev]" to get pytest and pyflakes too
 
 Installing the package registers the `automation-tools` command inside the virtual environment.
 
-> **Requires Python 3.10+.** Optional extras: [LibreOffice](https://www.libreoffice.org/) (used by the PDF Builder for full-layout office → PDF when installed; it falls back to a pure-Python text engine otherwise) and an **API key for one of the eight AI providers** (AI tools) — see [Configuration](#configuration).
+> **Requires Python 3.10+.** Optional extras: [LibreOffice](https://www.libreoffice.org/) (used by the PDF Builder for full-layout office → PDF when installed; it falls back to a pure-Python text engine otherwise), [ffmpeg](https://ffmpeg.org/) (FLAC Authenticity needs it to decode and measure audio; without it that tool only reads headers) and an **API key for one of the eight AI providers** (AI tools) — see [Configuration](#configuration).
 
 ---
 
@@ -173,6 +173,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them as `atools <n
 | Encryption Vault | `vault.py` | Encrypt/decrypt files & folders with a password (scrypt + AES-256-GCM, chunked so file size does not matter). |
 | Integrity Checker | `integrity.py` | Create a checksum manifest (MD5/SHA-1/SHA-256/SHA-512) of a folder and verify it later — `sha256sum -c` compatible. |
 | Dotenv Manager | `env_manager.py` | Generate a `.env.example` template, scan a tree for exposed `.env` files, and validate a `.env` against its template. |
+| FLAC Authenticity | `flac_check.py` | Tell a real lossless FLAC from an MP3 re-encoded as one: finds the codec cutoff in the spectrum, verifies the checksum the file stores about itself, and spots fake 24-bit/96 kHz. Needs `ffmpeg`. |
 
 ---
 

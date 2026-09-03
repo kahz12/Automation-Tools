@@ -433,3 +433,70 @@ class FileTypeScreen(ToolScreen):
             show_unknown=self._bval(self.query_one("#show-unknown", Switch)),
         )
 
+
+
+# ── 26. FLAC Authenticity ────────────────────────────────────────────────────
+class FlacCheckScreen(ToolScreen):
+    TOOL_TITLE = "🎼  FLAC Authenticity"
+    TOOL_DESC = "Check whether .flac files really hold lossless audio"
+
+    def compose_fields(self) -> ComposeResult:
+        yield Label("FLAC file or music folder:", classes="field-label")
+        yield Input(placeholder="/path/to/music", id="path")
+        yield Label("Recurse into subfolders?", classes="field-label")
+        yield Switch(id="recursive", value=True)
+        yield Label("Exclude patterns (comma-separated, optional):", classes="field-label")
+        yield Input(placeholder="*.tmp, samples", id="excludes")
+        yield Label("Verify the stored checksum? (slower: decodes every file)",
+                    classes="field-label")
+        yield Switch(id="check-md5", value=True)
+        yield Label("Also list the files that passed?", classes="field-label")
+        yield Switch(id="show-all", value=False)
+        yield Label("Render a spectrogram per file?", classes="field-label")
+        yield Switch(id="spectrograms", value=False)
+        with Vertical(id="sec-spectrograms", classes="sub-section"):
+            yield Label("Folder for the PNG files:", classes="field-label")
+            yield Input(placeholder="spectrograms", id="spectrograms-dir")
+        yield Label("Export CSV report?", classes="field-label")
+        yield Switch(id="export", value=False)
+        with Vertical(id="sec-export", classes="sub-section"):
+            yield Label("CSV output path:", classes="field-label")
+            yield Input(placeholder="flac_report.csv", id="export-path")
+
+    def on_mount(self) -> None:
+        self.query_one("#sec-spectrograms").display = False
+        self.query_one("#sec-export").display = False
+
+    @on(Switch.Changed, "#spectrograms")
+    def _spectrograms_changed(self, e: Switch.Changed) -> None:
+        self.query_one("#sec-spectrograms").display = e.value
+
+    @on(Switch.Changed, "#export")
+    def _export_changed(self, e: Switch.Changed) -> None:
+        self.query_one("#sec-export").display = e.value
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import flac_check
+        path = self._ival(self.query_one("#path", Input))
+        if not path:
+            self._err("A FLAC file or folder is required.")
+            return
+        raw_exc = self._ival(self.query_one("#excludes", Input))
+        excludes = [p.strip() for p in raw_exc.split(",") if p.strip()] if raw_exc else None
+        spectrogram_dir = None
+        if self._bval(self.query_one("#spectrograms", Switch)):
+            spectrogram_dir = self._ival(
+                self.query_one("#spectrograms-dir", Input)) or "spectrograms"
+        export_path = None
+        if self._bval(self.query_one("#export", Switch)):
+            export_path = self._ival(self.query_one("#export-path", Input)) or "flac_report.csv"
+        await self._run_tool(
+            flac_check.run_flac_check,
+            path=path,
+            recursive=self._bval(self.query_one("#recursive", Switch)),
+            excludes=excludes,
+            export_path=export_path,
+            spectrogram_dir=spectrogram_dir,
+            check_md5=self._bval(self.query_one("#check-md5", Switch)),
+            show_all=self._bval(self.query_one("#show-all", Switch)),
+        )

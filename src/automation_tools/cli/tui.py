@@ -115,6 +115,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "🔬", "File Type Check",
         "Verify a file really is what its extension\nclaims, by reading its magic number.",
     ),
+    "🎼  FLAC Authenticity": (
+        "🎼", "FLAC Authenticity",
+        "Tell real lossless from an MP3 in a\nFLAC costume. Spectrum and checksum.",
+    ),
     "⚙️  Dotenv Manager": (
         "⚙️", "Dotenv Manager",
         "Generate .env.example, scan for exposed\n.env files, validate against a template.",

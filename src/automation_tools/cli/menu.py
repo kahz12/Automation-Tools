@@ -66,6 +66,7 @@ MENU_ENTRIES = [
         ("🧾  Integrity Checker",   None),
         ("⚙️  Dotenv Manager",      None),
         ("🔬  File Type Check",     None),
+        ("🎼  FLAC Authenticity",    None),
     ]),
 ]
 

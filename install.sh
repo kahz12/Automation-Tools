@@ -95,6 +95,15 @@ if ! command -v libreoffice >/dev/null 2>&1 && ! command -v soffice >/dev/null 2
 fi
 
 # ---------------------------------------------------------------------------
+# Optional enhancement: ffmpeg. The FLAC Authenticity checker reads file
+# headers without it, but every measurement of the audio itself needs a
+# decoder, so without ffmpeg it can only report that it cannot tell.
+# ---------------------------------------------------------------------------
+if ! command -v ffmpeg >/dev/null 2>&1; then
+    info "ffmpeg not detected. FLAC Authenticity needs it to analyse audio: $(detect_pkg_hint ffmpeg)"
+fi
+
+# ---------------------------------------------------------------------------
 # Clone or update the repository (idempotent)
 # ---------------------------------------------------------------------------
 if [ -d "${INSTALL_DIR}/.git" ]; then

@@ -29,6 +29,10 @@ SCREEN_WIDGETS = {
         "ids": ['back-btn', 'error-msg', 'excludes', 'export', 'export-path', 'path', 'recursive', 'run-btn', 'sec-export', 'show-unknown'],
         "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
     },
+    'FlacCheckScreen': {
+        "ids": ['back-btn', 'check-md5', 'error-msg', 'excludes', 'export', 'export-path', 'path', 'recursive', 'run-btn', 'sec-export', 'sec-spectrograms', 'show-all', 'spectrograms', 'spectrograms-dir'],
+        "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
+    },
     'ImageProcessorScreen': {
         "ids": ['back-btn', 'error-msg', 'max-size', 'op', 'out-dir', 'path', 'quality', 'rb-bl', 'rb-br', 'rb-center', 'rb-compress', 'rb-resize', 'rb-tl', 'rb-tr', 'rb-watermark', 'recursive', 'run-btn', 'scale', 'sec-compress', 'sec-resize', 'sec-watermark', 'wm-opacity', 'wm-pos', 'wm-text'],
         "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
