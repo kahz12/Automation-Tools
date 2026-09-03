@@ -116,6 +116,15 @@ atools archiver create ./project -x "*.log" "__pycache__" --apply
 # Create a checksum manifest of a folder, then verify it later
 atools integrity create ./backups
 atools integrity verify ./backups --extra
+
+# Check a music library for MP3s wearing a FLAC costume
+atools flac_check ~/Music
+
+# Faster sweep over a large library: measure the spectrum, skip the full decode
+atools flac_check ~/Music --no-md5 --export flac_report.csv
+
+# Render a spectrogram per file to eyeball the borderline verdicts
+atools flac_check ~/Music --spectrograms ./spectra
 ```
 
 ---
@@ -173,7 +182,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them as `atools <n
 | Encryption Vault | `vault.py` | Encrypt/decrypt files & folders with a password (scrypt + AES-256-GCM, chunked so file size does not matter). |
 | Integrity Checker | `integrity.py` | Create a checksum manifest (MD5/SHA-1/SHA-256/SHA-512) of a folder and verify it later — `sha256sum -c` compatible. |
 | Dotenv Manager | `env_manager.py` | Generate a `.env.example` template, scan a tree for exposed `.env` files, and validate a `.env` against its template. |
-| FLAC Authenticity | `flac_check.py` | Tell a real lossless FLAC from an MP3 re-encoded as one: finds the codec cutoff in the spectrum, verifies the checksum the file stores about itself, and spots fake 24-bit/96 kHz. Needs `ffmpeg`. |
+| FLAC Authenticity | `flac_check.py` | Tell a real lossless FLAC from an MP3 re-encoded as one. Finds the encoder's cutoff in the spectrum, re-checks the MD5 the file stores about its own audio, and spots 24-bit/96 kHz that is really 16/44.1 upsampled. Reports `inconclusive` rather than guessing when the evidence does not reach — a quiet or old recording has no treble to judge, and near 20 kHz a 320 kbps MP3 and a steeply filtered CD master are indistinguishable. Optional spectrogram PNGs and CSV report. Needs `ffmpeg`. |
 
 ---
 
@@ -257,7 +266,7 @@ Automation-Tools/
 ├── src/automation_tools/
 │   ├── core/                           # logger · config · fs (one directory walk) · report · prompt
 │   ├── cli/                            # menu · tui (Textual dashboard) · dispatch (atools) · screens/
-│   └── tools/                          # 25 tool modules (one per utility)
+│   └── tools/                          # 26 tool modules (one per utility)
 └── tests/                              # pytest suite (one file per module)
 ```
 

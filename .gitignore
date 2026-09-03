@@ -52,6 +52,11 @@ checksums.*
 SHA256SUMS
 MD5SUMS
 
+# FLAC Authenticity output. --spectrograms writes into the current directory,
+# so a run from the checkout drops a folder of PNGs next to the code.
+spectrograms/
+flac_report.csv
+
 # Distribution / packaging / Archiver output
 dist/
 build/

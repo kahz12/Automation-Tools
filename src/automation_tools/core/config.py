@@ -7,14 +7,15 @@ from typing import Dict, Any, List, Optional
 try:
     # python-dotenv is optional; without it, .env files are simply ignored.
     from dotenv import load_dotenv
+    HAS_DOTENV = True
 except ImportError:
-    load_dotenv = None
+    HAS_DOTENV = False
 
 from automation_tools.core.logger import print_error
 
 def load_environment() -> None:
     """Loads a .env file into the environment, if python-dotenv is installed."""
-    if load_dotenv:
+    if HAS_DOTENV:
         load_dotenv()
 
 def get_env_var(key: str, default: Optional[str] = None) -> Optional[str]:
