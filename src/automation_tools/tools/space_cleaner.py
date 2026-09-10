@@ -117,15 +117,36 @@ class ScanReport:
 
     def total_bytes(self) -> int:
         """Calculates the total size of all items.
-        Avoids double-counting: if a large/old file sits inside a junk dir,
-        it is only counted once as part of the junk dir.
+        Avoids double-counting items matched by multiple rules or covered by a
+        selected junk directory.
         """
-        junk_roots = tuple(i.path + os.sep for i in self.junk)
-        total = sum(i.size for i in self.junk)
-        for item in self.large + self.old:
-            if not item.path.startswith(junk_roots):
-                total += item.size
-        return total
+        return sum(item.size for item in _unique_items(self.all_items()))
+
+
+def _unique_items(items: Iterable[CleanItem]) -> List[CleanItem]:
+    """Return items that would result in one physical deletion each.
+
+    A file can match both the large and old criteria, and a file can also be
+    reported alongside a junk directory containing it.  Keep the first item
+    (junk is first in all report aggregates) and drop exact duplicates or
+    descendants of an already-selected directory.
+    """
+    unique: List[CleanItem] = []
+    seen_paths = set()
+    selected_dirs: List[str] = []
+
+    for item in items:
+        path = os.path.normcase(os.path.abspath(os.path.normpath(item.path)))
+        if path in seen_paths:
+            continue
+        if any(path.startswith(directory + os.sep) for directory in selected_dirs):
+            continue
+        seen_paths.add(path)
+        unique.append(item)
+        if item.is_dir:
+            selected_dirs.append(path)
+
+    return unique
 
 
 def human_size(n: int) -> str:
@@ -279,7 +300,7 @@ def delete_items(items: Iterable[CleanItem]) -> int:
     """Iterates through items and deletes them, tracking progress and freed space."""
     deleted = 0
     freed = 0
-    for item in items:
+    for item in _unique_items(items):
         ok, err = _delete_item(item)
         if ok:
             deleted += 1
@@ -376,6 +397,7 @@ def run_space_cleaner(
     to_delete: List[CleanItem] = list(report.junk)
     if delete_large_and_old:
         to_delete += report.large + report.old
+    to_delete = _unique_items(to_delete)
 
     if not to_delete:
         print_warning("No items selected for deletion.")

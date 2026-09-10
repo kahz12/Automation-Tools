@@ -58,3 +58,19 @@ def test_database_roundtrip(monkeypatch, tmp_path):
     assert monitor.get_last_stock(url) is True
     monitor.save_stock(url, False)
     assert monitor.get_last_stock(url) is False
+
+
+def test_latest_price_is_stable_when_timestamps_match(monkeypatch, tmp_path):
+    monkeypatch.setattr(monitor, "DB_FILE", str(tmp_path / "hist.db"))
+    monitor.init_db()
+    url = "https://x/item"
+    conn = monitor.sqlite3.connect(monitor.DB_FILE)
+    conn.executemany(
+        "INSERT INTO historial (nombre, url, precio, moneda, fecha) VALUES (?, ?, ?, ?, ?)",
+        [("Item", url, 100.0, "USD", "2026-01-01 00:00:00"),
+         ("Item", url, 80.0, "USD", "2026-01-01 00:00:00")],
+    )
+    conn.commit()
+    conn.close()
+
+    assert monitor.obtener_ultimo_precio(url) == 80.0

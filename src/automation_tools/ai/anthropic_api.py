@@ -8,7 +8,7 @@ from __future__ import annotations
 import base64
 from typing import Any, Dict, List, Optional
 
-from automation_tools.ai.base import Capability, ProviderSpec
+from automation_tools.ai.base import Capability, CapabilityError, ProviderSpec
 from automation_tools.ai.retry import with_retry
 from automation_tools.core.logger import console, get_logger
 
@@ -37,7 +37,10 @@ class AnthropicProvider:
         return anthropic.Anthropic(api_key=api_key)
 
     def _model(self, capability: Capability, override: Optional[str] = None) -> str:
-        return override or self._model_override or self.spec.model_for(capability)
+        model = override or self._model_override or self.spec.model_for(capability)
+        if model is None:
+            raise ValueError(f"No model configured for {capability.value} on {self.spec.label}")
+        return model
 
     def _log_usage(self, response: Any, model: str) -> None:
         usage = getattr(response, "usage", None)
@@ -93,3 +96,8 @@ class AnthropicProvider:
             ],
             self._model(Capability.VISION, model),
         )
+
+    def transcribe(self, filepath: str, *, mode: str = "srt",
+                   model: Optional[str] = None) -> Optional[str]:
+        """Anthropic has no audio capability; the registry normally blocks this."""
+        raise CapabilityError(f"'{self.spec.label}' does not support audio transcription")

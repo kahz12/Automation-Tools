@@ -381,7 +381,7 @@ class ArchiverScreen(ToolScreen):
 
     @on(RadioSet.Changed, "#action")
     def _action_changed(self, e: RadioSet.Changed) -> None:
-        rid = e.pressed.id if e.pressed else "rb-create"
+        rid = str(e.pressed.id) if e.pressed and e.pressed.id else "rb-create"
         selected = rid.replace("rb-", "")
         for name in self._SECTIONS:
             self.query_one(f"#sec-{name}").display = (name == selected)
@@ -479,4 +479,3 @@ class LogAnalyzerScreen(ToolScreen):
             ignore_case=not case_sensitive,
             out_path=out_path
         )
-

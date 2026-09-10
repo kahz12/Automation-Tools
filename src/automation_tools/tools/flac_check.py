@@ -4,6 +4,9 @@ import os
 import re
 import shutil
 import subprocess
+import queue
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -317,26 +320,67 @@ def verify_md5(path: str, stream: StreamInfo, ffmpeg: str) -> Tuple[Optional[boo
     low_bits = 0
     tail = b""
 
+    # Reading a pipe directly can block forever before ``wait(timeout)`` is
+    # reached, so the old timeout did not protect a stuck ffmpeg process. A
+    # small reader thread keeps the main thread deadline-aware while retaining
+    # bounded memory (chunks are consumed as they arrive).
+    chunks: "queue.Queue[Optional[bytes]]" = queue.Queue(maxsize=4)
+    reader_error: list[BaseException] = []
+
     try:
-        with subprocess.Popen(command, stdout=subprocess.PIPE,
-                              stderr=subprocess.DEVNULL) as process:
-            assert process.stdout is not None
-            while True:
-                chunk = process.stdout.read(65536)
-                if not chunk:
-                    break
-                digest.update(chunk)
-                if stride > 1:
-                    # Sample boundaries do not respect read boundaries, so
-                    # carry the partial sample over into the next chunk.
-                    buffered = tail + chunk
-                    usable = len(buffered) - (len(buffered) % stride)
-                    for byte in buffered[:usable:stride]:
-                        low_bits |= byte
-                    tail = buffered[usable:]
-            if process.wait(timeout=_FFMPEG_TIMEOUT) != 0:
+        process = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL)
+        assert process.stdout is not None
+        stdout = process.stdout
+
+        def _read_stdout() -> None:
+            try:
+                while True:
+                    chunk = stdout.read(65536)
+                    if not chunk:
+                        break
+                    chunks.put(chunk)
+            except BaseException as exc:  # communicate the error to the caller
+                reader_error.append(exc)
+            finally:
+                chunks.put(None)
+
+        reader = threading.Thread(target=_read_stdout, daemon=True)
+        reader.start()
+        deadline = time.monotonic() + _FFMPEG_TIMEOUT
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                process.kill()
+                process.wait()
                 return None, 0
-    except (subprocess.SubprocessError, OSError):
+            try:
+                chunk = chunks.get(timeout=min(remaining, 0.25))
+            except queue.Empty:
+                if process.poll() is not None:
+                    # The reader may still be flushing the final bytes.
+                    continue
+                continue
+            if chunk is None:
+                break
+            digest.update(chunk)
+            if stride > 1:
+                # Sample boundaries do not respect read boundaries, so carry
+                # the partial sample over into the next chunk.
+                buffered = tail + chunk
+                usable = len(buffered) - (len(buffered) % stride)
+                for byte in buffered[:usable:stride]:
+                    low_bits |= byte
+                tail = buffered[usable:]
+        if reader_error or process.wait(timeout=max(0.0, deadline - time.monotonic())) != 0:
+            return None, 0
+        reader.join(timeout=1)
+    except (subprocess.SubprocessError, OSError, queue.Empty):
+        try:
+            process.kill()  # type: ignore[possibly-undefined]
+            process.wait()
+        except (NameError, OSError, subprocess.SubprocessError):
+            pass
         return None, 0
 
     dead = 0

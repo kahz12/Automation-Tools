@@ -1,6 +1,8 @@
 """Screens for the tools that turn one format into another."""
 from __future__ import annotations
 
+from typing import Optional
+
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Vertical
@@ -260,7 +262,7 @@ class PdfConverterScreen(ToolScreen):
 
     @on(RadioSet.Changed, "#action")
     def _action_changed(self, e: RadioSet.Changed) -> None:
-        rid = e.pressed.id if e.pressed else "rb-document"
+        rid = str(e.pressed.id) if e.pressed and e.pressed.id else "rb-document"
         selected = rid.replace("rb-", "")
         for name in self._SECTIONS:
             self.query_one(f"#sec-{name}").display = (name == selected)
@@ -271,6 +273,7 @@ class PdfConverterScreen(ToolScreen):
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import pdf_builder
+        out: Optional[str] = None
         action = (self._rval(self.query_one("#action", RadioSet)) or "rb-document").replace("rb-", "")
         page_size = "letter" if self._rval(self.query_one("#page-size", RadioSet)) == "rb-letter" else "a4"
         use_lo = self._bval(self.query_one("#use-lo", Switch))
@@ -386,13 +389,15 @@ class PdfToolkitScreen(ToolScreen):
 
     @on(RadioSet.Changed, "#op")
     def _op_changed(self, e: RadioSet.Changed) -> None:
-        rid = e.pressed.id if e.pressed else "rb-merge"
+        rid = str(e.pressed.id) if e.pressed and e.pressed.id else "rb-merge"
         selected = rid.replace("rb-", "")
         for name in self._SECTIONS:
             self.query_one(f"#sec-{name}").display = (name == selected)
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import pdf_toolkit
+        out: Optional[str] = None
+        pages: Optional[str] = None
         op = (self._rval(self.query_one("#op", RadioSet)) or "rb-merge").replace("rb-", "")
 
         if op == "merge":
@@ -461,5 +466,3 @@ class PdfToolkitScreen(ToolScreen):
             out = self._ival(self.query_one("#decrypt-out", Input)) or None
             await self._run_tool(pdf_toolkit.run_pdf_decrypt, input_path=inp,
                                  password=pwd, output_path=out)
-
-

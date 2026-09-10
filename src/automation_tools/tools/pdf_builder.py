@@ -8,7 +8,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from automation_tools.core.logger import (
     console,
@@ -217,7 +217,11 @@ def read_pptx(path: str) -> List[Block]:
             if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
         ]
         # slide10 must not sort before slide2.
-        names.sort(key=lambda n: int(re.search(r"(\d+)", os.path.basename(n)).group(1)))
+        def slide_number(name: str) -> int:
+            match = re.search(r"(\d+)", os.path.basename(name))
+            return int(match.group(1)) if match else 0
+
+        names.sort(key=slide_number)
 
         blocks: List[Block] = []
         for index, name in enumerate(names):
@@ -465,7 +469,8 @@ def images_to_pdf(paths: List[str], out_path: str, page_size: str = "a4",
     pages = []
     for path in paths:
         try:
-            with Image.open(path) as img:
+            with Image.open(path) as source_img:
+                img: Any = source_img
                 # PDF has no alpha channel, so flatten onto white rather than
                 # letting Pillow fail or blacken the transparent areas.
                 if img.mode in ("RGBA", "LA", "P"):
@@ -481,7 +486,7 @@ def images_to_pdf(paths: List[str], out_path: str, page_size: str = "a4",
                     dims = (1240, 1754) if page_size.lower() == "a4" else (1275, 1650)
                     sheet = Image.new("RGB", dims, (255, 255, 255))
                     scaled = page.copy()
-                    scaled.thumbnail(dims, Image.LANCZOS)
+                    scaled.thumbnail(dims, Image.Resampling.LANCZOS)
                     sheet.paste(
                         scaled,
                         ((dims[0] - scaled.width) // 2, (dims[1] - scaled.height) // 2),

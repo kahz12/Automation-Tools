@@ -92,6 +92,12 @@ def test_output_path(tmp_path):
     assert ocr._output_path(src, "/out", ".md") == os.path.join("/out", "scan.md")
 
 
+def test_output_path_avoids_existing_batch_result(tmp_path):
+    src = str(tmp_path / "scan.png")
+    (tmp_path / "scan.txt").write_text("previous")
+    assert ocr._output_path(src, str(tmp_path), ".txt") == str(tmp_path / "scan_1.txt")
+
+
 # ── run_ocr workflow (mocked provider) ────────────────────────────────────────
 def test_run_ocr_single_saves_file(tmp_path, make_image, fake_provider):
     src = make_image(tmp_path / "scan.png")

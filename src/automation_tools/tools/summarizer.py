@@ -15,12 +15,10 @@ CHUNK_CHARS = 28000
 
 def extract_text_from_pdf(filepath: str) -> Optional[str]:
     """Extracts all text from a PDF file using pypdf."""
-    text = ""
     try:
         reader = pypdf.PdfReader(filepath)
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
-        return text
+        pages = [(page.extract_text() or "") for page in reader.pages]
+        return "\n".join(pages)
     except Exception as e:
         print_error(f"Error reading PDF: {e}")
         return None
@@ -79,9 +77,11 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None,
     ext = os.path.splitext(filepath)[1].lower()
     text = ""
     if ext == ".pdf":
-        text = extract_text_from_pdf(filepath)
+        extracted = extract_text_from_pdf(filepath)
+        text = extracted or ""
     elif ext in [".txt", ".md", ".py", ".json"]:
-        text = extract_text_from_txt(filepath)
+        extracted = extract_text_from_txt(filepath)
+        text = extracted or ""
     else:
         print_error(f"Unsupported format: {ext}")
         return

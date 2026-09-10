@@ -66,6 +66,26 @@ def test_run_compress_folder(tmp_path, make_image):
     assert (tmp_path / "out" / "b.jpg").exists()
 
 
+def test_run_recursive_preserves_paths_for_duplicate_basenames(tmp_path, make_image):
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    make_image(tmp_path / "a" / "photo.png", size=(800, 600))
+    make_image(tmp_path / "b" / "photo.png", size=(800, 600))
+
+    output_dir = tmp_path / "out"
+    ip.run_batch_image_processor(
+        str(tmp_path), operation="resize", max_size=100,
+        output_dir=str(output_dir), recursive=True,
+    )
+
+    assert (output_dir / "a" / "photo.png").exists()
+    assert (output_dir / "b" / "photo.png").exists()
+    with Image.open(output_dir / "a" / "photo.png") as first:
+        assert max(first.size) == 100
+    with Image.open(output_dir / "b" / "photo.png") as second:
+        assert max(second.size) == 100
+
+
 def test_run_watermark(tmp_path, make_image):
     make_image(tmp_path / "p.png", size=(400, 300), mode="RGBA")
     ip.run_batch_image_processor(str(tmp_path), operation="watermark",

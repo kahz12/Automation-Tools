@@ -90,7 +90,7 @@ def dhash(path: str, size: int = HASH_SIZE) -> Optional[Tuple[int, int, int]]:
             width, height = img.size
             # tobytes() on mode "L" is one byte per pixel, row-major. getdata()
             # would do as well but is deprecated from Pillow 14.
-            small = img.convert("L").resize((size + 1, size), Image.LANCZOS)
+            small = img.convert("L").resize((size + 1, size), Image.Resampling.LANCZOS)
             pixels = small.tobytes()
     except Exception:
         return None
@@ -175,12 +175,51 @@ def group_similar(images: List[ImageInfo], threshold: int = DEFAULT_THRESHOLD) -
             union(indexes[0], other)
         representatives.append(indexes[0])
 
-    if threshold > 0:
-        for i in range(len(representatives)):
-            for j in range(i + 1, len(representatives)):
-                a, b = representatives[i], representatives[j]
-                if hamming(images[a].hash, images[b].hash) <= threshold:
-                    union(a, b)
+    if threshold > 0 and representatives:
+        # A BK-tree indexes metric values by their Hamming distance. Querying
+        # only branches that can still contain a match avoids comparing every
+        # distinct image with every other one, while still visiting every pair
+        # within the requested threshold (and therefore preserving transitive
+        # union-find clustering).
+        tree: List[Tuple[int, int, Dict[int, int]]] = []
+
+        def insert(value: int, representative: int) -> None:
+            if not tree:
+                tree.append((value, representative, {}))
+                return
+            node = 0
+            while True:
+                node_value, _node_rep, children = tree[node]
+                distance = hamming(value, node_value)
+                child = children.get(distance)
+                if child is None:
+                    children[distance] = len(tree)
+                    tree.append((value, representative, {}))
+                    return
+                node = child
+
+        def query(value: int) -> List[int]:
+            matches: List[int] = []
+            pending = [0]
+            while pending:
+                node = pending.pop()
+                node_value, node_rep, children = tree[node]
+                distance = hamming(value, node_value)
+                if distance <= threshold:
+                    matches.append(node_rep)
+                low, high = distance - threshold, distance + threshold
+                pending.extend(
+                    child for edge_distance, child in children.items()
+                    if low <= edge_distance <= high
+                )
+            return matches
+
+        insert(images[representatives[0]].hash, representatives[0])
+        for representative in representatives[1:]:
+            value = images[representative].hash
+            for match in query(value):
+                union(representative, match)
+            insert(value, representative)
 
     clusters: Dict[int, List[ImageInfo]] = {}
     for index in range(len(images)):

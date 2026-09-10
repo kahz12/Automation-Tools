@@ -6,7 +6,7 @@ import tarfile
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 from automation_tools.core import fs
 from automation_tools.core.logger import (
@@ -39,7 +39,7 @@ ARCHIVE_FORMATS = {
     "tar.bz2": ".tar.bz2",
 }
 # tarfile open modes for the tar-based formats.
-_TAR_MODES = {"tar": "w", "tar.gz": "w:gz", "tar.bz2": "w:bz2"}
+_TAR_MODES: dict[str, Any] = {"tar": "w", "tar.gz": "w:gz", "tar.bz2": "w:bz2"}
 
 DEFAULT_FORMAT = "zip"
 
@@ -195,10 +195,21 @@ def list_archive(archive_path: str) -> List[Tuple[str, int]]:
 
 
 def _is_within(base: str, target: str) -> bool:
-    """True if `target` resolves to a path inside `base` (blocks Zip Slip)."""
-    base = os.path.abspath(base)
-    target = os.path.abspath(target)
-    return target == base or target.startswith(base + os.sep)
+    """True if ``target`` resolves inside ``base`` (including symlink checks).
+
+    ``abspath`` only normalizes ``..`` components; it does not resolve an
+    existing symlink.  During extraction that distinction matters because an
+    archive member such as ``linked/file.txt`` would otherwise be written
+    outside ``dest`` when ``dest/linked`` already points elsewhere.
+    """
+    base = os.path.realpath(os.path.abspath(base))
+    target = os.path.realpath(os.path.abspath(target))
+    try:
+        return os.path.commonpath((base, target)) == base
+    except ValueError:
+        # On platforms with multiple drives (for example Windows), paths on
+        # different drives can not have a common path and are never safe.
+        return False
 
 
 def _write_zip_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo, target: str) -> None:
@@ -252,14 +263,20 @@ def extract_archive(
     if kind == "zip":
         with zipfile.ZipFile(archive_path) as zf:
             for info in zf.infolist():
-                _plan(info.filename, info.is_dir(), lambda t, i=info: _write_zip_member(zf, i, t))
+                def write_zip_member(target: str, member: zipfile.ZipInfo = info) -> None:
+                    _write_zip_member(zf, member, target)
+
+                _plan(info.filename, info.is_dir(), write_zip_member)
     else:
         with tarfile.open(archive_path) as tf:
             for m in tf.getmembers():
                 if not (m.isfile() or m.isdir()):
                     skipped.append((m.name, "special member (link/device)"))
                     continue
-                _plan(m.name, m.isdir(), lambda t, mm=m: _write_tar_member(tf, mm, t))
+                def write_tar_member(target: str, member: tarfile.TarInfo = m) -> None:
+                    _write_tar_member(tf, member, target)
+
+                _plan(m.name, m.isdir(), write_tar_member)
 
     return written, skipped
 

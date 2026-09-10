@@ -1,10 +1,13 @@
 import argparse
 import os
+import tempfile
+from typing import Any
 
 from automation_tools.core.logger import console, print_error, print_step, print_success
 
 try:
     from PIL import Image
+    from PIL.Image import Image as PillowImage
     HAS_PILLOW = True
 except ImportError:
     HAS_PILLOW = False
@@ -19,6 +22,44 @@ FORMAT_MAP = {
     'tiff': 'TIFF',
     'gif': 'GIF',
 }
+
+
+def _next_output_path(input_path: str, output_format: str) -> str:
+    """Return an output path that cannot overwrite an existing filesystem entry.
+
+    Conversion is often run over a directory containing files with the same
+    stem (for example ``photo.jpg`` and ``photo.png``).  Both would naturally
+    map to ``photo.webp``; choose a numbered suffix for the later result.  A
+    same-format conversion gets the existing ``_converted`` name first, then
+    the same numbering policy.  ``lexists`` also protects dangling symlinks.
+    """
+    base_name = os.path.splitext(os.path.basename(input_path))[0]
+    output_directory = os.path.dirname(input_path) if os.path.dirname(input_path) else '.'
+    ext = output_format.lower()
+    source = os.path.normcase(os.path.abspath(input_path))
+    preferred = os.path.join(output_directory, f"{base_name}.{ext}")
+
+    if os.path.normcase(os.path.abspath(preferred)) == source:
+        stem = f"{base_name}_converted"
+        candidate = os.path.join(output_directory, f"{stem}.{ext}")
+        index = 1
+        while os.path.lexists(candidate):
+            candidate = os.path.join(output_directory, f"{stem}_{index}.{ext}")
+            index += 1
+        return candidate
+
+    if not os.path.lexists(preferred):
+        return preferred
+
+    # The preferred name is occupied by another input or a prior result.
+    # Number from the base (base_1, base_2, …), rather than nesting suffixes
+    # (base_1_2), so repeated runs remain predictable.
+    index = 1
+    while True:
+        candidate = os.path.join(output_directory, f"{base_name}_{index}.{ext}")
+        if not os.path.lexists(candidate):
+            return candidate
+        index += 1
 
 
 def convert_single_file(
@@ -38,29 +79,20 @@ def convert_single_file(
             return False
 
         with Image.open(input_path) as img:
+            image: PillowImage = img
             # JPEG does not support transparency; convert to RGB if necessary
-            if pillow_format == 'JPEG' and img.mode in ('RGBA', 'P', 'LA'):
-                img = img.convert('RGB')
+            if pillow_format == 'JPEG' and image.mode in ('RGBA', 'P', 'LA'):
+                image = image.convert('RGB')
 
-            base_name = os.path.splitext(os.path.basename(input_path))[0]
-            output_directory = os.path.dirname(input_path) if os.path.dirname(input_path) else '.'
-            ext = output_format.lower()
-            output_path = os.path.join(output_directory, f"{base_name}.{ext}")
+            output_path = _next_output_path(input_path, output_format)
 
-            # Asking for the format a file already has used to write straight
-            # back over the source: converting a folder of .jpg to jpg
-            # re-encoded every original at `quality` with no copy kept. Give
-            # the result its own name instead.
-            if os.path.abspath(output_path) == os.path.abspath(input_path):
-                output_path = os.path.join(output_directory, f"{base_name}_converted.{ext}")
-
-            save_kwargs = {'format': pillow_format}
+            save_kwargs: dict[str, Any] = {'format': pillow_format}
             if pillow_format in ('JPEG', 'WEBP'):
                 save_kwargs['quality'] = max(1, min(100, quality))
                 if pillow_format == 'JPEG':
                     save_kwargs['optimize'] = True
 
-            img.save(output_path, **save_kwargs)
+            image.save(output_path, **save_kwargs)
 
         console.print(f"Converted: '{input_path}' -> [green]'{output_path}'[/green]")
         return True
@@ -119,20 +151,26 @@ def run_pdf_to_image(input_path: str, output_format: str = "png", dpi: int = 200
 
     try:
         print_step(f"Rendering PDF to {fmt.upper()} at {dpi} dpi…")
-        pages = convert_from_path(input_path, dpi=dpi)
         base = os.path.splitext(input_path)[0]
         out_dir = base + "_pages"
         os.makedirs(out_dir, exist_ok=True)
+        # Ask pdf2image for temporary paths instead of retaining every raster
+        # page in memory.  A 300-page PDF can otherwise consume gigabytes.
+        with tempfile.TemporaryDirectory(prefix="pdf-pages-") as staging:
+            page_paths = convert_from_path(
+                input_path, dpi=dpi, output_folder=staging,
+                paths_only=True, fmt=fmt,
+            )
+            for i, page_path in enumerate(page_paths, 1):
+                out = os.path.join(out_dir, f"page_{i:03d}.{fmt}")
+                with Image.open(page_path) as page:
+                    image: PillowImage = page
+                    if fmt in ("jpg", "jpeg") and image.mode != "RGB":
+                        image = image.convert("RGB")
+                    image.save(out, FORMAT_MAP[fmt])
+                console.print(f"  → {out}")
 
-        for i, page in enumerate(pages, 1):
-            out = os.path.join(out_dir, f"page_{i:03d}.{fmt}")
-            # Convert to RGB if format is JPEG to ensure compatibility
-            if fmt in ("jpg", "jpeg") and page.mode != "RGB":
-                page = page.convert("RGB")
-            page.save(out, FORMAT_MAP[fmt])
-            console.print(f"  → {out}")
-
-        print_success(f"{len(pages)} page(s) exported to: {out_dir}")
+        print_success(f"{len(page_paths)} page(s) exported to: {out_dir}")
     except Exception as e:
         print_error(f"Error converting PDF: {e}")
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 from rich.text import Text
 
@@ -155,7 +155,7 @@ class SearchInput(Input):
     ]
 
     def action_to_grid(self) -> None:
-        self.app.focus_first_card()
+        cast(AutomationApp, self.app).focus_first_card()
 
 
 # ── Tool card: a focusable, clickable tile in the grid ──────────────────────
@@ -171,19 +171,19 @@ class ToolCard(Static):
         self.tool_desc = " ".join(desc.split())  # collapse the 2-line blurb
 
     def on_focus(self) -> None:
-        self.app.show_detail(self)
+        cast(AutomationApp, self.app).show_detail(self)
 
     def on_click(self) -> None:
         self.focus()
-        self.app.launch_card(self)
+        cast(AutomationApp, self.app).launch_card(self)
 
     def on_key(self, event: events.Key) -> None:
         if event.key == "enter":
             event.stop()
-            self.app.launch_card(self)
+            cast(AutomationApp, self.app).launch_card(self)
         elif event.key in ("up", "down", "left", "right"):
             event.stop()
-            self.app.nav(self, event.key)
+            cast(AutomationApp, self.app).nav(self, event.key)
 
 
 # ── Home / launcher app ─────────────────────────────────────────────────────

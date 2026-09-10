@@ -93,10 +93,19 @@ def ocr_image(
 
 
 def _output_path(src: str, out_dir: Optional[str], ext: str) -> str:
-    """Computes the .txt/.md output path for a source image."""
+    """Computes a non-destructive .txt/.md output path for a source image."""
     base = os.path.splitext(os.path.basename(src))[0] + ext
     target_dir = out_dir if out_dir else os.path.dirname(src) or "."
-    return os.path.join(target_dir, base)
+    preferred = os.path.join(target_dir, base)
+    if not os.path.lexists(preferred):
+        return preferred
+    stem, suffix = os.path.splitext(base)
+    index = 1
+    while True:
+        candidate = os.path.join(target_dir, f"{stem}_{index}{suffix}")
+        if not os.path.lexists(candidate):
+            return candidate
+        index += 1
 
 
 def _write_text(text: str, out_path: str) -> bool:

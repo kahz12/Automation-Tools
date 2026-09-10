@@ -58,8 +58,12 @@ def _text_len(node) -> int:
 
 
 def _attr_blob(node: "Tag") -> str:
-    classes = node.get("class") or []
-    return " ".join(classes) + " " + (node.get("id") or "")
+    raw_classes = node.get("class")
+    if isinstance(raw_classes, (list, tuple)):
+        classes = " ".join(str(value) for value in raw_classes)
+    else:
+        classes = str(raw_classes or "")
+    return classes + " " + str(node.get("id") or "")
 
 
 def _score(node: "Tag") -> float:
@@ -72,6 +76,38 @@ def _score(node: "Tag") -> float:
     if _CONTENT_HINT.search(blob):
         score *= 1.5
     return score
+
+
+def _score_candidates(soup: "BeautifulSoup") -> dict[int, float]:
+    """Compute paragraph scores for all candidate blocks in one tree pass.
+
+    Calling ``find_all('p')`` for every nested container repeatedly traverses
+    the same article.  Aggregate paragraph lengths bottom-up instead, so each
+    tag and paragraph is visited once (apart from its normal ancestor walk).
+    """
+    candidates = ("div", "section", "article")
+    totals: dict[int, int] = {}
+    scores: dict[int, float] = {}
+    tags = soup.find_all(True)
+    for node in reversed(tags):
+        total = 0
+        for child in node.children:
+            if not isinstance(child, Tag):
+                continue
+            if child.name == "p":
+                total += len(child.get_text(strip=True))
+            else:
+                total += totals.get(id(child), 0)
+        totals[id(node)] = total
+        if node.name in candidates:
+            score = float(total)
+            blob = _attr_blob(node)
+            if _JUNK_HINT.search(blob):
+                score *= 0.3
+            if _CONTENT_HINT.search(blob):
+                score *= 1.5
+            scores[id(node)] = score
+    return scores
 
 
 def _extract_main(soup: "BeautifulSoup") -> Optional["Tag"]:
@@ -89,8 +125,9 @@ def _extract_main(soup: "BeautifulSoup") -> Optional["Tag"]:
 
     # Otherwise pick the highest-scoring block container.
     best, best_score = None, 0.0
+    scores = _score_candidates(soup)
     for node in soup.find_all(["div", "section", "article"]):
-        score = _score(node)
+        score = scores.get(id(node), 0.0)
         if score > best_score:
             best, best_score = node, score
     return best or soup.body or soup
@@ -131,18 +168,18 @@ def _to_markdown(node, base_url: str, include_images: bool) -> str:
         inner = node.get_text().strip()
         return f"`{inner}`" if inner else ""
     if name == "a":
-        inner = children().strip() or (node.get("title") or "")
-        href = node.get("href", "")
+        inner = children().strip() or str(node.get("title") or "")
+        href = str(node.get("href") or "")
         if href:
             href = urljoin(base_url, href)
         return f"[{inner}]({href})" if inner and href else inner
     if name == "img":
         if not include_images:
             return ""
-        src = node.get("src") or node.get("data-src") or ""
+        src = str(node.get("src") or node.get("data-src") or "")
         if src:
             src = urljoin(base_url, src)
-        return f"![{node.get('alt', '')}]({src})" if src else ""
+        return f"![{str(node.get('alt') or '')}]({src})" if src else ""
     if name in ("h1", "h2", "h3", "h4", "h5", "h6"):
         inner = children().strip()
         return f"\n\n{'#' * int(name[1])} {inner}\n\n" if inner else ""
@@ -188,7 +225,7 @@ def _meta(soup: "BeautifulSoup", *names: str) -> str:
     for name in names:
         tag = soup.find("meta", attrs={"property": name}) or soup.find("meta", attrs={"name": name})
         if tag and tag.get("content"):
-            return tag["content"].strip()
+            return str(tag["content"]).strip()
     return ""
 
 

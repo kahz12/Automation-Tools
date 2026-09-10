@@ -36,3 +36,27 @@ def test_scan_finds_large_file(tmp_path):
     big.write_bytes(b"0" * (2 * 1024 * 1024))  # 2 MB
     report = sc.scan(str(tmp_path), large_mb=1, find_junk=False, find_old=False)
     assert any(item.path.endswith("big.bin") for item in report.large)
+
+
+def test_total_bytes_deduplicates_large_and_old_match(tmp_path):
+    path = tmp_path / "same.bin"
+    path.write_bytes(b"x" * 100)
+    items = [
+        sc.CleanItem(str(path), 100, "large"),
+        sc.CleanItem(str(path), 100, "old"),
+    ]
+    report = sc.ScanReport(large=items[:1], old=items[1:])
+
+    assert report.total_bytes() == 100
+
+
+def test_delete_items_deduplicates_large_and_old_match(tmp_path):
+    path = tmp_path / "same.bin"
+    path.write_bytes(b"x" * 100)
+    items = [
+        sc.CleanItem(str(path), 100, "large"),
+        sc.CleanItem(str(path), 100, "old"),
+    ]
+
+    assert sc.delete_items(items) == 1
+    assert not path.exists()

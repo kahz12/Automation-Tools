@@ -115,6 +115,19 @@ def test_verify_manifest_inside_folder_not_extra(tmp_path):
     assert result.extra == []
 
 
+def test_verify_rejects_manifest_path_escape(tmp_path):
+    data = _make_tree(tmp_path)
+    manifest = tmp_path / "evil.sha256"
+    digest = hashlib.sha256(b"outside").hexdigest()
+    manifest.write_text(f"{digest}  ../outside.txt\n")
+
+    try:
+        it.verify_manifest(data, str(manifest))
+        assert False, "expected ValueError"
+    except ValueError as exc:
+        assert "escapes directory" in str(exc)
+
+
 def test_find_manifest(tmp_path):
     data = _make_tree(tmp_path)
     assert it.find_manifest(data) is None

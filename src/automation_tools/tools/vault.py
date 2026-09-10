@@ -54,6 +54,7 @@ from automation_tools.core.logger import (
 # Files written by the previous format (ATVAULT1: PBKDF2 + Fernet) are still
 # decrypted, so an existing vault keeps working after the upgrade.
 
+AUTH_ERRORS: Tuple[type[BaseException], ...]
 try:
     from cryptography.exceptions import InvalidTag
     from cryptography.fernet import Fernet, InvalidToken
@@ -64,7 +65,7 @@ try:
     from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
     HAS_CRYPTO = True
     # Wrong password and tampered data surface differently in each format.
-    AUTH_ERRORS: Tuple[type, ...] = (InvalidTag, InvalidToken)
+    AUTH_ERRORS = (InvalidTag, InvalidToken)
 except ImportError:
     HAS_CRYPTO = False
     AUTH_ERRORS = ()
@@ -403,6 +404,7 @@ def _decrypt_v2(handle: BinaryIO, header: bytes, password: str,
         ))
         if final:
             return
+        assert following is not None
         frame = following
         counter += 1
 

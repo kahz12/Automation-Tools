@@ -2,6 +2,7 @@ import os
 import zipfile
 
 from automation_tools.tools import archiver as ar
+from conftest import needs_symlinks
 
 
 def _make_tree(root):
@@ -144,6 +145,26 @@ def test_extract_blocks_zip_slip(tmp_path):
     assert any(reason.startswith("unsafe path") for _, reason in skipped)
     # nothing escaped the destination
     assert not (tmp_path / "escaped.txt").exists()
+
+
+@needs_symlinks
+def test_extract_rejects_preexisting_destination_symlink(tmp_path):
+    evil = tmp_path / "symlink.zip"
+    with zipfile.ZipFile(evil, "w") as zf:
+        zf.writestr("linked/escaped.txt", "pwned")
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    dest = tmp_path / "extract"
+    dest.mkdir()
+    os.symlink(outside, dest / "linked")
+
+    written, skipped = ar.extract_archive(str(evil), str(dest), overwrite=True)
+
+    assert written == []
+    assert any(name == "linked/escaped.txt" and reason.startswith("unsafe path")
+               for name, reason in skipped)
+    assert not (outside / "escaped.txt").exists()
 
 
 def test_run_archiver_create_dry_run(tmp_path):

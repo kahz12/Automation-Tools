@@ -68,7 +68,7 @@ def _parse_pages(spec: str, total: int) -> List[int]:
             start, end = int(a), int(b)
             if start > end:
                 start, end = end, start
-            page_numbers = range(start, end + 1)
+            page_numbers: List[int] = list(range(start, end + 1))
         else:
             page_numbers = [int(part)]
         for n in page_numbers:

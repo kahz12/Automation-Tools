@@ -38,7 +38,10 @@ class OpenAICompatProvider:
         return OpenAI(api_key=api_key, base_url=base_url)
 
     def _model(self, capability: Capability, override: Optional[str] = None) -> str:
-        return override or self._model_override or self.spec.model_for(capability)
+        model = override or self._model_override or self.spec.model_for(capability)
+        if model is None:
+            raise ValueError(f"No model configured for {capability.value} on {self.spec.label}")
+        return model
 
     def _log_usage(self, response: Any, model: str) -> None:
         usage = getattr(response, "usage", None)

@@ -28,3 +28,21 @@ def test_find_duplicates_respects_excludes(tmp_path):
     (tmp_path / "x2.log").write_text("dup")
     dups = df.find_duplicates(str(tmp_path), excludes=["*.log"])
     assert dups == {}
+
+
+def test_find_duplicates_does_not_hash_unique_sizes(tmp_path, monkeypatch):
+    (tmp_path / "a.bin").write_bytes(b"same")
+    (tmp_path / "b.bin").write_bytes(b"same")
+    (tmp_path / "unique.bin").write_bytes(b"a different size")
+    hashed = []
+    real_hash = df.hash_file
+
+    def recording_hash(path, chunk_size=8192):
+        hashed.append(path)
+        return real_hash(path, chunk_size)
+
+    monkeypatch.setattr(df, "hash_file", recording_hash)
+    dups = df.find_duplicates(str(tmp_path))
+
+    assert len(dups) == 1
+    assert str(tmp_path / "unique.bin") not in hashed

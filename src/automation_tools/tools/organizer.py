@@ -65,7 +65,9 @@ def _save_history(moves: List[Dict[str, str]], root_path: str) -> Optional[str]:
     if not moves:
         return None
     os.makedirs(HISTORY_DIR, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Include microseconds so two quick runs cannot overwrite each other's
+    # undo history file.
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     history_path = os.path.join(HISTORY_DIR, f"organize_{stamp}.json")
     payload = {
         "timestamp": stamp,
@@ -170,9 +172,13 @@ def undo_from_file(history_path: str) -> None:
         except Exception as e:
             print_error(f"Error reverting {src}: {e}")
 
-    if reverted:
+    # Keep a partially completed history so a later undo can retry the moves
+    # that were blocked by missing files or destination collisions.  Removing
+    # it after the first successful move used to make the remaining moves
+    # impossible to recover through the tool.
+    if reverted == len(moves):
         try:
-            # Delete history file if at least some moves were reverted
+            # Delete history only after every recorded move was reverted.
             os.remove(history_path)
         except OSError:
             pass

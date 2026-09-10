@@ -4,7 +4,7 @@ import sqlite3
 import re
 import argparse
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 from urllib.parse import urlparse
 
 import requests
@@ -68,6 +68,12 @@ def init_db() -> None:
             fecha       TEXT    NOT NULL
         )
     """)
+    # Price lookups are always by URL and newest timestamp.  Without this
+    # index each monitoring round scans the complete history table per product.
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_historial_url_fecha "
+        "ON historial (url, fecha DESC, id DESC)"
+    )
     conn.commit()
     conn.close()
 
@@ -107,7 +113,8 @@ def obtener_ultimo_precio(url: str) -> Optional[float]:
     """Most recent price recorded for `url`, or None."""
     conn = sqlite3.connect(DB_FILE)
     row = conn.execute(
-        "SELECT precio FROM historial WHERE url = ? ORDER BY fecha DESC LIMIT 1",
+        "SELECT precio FROM historial WHERE url = ? "
+        "ORDER BY fecha DESC, id DESC LIMIT 1",
         (url,)
     ).fetchone()
     conn.close()
@@ -239,7 +246,7 @@ def check_mercadolibre(url: str, soup: BeautifulSoup, settings: Dict[str, Any], 
             logger.info(f"ML price via API: {price}")
             return price
 
-    selectors = [
+    selectors: List[Tuple[str, Dict[str, Any], str]] = [
         ("meta", {"itemprop": "price"}, "content"),
         ("span", {"class": "andes-money-amount__fraction"}, "text"),
         ("span", {"class": "price-tag-fraction"}, "text"),

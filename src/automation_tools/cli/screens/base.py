@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 from rich.text import Text
 from textual import on
 from textual.app import ComposeResult
@@ -19,6 +19,7 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Button, Footer, Header, Input, Label, RadioSet, RichLog, Select, Static, Switch,
 )
+from automation_tools.ai.base import Capability
 
 
 # ── Shared CSS ─────────────────────────────────────────────────────────────
@@ -566,13 +567,16 @@ class ProviderFieldMixin:
     it will matter to whoever adds a "remember the last key" feature.
     """
 
-    PROVIDER_CAPABILITY = None  # set by each screen
+    PROVIDER_CAPABILITY: Optional[Capability] = None  # set by each screen
 
     def compose_provider_fields(self) -> ComposeResult:
         from automation_tools.ai.base import UnknownProviderError
         from automation_tools.ai.registry import PROVIDERS, providers_with, resolve_name
 
-        names = providers_with(self.PROVIDER_CAPABILITY)
+        capability = self.PROVIDER_CAPABILITY
+        if capability is None:
+            raise RuntimeError("AI screen did not declare a provider capability")
+        names = providers_with(capability)
         # `resolve_name` raises on a name it does not recognise, and a typo in
         # $AI_PROVIDER would otherwise take the whole TUI down the moment this
         # screen is opened. Anything unusable (unknown, or known but lacking
@@ -593,7 +597,7 @@ class ProviderFieldMixin:
         yield Input(placeholder=PROVIDERS[current].key_hint,
                     password=True, id="api-key")
 
-    def refresh_provider_key_field(self, name: str) -> None:
+    def refresh_provider_key_field(self: Any, name: str) -> None:
         """Re-labels and re-fills the key field for the selected provider."""
         from automation_tools.ai.registry import PROVIDERS
         from automation_tools.core.config import get_env_var
@@ -615,7 +619,7 @@ class ProviderFieldMixin:
         if e.select.id == "provider":
             self.refresh_provider_key_field(str(e.value))
 
-    def _provider_values(self) -> "tuple[str, Optional[str]]":
+    def _provider_values(self: Any) -> "tuple[str, Optional[str]]":
         """Returns (provider_name, api_key_or_None) from the two fields.
 
         The name is always a real provider: `allow_blank=False` on the Select
@@ -624,5 +628,3 @@ class ProviderFieldMixin:
         name = str(self.query_one("#provider", Select).value)
         key = self._ival(self.query_one("#api-key", Input)) or None
         return name, key
-
-

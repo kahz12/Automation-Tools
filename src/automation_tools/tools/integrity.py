@@ -180,8 +180,20 @@ def verify_manifest(
     result = VerifyResult()
 
     for rel, digest in expected.items():
+        # A manifest is input data, not a trusted path list.  Refuse absolute
+        # paths, ``..`` escapes, and symlinked files so verification cannot be
+        # tricked into hashing data outside the requested directory.
+        candidate = os.path.abspath(os.path.join(directory, rel))
+        base_real = os.path.normcase(os.path.realpath(directory))
+        candidate_real = os.path.normcase(os.path.realpath(candidate))
+        try:
+            inside = os.path.commonpath((base_real, candidate_real)) == base_real
+        except ValueError:
+            inside = False
+        if not inside:
+            raise ValueError(f"manifest path escapes directory: {rel!r}")
         fp = os.path.join(directory, rel)
-        if not os.path.isfile(fp):
+        if os.path.islink(fp) or not os.path.isfile(fp):
             result.missing.append(rel)
             continue
         actual = hash_file(fp, algorithm)

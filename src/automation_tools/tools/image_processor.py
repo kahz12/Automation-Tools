@@ -1,6 +1,6 @@
 import argparse
 import os
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from automation_tools.core import fs
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
@@ -56,7 +56,7 @@ def human_size(n: int) -> str:
     return f"{size:.1f} GB"
 
 
-def _load_font(size: int) -> "ImageFont.ImageFont":
+def _load_font(size: int) -> Any:
     """Loads a scalable TrueType font, falling back to Pillow's default."""
     for path in _FONT_CANDIDATES:
         try:
@@ -88,7 +88,7 @@ def _resize_image(
         new_h = max(1, int(img.height * ratio))
     else:
         return img
-    return img.resize((new_w, new_h), Image.LANCZOS)
+    return img.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
 
 def _apply_watermark(
@@ -139,7 +139,7 @@ def _save_image(img: "Image.Image", output_path: str, quality: int) -> None:
     if pil_format == "JPEG" and img.mode in ("RGBA", "P", "LA"):
         img = img.convert("RGB")
 
-    save_kwargs = {"format": pil_format}
+    save_kwargs: dict[str, Any] = {"format": pil_format}
     if pil_format in ("JPEG", "WEBP"):
         save_kwargs["quality"] = max(1, min(100, quality))
         if pil_format == "JPEG":
@@ -165,7 +165,8 @@ def _process_one(
     """
     try:
         original_bytes = os.path.getsize(input_path)
-        with Image.open(input_path) as img:
+        with Image.open(input_path) as source_img:
+            img: Any = source_img
             # Honour EXIF orientation so portrait photos aren't rotated wrong.
             img = ImageOps.exif_transpose(img)
 
@@ -264,7 +265,15 @@ def run_batch_image_processor(
     total_out = 0
     for filepath in files:
         filename = os.path.basename(filepath)
-        output_path = os.path.join(out_dir, filename)
+        # Keep recursive batches in the same relative directory structure as
+        # the input.  A flat destination would make e.g. ``a/photo.png`` and
+        # ``b/photo.png`` collide and silently replace one another.
+        if recursive and os.path.isdir(input_path):
+            relative_path = os.path.relpath(filepath, input_path)
+            output_path = os.path.join(out_dir, relative_path)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        else:
+            output_path = os.path.join(out_dir, filename)
 
         # Never silently overwrite the original when the output lands in the
         # same folder as the source, so add an operation suffix instead.

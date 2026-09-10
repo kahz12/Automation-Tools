@@ -39,3 +39,32 @@ def test_run_download_organizer_and_undo(tmp_path, monkeypatch):
     organizer.undo_last()
     assert (downloads / "pic.jpg").exists()
     assert not (downloads / "Imágenes" / "pic.jpg").exists()
+
+
+def test_partial_undo_keeps_history_for_retry(tmp_path, monkeypatch):
+    history_dir = tmp_path / "history"
+    monkeypatch.setattr(organizer, "HISTORY_DIR", str(history_dir))
+
+    first_src = tmp_path / "first.txt"
+    second_src = tmp_path / "second.txt"
+    first_dst = tmp_path / "moved-first.txt"
+    second_dst = tmp_path / "moved-second.txt"
+    first_dst.write_text("first")
+    second_src.write_text("blocking destination")
+    second_dst.write_text("second")
+    history = organizer._save_history(
+        [
+            {"from": str(first_src), "to": str(first_dst)},
+            {"from": str(second_src), "to": str(second_dst)},
+        ],
+        str(tmp_path),
+    )
+    assert history is not None
+
+    # The first move succeeds; the second is blocked by an existing source.
+    first_dst.rename(first_src)
+    organizer.undo_from_file(history)
+
+    assert first_src.exists()
+    assert second_dst.exists()
+    assert organizer.list_history() == [history]

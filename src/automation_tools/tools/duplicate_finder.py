@@ -38,6 +38,9 @@ def find_duplicates(
         console.print(f"[dim]Excluding: {', '.join(patterns)}[/dim]")
 
     hashes: Dict[str, List[str]] = defaultdict(list)
+    # Files with different sizes cannot have identical bytes. Grouping first
+    # avoids reading every large unique file just to discover it has no match.
+    candidates: Dict[int, List[str]] = defaultdict(list)
     symlinks: List[str] = []
 
     for filepath in fs.walk_files(directory, excludes=patterns, include_symlinks=True):
@@ -45,10 +48,18 @@ def find_duplicates(
             # Reported, never hashed: two names for one file are not copies.
             symlinks.append(filepath)
             continue
+        try:
+            candidates[os.path.getsize(filepath)].append(filepath)
+        except OSError as e:
+            print_error(f"Error reading {filepath}: {e}")
 
-        file_hash = hash_file(filepath)
-        if file_hash:
-            hashes[file_hash].append(filepath)
+    for same_size in candidates.values():
+        if len(same_size) < 2:
+            continue
+        for filepath in same_size:
+            file_hash = hash_file(filepath)
+            if file_hash:
+                hashes[file_hash].append(filepath)
 
     if symlinks:
         console.print(f"[dim]🔗 Omitted {len(symlinks)} symlinks (not hashed).[/dim]")

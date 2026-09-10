@@ -38,7 +38,10 @@ class GeminiProvider:
         return genai.Client(api_key=api_key)
 
     def _model(self, capability: Capability, override: Optional[str] = None) -> str:
-        return override or self._model_override or self.spec.model_for(capability)
+        model = override or self._model_override or self.spec.model_for(capability)
+        if model is None:
+            raise ValueError(f"No model configured for {capability.value} on {self.spec.label}")
+        return model
 
     def _generate(self, contents: Any, model: str) -> Optional[str]:
         def call():
