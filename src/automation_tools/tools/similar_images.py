@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser
 import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -384,7 +384,7 @@ def run_similar_images(
 
 def main() -> None:
     """CLI entry point for the Similar Photo Finder."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Find photos that look the same even when the files differ."
     )
     parser.add_argument("directory", help="Folder to scan.")

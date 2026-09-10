@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import os
 import re
 from datetime import datetime
@@ -273,7 +273,7 @@ def run_web_clipper(
     include_images: bool = True,
     save: bool = False,
     timeout: int = 20,
-) -> None:
+) -> bool:
     """Clip the main article of a web page to clean Markdown or plain text.
 
     The scheme defaults to https:// when `url` omits it. With `save` on and no
@@ -281,7 +281,7 @@ def run_web_clipper(
     """
     if not HAS_DEPS:
         print_error("Missing dependencies. Install with 'pip install requests beautifulsoup4'.")
-        return
+        return False
 
     url = url.strip()
     if not re.match(r"^https?://", url, re.I):
@@ -292,10 +292,10 @@ def run_web_clipper(
         html = _fetch(url, timeout)
     except requests.exceptions.Timeout:
         print_error(f"The request timed out after {timeout}s.")
-        return
+        return False
     except requests.exceptions.RequestException as e:
         print_error(f"Could not fetch the page: {e}")
-        return
+        return False
 
     soup = BeautifulSoup(html, "html.parser")
     title = _get_title(soup)
@@ -312,7 +312,7 @@ def run_web_clipper(
 
     if not body.strip():
         print_error("No readable content was found on the page.")
-        return
+        return False
 
     document = _assemble(title, url, soup, body, fmt)
     print_step(f"“{title}” — ~{len(body.split())} words extracted.")
@@ -339,13 +339,15 @@ def run_web_clipper(
             print_success(f"Saved to '{target}'  ({len(document)} chars)")
         except OSError as e:
             print_error(f"Could not write '{target}': {e}")
+            return False
     else:
         print_success("Done. Enable 'Save to file' to keep a copy.")
+    return True
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Clip a web page's main article to Markdown or text.")
+    parser = ArgumentParser(description="Clip a web page's main article to Markdown or text.")
     parser.add_argument("url", help="Page URL.")
     parser.add_argument("--text", action="store_true", help="Output plain text instead of Markdown.")
     parser.add_argument("--no-images", action="store_true", help="Drop image references (Markdown only).")
@@ -354,14 +356,18 @@ def main() -> None:
     parser.add_argument("--timeout", type=int, default=20, help="Network timeout in seconds (default 20).")
     args = parser.parse_args()
 
-    run_web_clipper(
-        args.url,
-        out_path=args.out,
-        fmt="text" if args.text else "markdown",
-        include_images=not args.no_images,
-        save=args.save,
-        timeout=args.timeout,
-    )
+    try:
+        result = run_web_clipper(
+            args.url,
+            out_path=args.out,
+            fmt="text" if args.text else "markdown",
+            include_images=not args.no_images,
+            save=args.save,
+            timeout=args.timeout,
+        )
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

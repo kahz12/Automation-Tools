@@ -1,6 +1,6 @@
 import os
 import hashlib
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 from typing import Dict, List, Optional
 from collections import defaultdict
 
@@ -94,17 +94,17 @@ def run_duplicate_finder(
     auto_delete: bool = False,
     excludes: Optional[List[str]] = None,
     export_path: Optional[str] = None,
-) -> None:
+) -> bool:
     """Finds duplicates under `directory`, optionally exporting a CSV or deleting them."""
     if not os.path.isdir(directory):
         print_error(f"The directory '{directory}' does not exist.")
-        return
+        return False
 
     duplicates = find_duplicates(directory, excludes=excludes)
 
     if not duplicates:
         print_success("No duplicate files found.")
-        return
+        return True
 
     total_wasted_bytes = 0
     console.print(f"\n[bold yellow]Found {len(duplicates)} groups of duplicates![/bold yellow]\n")
@@ -126,8 +126,9 @@ def run_duplicate_finder(
     mb_saved = total_wasted_bytes / (1024 * 1024)
     console.print(f"Recoverable space: [bold green]{mb_saved:.2f} MB[/bold green]\n")
 
+    export_ok = True
     if export_path:
-        _export_duplicates(duplicates, export_path)
+        export_ok = _export_duplicates(duplicates, export_path)
 
     # default=False matters in the TUI: the modal focuses whichever button the
     # default names, and this one wipes files, so it must not open with Yes
@@ -137,6 +138,7 @@ def run_duplicate_finder(
         default=False,
     )
 
+    delete_ok = True
     if confirm:
         deleted = 0
         for h, paths in duplicates.items():
@@ -148,16 +150,18 @@ def run_duplicate_finder(
                     console.print(f"[dim]Deleted: {p}[/dim]")
                 except Exception as e:
                     print_error(f"Error deleting {p}: {e}")
+                    delete_ok = False
 
         print_success(f"Process completed! {deleted} files were deleted.")
     else:
         print_warning("No files were deleted.")
+    return export_ok and delete_ok
 
 
 def main():
     """Main entry point for the duplicate finder CLI.
     """
-    parser = argparse.ArgumentParser(description="Duplicate File Finder")
+    parser = ArgumentParser(description="Duplicate File Finder")
     parser.add_argument("directory", help="Directory to scan")
     parser.add_argument("--delete", action="store_true", help="Automatically delete duplicates")
     parser.add_argument(
@@ -168,7 +172,11 @@ def main():
     args = parser.parse_args()
 
     excludes = [p.strip() for p in args.exclude.split(",")] if args.exclude else None
-    run_duplicate_finder(args.directory, args.delete, excludes=excludes, export_path=args.export)
+    try:
+        result = run_duplicate_finder(args.directory, args.delete, excludes=excludes, export_path=args.export)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

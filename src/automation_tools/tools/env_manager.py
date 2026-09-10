@@ -1,5 +1,5 @@
 import os
-import argparse
+from automation_tools.core.cli import ArgumentParser
 from typing import List, Optional, Tuple
 
 from automation_tools.core import fs
@@ -166,7 +166,7 @@ def run_env_manager(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Dotenv & Config Manager")
+    parser = ArgumentParser(description="Dotenv & Config Manager")
     parser.add_argument("action", choices=["generate", "scan", "validate"], help="Action to perform")
     parser.add_argument("target_path", help="Path to a .env file or directory (for scanning)")
     parser.add_argument("--example", help="Path to .env.example (required for validate)")

@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import os
 import tempfile
 from typing import Any
@@ -101,11 +101,11 @@ def convert_single_file(
         return False
 
 
-def run_image_converter(input_path: str, output_format: str, quality: int = 85) -> None:
+def run_image_converter(input_path: str, output_format: str, quality: int = 85) -> bool:
     """Converts an image, or every image in a directory, to `output_format`."""
     if not os.path.exists(input_path):
         print_error(f"The path '{input_path}' is not valid.")
-        return
+        return False
 
     if os.path.isdir(input_path):
         print_step(f"Processing directory: {input_path}")
@@ -114,7 +114,7 @@ def run_image_converter(input_path: str, output_format: str, quality: int = 85) 
 
         if not files:
             print_error("No supported images found in the directory.")
-            return
+            return False
 
         success_count = 0
         for file in files:
@@ -123,17 +123,21 @@ def run_image_converter(input_path: str, output_format: str, quality: int = 85) 
                 success_count += 1
 
         print_success(f"Process completed. {success_count}/{len(files)} images converted.")
+        return success_count == len(files)
 
     elif os.path.isfile(input_path):
         if convert_single_file(input_path, output_format, quality=quality):
             print_success("Image converted.")
+            return True
+        return False
+    return False
 
 
-def run_pdf_to_image(input_path: str, output_format: str = "png", dpi: int = 200) -> None:
+def run_pdf_to_image(input_path: str, output_format: str = "png", dpi: int = 200) -> bool:
     """Renders each page of a PDF as an image. Needs `pdf2image` and the poppler binaries."""
     if not os.path.exists(input_path):
         print_error(f"The file '{input_path}' does not exist.")
-        return
+        return False
 
     try:
         from pdf2image import convert_from_path  # type: ignore
@@ -142,12 +146,12 @@ def run_pdf_to_image(input_path: str, output_format: str = "png", dpi: int = 200
             "Missing 'pdf2image'. Install it with 'pip install pdf2image' and 'poppler' binary "
             "(Termux: 'pkg install poppler'; Debian/Ubuntu: 'apt install poppler-utils')."
         )
-        return
+        return False
 
     fmt = output_format.lower()
     if FORMAT_MAP.get(fmt) is None:
         print_error(f"Unsupported format: {fmt}")
-        return
+        return False
 
     try:
         print_step(f"Rendering PDF to {fmt.upper()} at {dpi} dpi…")
@@ -171,15 +175,17 @@ def run_pdf_to_image(input_path: str, output_format: str = "png", dpi: int = 200
                 console.print(f"  → {out}")
 
         print_success(f"{len(page_paths)} page(s) exported to: {out_dir}")
+        return True
     except Exception as e:
         print_error(f"Error converting PDF: {e}")
+        return False
 
 
 def main():
     """Main entry point for the converter tool CLI.
     Parses arguments and dispatches to appropriate conversion function.
     """
-    parser = argparse.ArgumentParser(description="Converts an image or directory to a different format.")
+    parser = ArgumentParser(description="Converts an image or directory to a different format.")
     parser.add_argument("input_path", help="Path to the input file or directory.")
     parser.add_argument("output_format", help="Output format (png, jpg, webp, ...).")
     parser.add_argument("--quality", type=int, default=85, help="JPEG/WebP quality (1-100, default 85).")
@@ -187,10 +193,14 @@ def main():
     parser.add_argument("--dpi", type=int, default=200, help="DPI when rendering PDF (default 200).")
     args = parser.parse_args()
 
-    if args.from_pdf:
-        run_pdf_to_image(args.input_path, args.output_format, dpi=args.dpi)
-    else:
-        run_image_converter(args.input_path, args.output_format, quality=args.quality)
+    try:
+        if args.from_pdf:
+            result = run_pdf_to_image(args.input_path, args.output_format, dpi=args.dpi)
+        else:
+            result = run_image_converter(args.input_path, args.output_format, quality=args.quality)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

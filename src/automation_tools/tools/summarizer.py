@@ -1,5 +1,5 @@
 import os
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 from typing import List, Optional
 import pypdf
 
@@ -61,7 +61,7 @@ def _chunk_text(text: str, max_chars: int = CHUNK_CHARS) -> List[str]:
 def run_summarizer(filepath: str, api_key: Optional[str] = None,
                    out_path: Optional[str] = None,
                    provider: Optional[str] = None,
-                   model: Optional[str] = None) -> None:
+                   model: Optional[str] = None) -> bool:
     """Orchestrates the summarization workflow:
     1. Extracts text from the document.
     2. Chunks text if it is too long.
@@ -71,7 +71,7 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None,
 
     if not os.path.exists(filepath):
         print_error(f"File '{filepath}' does not exist.")
-        return
+        return False
 
     # Determine extraction method based on file extension.
     ext = os.path.splitext(filepath)[1].lower()
@@ -84,18 +84,18 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None,
         text = extracted or ""
     else:
         print_error(f"Unsupported format: {ext}")
-        return
+        return False
 
     if not text:
         print_error("Could not extract text from file.")
-        return
+        return False
 
     # Resolve the AI provider.
     try:
         ai = get_provider(Capability.TEXT, name=provider, api_key=api_key, model=model)
     except AIProviderError as e:
         print_error(str(e))
-        return
+        return False
 
     chunks = _chunk_text(text)
 
@@ -145,7 +145,7 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None,
 
         if not partials:
             print_error("No partial summaries were generated.")
-            return
+            return False
 
         print_step("Consolidating final summary…")
         combined = "\n\n".join(partials)
@@ -169,11 +169,15 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None,
                 console.print(f"\n[dim]Summary saved to: {out_path}[/dim]")
             except Exception as e:
                 print_error(f"Error saving file: {e}")
+                return False
+        return True
+    print_error("The AI returned no summary.")
+    return False
 
 
 def main():
     """CLI entry point for the Document Summarizer."""
-    parser = argparse.ArgumentParser(description="Document Summarizer with AI")
+    parser = ArgumentParser(description="Document Summarizer with AI")
     parser.add_argument("filepath", help="Path to the PDF or TXT file")
     parser.add_argument("--key", help="API key for the chosen provider (optional)")
     parser.add_argument("--out", help="Save summary to this file")
@@ -181,8 +185,12 @@ def main():
     parser.add_argument("--model", help="Override the provider's default model")
     args = parser.parse_args()
 
-    run_summarizer(args.filepath, args.key, args.out,
-                   provider=args.provider, model=args.model)
+    try:
+        result = run_summarizer(args.filepath, args.key, args.out,
+                                provider=args.provider, model=args.model)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

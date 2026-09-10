@@ -7,8 +7,8 @@ from typing import Iterator, Optional, Sequence
 # Twelve tools had grown their own. Seven of them skipped symlinks and five did
 # not; two pruned their own output folder and the rest would happily re-process
 # what they had just written; three carried a byte-identical copy of the
-# exclude list. None of that was a decision, it was drift, and every fix had to
-# be made twelve times.
+# exclude list. None of that was a decision, it was drift, and each behavior
+# had to be maintained in twelve places.
 #
 # The defaults here are the careful ones: symlinks are not followed, unreadable
 # directories are skipped instead of raising, and the order is sorted so two

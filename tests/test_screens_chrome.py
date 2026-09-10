@@ -148,7 +148,7 @@ def test_picking_a_provider_relabels_and_refills_the_key_field(name, monkeypatch
     This drives the widget the way a user does, assigning to `Select.value` and
     letting Textual deliver the message, rather than calling the handler itself.
     A handler that is never dispatched looks identical to a working one when
-    you call it yourself, and that is exactly the bug this caught: `@on` only
+    you call it yourself, and that is exactly the runtime failure this catches: `@on` only
     registers handlers on classes the Textual metaclass processed, so a plain
     mixin's decorated handler is silently dropped.
     """

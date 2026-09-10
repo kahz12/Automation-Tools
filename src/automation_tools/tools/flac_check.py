@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser
 import hashlib
 import os
 import re
@@ -812,7 +812,7 @@ def run_flac_check(
 
 def main() -> None:
     """CLI entry point for the FLAC Authenticity Checker."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Check whether .flac files really hold lossless audio."
     )
     parser.add_argument("path", help="FLAC file or folder to check.")

@@ -2,7 +2,7 @@ import time
 import random
 import sqlite3
 import re
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
 from urllib.parse import urlparse
@@ -414,7 +414,7 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
         logger.error(f"{nombre}: {e}")
 
 
-def run_price_monitor_job() -> None:
+def run_price_monitor_job() -> bool:
     """Executes a single round of price monitoring for all configured products.
     """
     init_db()
@@ -429,15 +429,16 @@ def run_price_monitor_job() -> None:
 
     if not products:
         print_warning("No products configured in productos_a_monitorear.json")
-        return
+        return False
 
     for product in products:
         check_price(product, settings)
 
     print_success(f"Check complete — {len(products)} product(s)\n")
+    return True
 
 
-def run_continuous_monitor(interval_minutes: int = 60) -> None:
+def run_continuous_monitor(interval_minutes: int = 60) -> int:
     """Runs the monitor in a continuous loop at the specified interval.
     """
     console.print(f"[bold green]🟢 Monitor started.[/bold green] Checking every {interval_minutes} minute(s)...")
@@ -448,23 +449,29 @@ def run_continuous_monitor(interval_minutes: int = 60) -> None:
             run_price_monitor_job()
     except KeyboardInterrupt:
         console.print("\n[yellow]Monitor stopped by user.[/yellow]")
+        return 130
+    return 0
 
 
 def main():
     """Main entry point for the price monitor CLI.
     """
-    parser = argparse.ArgumentParser(description="Price Monitor v2.0")
+    parser = ArgumentParser(description="Price Monitor v2.0")
     parser.add_argument("--now",       action="store_true", help="Run an immediate check")
     parser.add_argument("--historial", action="store_true", help="View price history")
     parser.add_argument("--interval",  type=int, default=60, help="Interval in minutes (default: 60)")
     args = parser.parse_args()
 
-    if args.historial:
-        mostrar_historial()
-    elif args.now:
-        run_price_monitor_job()
-    else:
-        run_continuous_monitor(args.interval)
+    try:
+        if args.historial:
+            result = mostrar_historial()
+        elif args.now:
+            result = run_price_monitor_job()
+        else:
+            result = run_continuous_monitor(args.interval)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 if __name__ == "__main__":
     main()

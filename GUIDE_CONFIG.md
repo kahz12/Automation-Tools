@@ -98,18 +98,18 @@ https://articulo.mercadolibre.com.co/MCO-123456789-..._JM
 
 Es gratis y llega instantáneo. Solo necesitas hacerlo una vez.
 
-**Paso 1 — Crear el bot:**
+**Crear el bot:**
 1. Abre Telegram y busca `@BotFather`
 2. Escribe `/newbot`
 3. Ponle un nombre y un username (debe terminar en `bot`)
 4. BotFather te dará el **token** — cópialo en `telegram_token`
 
-**Paso 2 — Obtener tu chat ID:**
+**Obtener tu chat ID:**
 1. Busca `@userinfobot` en Telegram
 2. Escribe `/start`
 3. Te responde con tu **ID** — cópialo en `telegram_chat_id`
 
-**Paso 3 — Activar el bot:**
+**Activar el bot:**
 Busca tu bot por su username en Telegram y escríbele `/start` una vez.
 Sin este paso el bot no puede enviarte mensajes.
 
@@ -178,7 +178,15 @@ atools monitor --interval 30
 
 # Monitoreo continuo cada hora (por defecto)
 atools monitor
+
+# Integración con scripts: devuelve un objeto JSON en stdout
+atools --json monitor --now
 ```
+
+Para la matriz completa de opciones y un ejemplo ejecutable de cada utilidad,
+consulta el [CLI cookbook](docs/CLI.md). Los binarios opcionales (ffmpeg,
+LibreOffice, Poppler y utilidades de portapapeles) están descritos en
+[DEPENDENCIES.md](docs/DEPENDENCIES.md).
 
 ---
 

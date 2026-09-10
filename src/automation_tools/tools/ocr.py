@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser
 import io
 import os
 from typing import List, Optional, Tuple
@@ -194,7 +194,7 @@ def run_ocr(
 
 def main() -> None:
     """CLI entry point for the AI OCR tool."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="AI OCR: extract text from images or scans using a vision-capable AI provider."
     )
     parser.add_argument("path", help="Image file or a folder of images.")

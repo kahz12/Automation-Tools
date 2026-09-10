@@ -3,7 +3,7 @@
 The expensive regression here is not a missed transcode, it is a false
 accusation: a genuinely lossless recording that happens to be quiet, old or
 sparsely mixed rolls off in the treble, and a naive "how far did the level
-drop" test convicts it. That bug was real during development — a lossless
+drop" test convicts it. That failure mode occurred during development — a lossless
 file lowpassed at 11 kHz was reported as an MP3 — so the shape tests below
 pin the distinction between a codec wall and an ordinary roll-off.
 

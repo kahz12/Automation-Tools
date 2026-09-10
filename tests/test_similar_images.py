@@ -6,6 +6,7 @@ picture recognisable: rescaling, re-compression and a colour drop.
 """
 import pytest
 from PIL import Image
+from pathlib import Path
 
 from automation_tools.tools import similar_images as si
 
@@ -127,7 +128,7 @@ def test_scan_walks_subfolders_and_skips_non_images(tmp_path, photo, make_image)
     (tmp_path / "notes.txt").write_text("hi", encoding="utf-8")
 
     images, unreadable = si.scan_images(str(tmp_path))
-    assert {p.path.split("/")[-1] for p in images} == {"original.png", "copy.png"}
+    assert {Path(p.path).name for p in images} == {"original.png", "copy.png"}
     assert unreadable == 0
 
 
@@ -137,14 +138,14 @@ def test_scan_respects_no_recursive(tmp_path, photo, make_image):
     img.resize((120, 80)).save(str(tmp_path / "sub" / "copy.png"))
 
     images, _ = si.scan_images(str(tmp_path), recursive=False)
-    assert [p.path.split("/")[-1] for p in images] == ["original.png"]
+    assert [Path(p.path).name for p in images] == ["original.png"]
 
 
 def test_scan_applies_exclude_patterns(tmp_path, photo, make_image):
     _path, img = photo
     img.resize((120, 80)).save(str(tmp_path / "thumb_copy.png"))
     images, _ = si.scan_images(str(tmp_path), excludes=["thumb_*"])
-    assert [p.path.split("/")[-1] for p in images] == ["original.png"]
+    assert [Path(p.path).name for p in images] == ["original.png"]
 
 
 def test_scan_counts_unreadable_files(tmp_path, photo):

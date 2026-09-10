@@ -1,5 +1,5 @@
 import os
-import argparse
+from automation_tools.core.cli import ArgumentParser
 import re
 from typing import Optional
 
@@ -137,7 +137,7 @@ def run_log_analyzer(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Log Analyzer - Scan logs for errors or patterns")
+    parser = ArgumentParser(description="Log Analyzer - Scan logs for errors or patterns")
     parser.add_argument("path", help="Path to a .log file or directory containing .log files")
     parser.add_argument("--keywords", required=True, help="Comma-separated keywords, or a regex pattern")
     parser.add_argument("--regex", action="store_true", help="Treat keywords as a single regex pattern")

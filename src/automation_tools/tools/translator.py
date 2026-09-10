@@ -1,5 +1,5 @@
 import os
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import hashlib
 from typing import List, Optional
 
@@ -71,7 +71,7 @@ def _chunk_cache_key(chunk: str, target_lang: str) -> str:
 def run_translator(filepath: str, target_lang: str, api_key: Optional[str] = None,
                    out_path: Optional[str] = None,
                    provider: Optional[str] = None,
-                   model: Optional[str] = None) -> None:
+                   model: Optional[str] = None) -> bool:
     """Core translation workflow:
     1. Validates file support and reads content.
     2. Chunks text if necessary.
@@ -80,7 +80,7 @@ def run_translator(filepath: str, target_lang: str, api_key: Optional[str] = Non
     """
     if not os.path.exists(filepath):
         print_error(f"File '{filepath}' does not exist.")
-        return
+        return False
 
     # List of common text-based formats that the tool can process safely.
     supported = ('.txt', '.md', '.srt', '.py', '.json', '.csv', '.xml', '.html', '.css', '.js')
@@ -88,18 +88,18 @@ def run_translator(filepath: str, target_lang: str, api_key: Optional[str] = Non
 
     if ext not in supported:
         print_error(f"Unsupported format: {ext}. \nSupported: {', '.join(supported)}")
-        return
+        return False
 
     text = read_file(filepath)
     if not text:
         print_error("Could not read file content.")
-        return
+        return False
 
     try:
         ai = get_provider(Capability.TEXT, name=provider, api_key=api_key, model=model)
     except AIProviderError as e:
         print_error(str(e))
-        return
+        return False
 
     # System instruction tailored for precise, formatting-aware translation.
     instruction = f"""You are a professional translator. Translate the following text to the language: {target_lang}.
@@ -164,11 +164,13 @@ Strict Rules:
             console.print(f"\n[dim]Translation saved to: {out_path}[/dim]")
         except Exception as e:
             print_error(f"Error saving file: {e}")
+            return False
+    return bool(translation)
 
 
 def main():
     """CLI entry point for the File Translator."""
-    parser = argparse.ArgumentParser(description="File Translator with AI")
+    parser = ArgumentParser(description="File Translator with AI")
     parser.add_argument("filepath", help="Path to the file to translate")
     parser.add_argument("--lang", required=True, help="Target language")
     parser.add_argument("--key", help="API key for the chosen provider (optional)")
@@ -177,8 +179,12 @@ def main():
     parser.add_argument("--model", help="Override the provider's default model")
     args = parser.parse_args()
 
-    run_translator(args.filepath, args.lang, args.key, args.out,
-                   provider=args.provider, model=args.model)
+    try:
+        result = run_translator(args.filepath, args.lang, args.key, args.out,
+                                provider=args.provider, model=args.model)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

@@ -152,7 +152,7 @@ def test_transcribe_gives_up_when_the_api_keeps_failing(provider, tmp_path):
     """Persistent polling errors must terminate too; this used to hang
     forever before `_wait_for_active` learned to catch and keep going
     (gemini.py:137-138: except Exception -> print_warning -> keep polling,
-    until the deadline). Regression guard for a shipped hang bug.
+    until the deadline). Regression guard for the timeout boundary.
     """
     def always_raises(name):
         raise RuntimeError("network down")

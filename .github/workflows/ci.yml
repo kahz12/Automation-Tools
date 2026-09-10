@@ -78,9 +78,5 @@ jobs:
         # the number up one commit at a time.
         run: python -m pytest -q --cov=automation_tools --cov-report=term-missing --cov-fail-under=60
 
-      - name: Types (core must stay clean)
-        run: python -m mypy src/automation_tools/core/
-
-      - name: Types (rest of the package, informational)
-        continue-on-error: true
-        run: python -m mypy src/automation_tools/
+      - name: Types (all package modules)
+        run: python -m mypy src/

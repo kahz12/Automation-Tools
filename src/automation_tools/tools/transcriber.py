@@ -1,5 +1,5 @@
 import os
-import argparse
+from automation_tools.core.cli import ArgumentParser
 from typing import Optional
 
 from automation_tools.ai import AIProviderError, Capability, get_provider
@@ -64,7 +64,7 @@ def run_transcriber(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Audio/Video Transcriber")
+    parser = ArgumentParser(description="Audio/Video Transcriber")
     parser.add_argument("filepath", help="Path to the audio or video file")
     parser.add_argument("--mode", choices=["srt", "txt"], default="srt",
                         help="Output format (srt or txt)")

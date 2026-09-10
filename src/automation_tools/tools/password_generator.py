@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import hashlib
 import shutil
 import string
@@ -425,7 +425,7 @@ def run_generate_password(
     use_special: bool = True,
     exclude_ambiguous: bool = False,
     count: int = 5,
-) -> None:
+) -> bool:
     """Generates and displays multiple secure passwords.
     """
     passwords = []
@@ -444,6 +444,8 @@ def run_generate_password(
     if passwords:
         display_passwords(passwords, title=f"Passwords ({length} chars)")
         print_success(f"{len(passwords)} passwords generated.")
+        return True
+    return False
 
 
 def run_generate_passphrase(
@@ -453,7 +455,7 @@ def run_generate_passphrase(
     add_number: bool = True,
     add_special: bool = False,
     count: int = 5,
-) -> None:
+) -> bool:
     """Generates and displays multiple memorable passphrases.
     """
     phrases = []
@@ -472,14 +474,16 @@ def run_generate_passphrase(
         bits = num_words * math.log2(len(WORD_LIST))
         console.print(f"  [dim]Words in dictionary: {len(WORD_LIST)} | Base entropy: ~{bits:.0f} bits[/dim]\n")
         print_success(f"{len(phrases)} passphrases generated.")
+        return True
+    return False
 
 
-def run_evaluate_strength(password: str, check_breach: bool = True) -> None:
+def run_evaluate_strength(password: str, check_breach: bool = True) -> bool:
     """Evaluates and displays the strength of a password, optionally checking HIBP.
     """
     if not password:
         print_error("No password provided.")
-        return
+        return False
 
     result = evaluate_strength(password)
     display_strength(result)
@@ -495,17 +499,20 @@ def run_evaluate_strength(password: str, check_breach: bool = True) -> None:
             print_error(
                 f"⚠ Appeared in {count:,} data breaches. Do not use this password!"
             )
+    return True
 
 
-def run_copy_password(password: str) -> None:
+def run_copy_password(password: str) -> bool:
     """Copies a password to the system clipboard.
     """
     if copy_to_clipboard(password):
         print_success("Password copied to clipboard.")
+        return True
     else:
         print_warning(
             "Could not copy to clipboard (ensure 'termux-api', 'xclip', 'wl-copy', 'pbcopy' or 'clip' is installed)."
         )
+    return False
 
 
 def main() -> None:
@@ -514,7 +521,7 @@ def main() -> None:
     This was the one tool the menu could reach and the command line could not,
     which also made it the one entry in the README's table nobody could run.
     """
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Generate passwords or passphrases and score their strength."
     )
     sub = parser.add_subparsers(dest="action", required=True)
@@ -546,28 +553,32 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.action == "generate":
-        run_generate_password(
-            length=args.length,
-            use_uppercase=not args.no_upper,
-            use_digits=not args.no_digits,
-            use_special=not args.no_special,
-            exclude_ambiguous=args.no_ambiguous,
-            count=args.count,
-        )
-    elif args.action == "passphrase":
-        run_generate_passphrase(
-            num_words=args.words,
-            separator=args.separator,
-            capitalize=not args.no_capitalize,
-            add_number=not args.no_number,
-            add_special=args.special,
-            count=args.count,
-        )
-    elif args.action == "check":
-        run_evaluate_strength(args.password, check_breach=not args.offline)
-    else:
-        run_copy_password(args.password)
+    try:
+        if args.action == "generate":
+            result = run_generate_password(
+                length=args.length,
+                use_uppercase=not args.no_upper,
+                use_digits=not args.no_digits,
+                use_special=not args.no_special,
+                exclude_ambiguous=args.no_ambiguous,
+                count=args.count,
+            )
+        elif args.action == "passphrase":
+            result = run_generate_passphrase(
+                num_words=args.words,
+                separator=args.separator,
+                capitalize=not args.no_capitalize,
+                add_number=not args.no_number,
+                add_special=args.special,
+                count=args.count,
+            )
+        elif args.action == "check":
+            result = run_evaluate_strength(args.password, check_breach=not args.offline)
+        else:
+            result = run_copy_password(args.password)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import os
 import re
 import datetime
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 from typing import Optional, List, Tuple
 
 from automation_tools.core import prompt
@@ -210,7 +210,7 @@ def run_massive_rename(
     continue_sequence: Optional[bool] = None,
     auto_version: bool = True,
     preview: bool = False,
-) -> None:
+) -> bool:
     """Renames a batch of files.
 
     continue_sequence behavior:
@@ -221,7 +221,7 @@ def run_massive_rename(
 
     if not os.path.isdir(directory):
         print_error(f"The directory '{directory}' does not exist.")
-        return
+        return False
 
     # Sort files to ensure predictable sequence numbering
     files = sorted([f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))])
@@ -231,7 +231,7 @@ def run_massive_rename(
 
     if not files:
         print_warning("No files found to process.")
-        return
+        return True
 
     count_start = 1
     if mode == 'patron':
@@ -248,7 +248,7 @@ def run_massive_rename(
                     "Pattern is required in 'patron' mode. "
                     "Tip: use a placeholder like 'photo_{:03d}' (no extension)."
                 )
-                return
+                return False
 
         matching, pending, max_index = _split_pattern_files(files, pattern)
         if matching:
@@ -267,7 +267,7 @@ def run_massive_rename(
 
     if not files:
         print_warning("No new files to rename — every file already matches the pattern.")
-        return
+        return True
 
     print_step(f"Processing {len(files)} files in '{directory}'...")
     print_step(f"Mode: {mode}")
@@ -317,7 +317,7 @@ def run_massive_rename(
 
     if not plan:
         print_warning("No changes to apply.")
-        return
+        return True
 
     # Display the plan
     for src_name, dst_name in plan:
@@ -326,7 +326,7 @@ def run_massive_rename(
     if preview and apply_changes:
         if not prompt.confirm(f"Apply these {len(plan)} renames?", default=True):
             print_warning("Cancelled by user. No changes applied.")
-            return
+            return True
 
     # Apply renames
     if apply_changes:
@@ -338,14 +338,16 @@ def run_massive_rename(
             except Exception as e:
                 print_error(f"Error renaming '{src_name}': {e}")
         print_success(f"Renaming complete. {applied}/{len(plan)} files processed.")
+        return applied == len(plan)
     else:
         console.print("\n[dim]To apply these changes, run with apply_changes=True[/dim]")
+        return True
 
 
 def main():
     """Main entry point for the smart mass renamer CLI.
     """
-    parser = argparse.ArgumentParser(description="Smart Mass File Renamer")
+    parser = ArgumentParser(description="Smart Mass File Renamer")
     
     parser.add_argument("directory", help="Target directory")
     parser.add_argument("--mode", choices=['patron', 'fecha', 'reemplazo'], required=True, help="Rename mode")
@@ -366,18 +368,22 @@ def main():
 
     args = parser.parse_args()
 
-    run_massive_rename(
-        directory=args.directory,
-        mode=args.mode,
-        apply_changes=args.aplicar,
-        ext_filter=args.ext,
-        pattern=args.pattern,
-        date_format=args.date_format,
-        keep_name=args.keep_name,
-        old_text=args.old_text,
-        new_text=args.new_text,
-        continue_sequence=args.continue_sequence,
-    )
+    try:
+        result = run_massive_rename(
+            directory=args.directory,
+            mode=args.mode,
+            apply_changes=args.aplicar,
+            ext_filter=args.ext,
+            pattern=args.pattern,
+            date_format=args.date_format,
+            keep_name=args.keep_name,
+            old_text=args.old_text,
+            new_text=args.new_text,
+            continue_sequence=args.continue_sequence,
+        )
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 if __name__ == "__main__":
     main()

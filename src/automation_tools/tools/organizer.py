@@ -4,6 +4,7 @@ import shutil
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from automation_tools.core.cli import exit_code
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
 from automation_tools.core.config import get_downloads_folder, state_path
 
@@ -79,7 +80,7 @@ def _save_history(moves: List[Dict[str, str]], root_path: str) -> Optional[str]:
     return history_path
 
 
-def run_download_organizer(collision_policy: str = "rename") -> None:
+def run_download_organizer(collision_policy: str = "rename") -> bool:
     """Sorts the downloads folder into category subfolders."""
     downloads_path = get_downloads_folder()
 
@@ -87,7 +88,7 @@ def run_download_organizer(collision_policy: str = "rename") -> None:
 
     if not os.path.isdir(downloads_path):
         print_error(f"The folder '{downloads_path}' does not exist or is not a directory.")
-        return
+        return False
 
     create_directories_if_not_exist(downloads_path)
 
@@ -125,6 +126,7 @@ def run_download_organizer(collision_policy: str = "rename") -> None:
     if history_path:
         console.print(f"[dim]📝 History: {history_path}[/dim]")
         console.print("[dim]   To revert: use organizer.undo_last() or from the menu.[/dim]")
+    return True
 
 
 def list_history() -> List[str]:
@@ -198,7 +200,11 @@ def undo_last() -> None:
 def main():
     """Main entry point for the organizer tool.
     """
-    run_download_organizer()
+    try:
+        result = run_download_organizer()
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

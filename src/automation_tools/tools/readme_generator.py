@@ -1,5 +1,5 @@
 import os
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import re
 from collections import Counter
 from typing import Dict, Optional, List, Tuple
@@ -176,17 +176,17 @@ def _inject_toc(markdown: str) -> str:
 def run_readme_generator(directory: str, api_key: Optional[str] = None,
                          out_path: str = "README_generado.md",
                          provider: Optional[str] = None,
-                         model: Optional[str] = None) -> None:
+                         model: Optional[str] = None) -> bool:
     """Analyses a project and has the AI write a README to `out_path`."""
     if not os.path.isdir(directory):
         print_error(f"The directory '{directory}' does not exist.")
-        return
+        return False
 
     try:
         ai = get_provider(Capability.TEXT, name=provider, api_key=api_key, model=model)
     except AIProviderError as e:
         print_error(str(e))
-        return
+        return False
 
     print_step(f"Analyzing project at: {directory}...")
     language = detect_primary_language(directory) or "unidentified"
@@ -252,12 +252,16 @@ Final instructions:
             print_success(f"README generated and saved at: {out_path}")
         except Exception as e:
             print_error(f"Error saving file: {e}")
+            return False
+        return True
+    print_error("The AI returned no README content.")
+    return False
 
 
 def main():
     """Main entry point for the README generator CLI.
     """
-    parser = argparse.ArgumentParser(description="AI-powered Automatic README Generator")
+    parser = ArgumentParser(description="AI-powered Automatic README Generator")
     parser.add_argument("directory", help="Project directory to analyze")
     parser.add_argument("--key", help="API key for the chosen provider (optional)")
     parser.add_argument("--out", default="README_generado.md", help="Output file path")
@@ -265,8 +269,12 @@ def main():
     parser.add_argument("--model", help="Override the provider's default model")
     args = parser.parse_args()
 
-    run_readme_generator(args.directory, args.key, args.out,
-                         provider=args.provider, model=args.model)
+    try:
+        result = run_readme_generator(args.directory, args.key, args.out,
+                                      provider=args.provider, model=args.model)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

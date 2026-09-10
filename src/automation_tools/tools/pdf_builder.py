@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser
 import csv
 import os
 import re
@@ -760,7 +760,7 @@ def run_pdf_builder(
 
 def main() -> None:
     """CLI entry point for the PDF builder."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Build PDFs: convert a document, bundle images, or merge many files."
     )
     sub = parser.add_subparsers(dest="action", required=True)

@@ -1,4 +1,6 @@
 import argparse
+
+from automation_tools.core.cli import ArgumentParser
 import base64
 import getpass
 import os
@@ -642,7 +644,7 @@ def run_vault(
 
 def main() -> None:
     """CLI entry point for the Encryption Vault."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Encrypt or decrypt files/folders with a password (scrypt + AES-256-GCM)."
     )
     parser.add_argument("path", help="File or folder to process.")

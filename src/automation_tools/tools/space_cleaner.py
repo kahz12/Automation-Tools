@@ -1,5 +1,5 @@
 import os
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import csv
 import json
 import shutil
@@ -355,7 +355,7 @@ def run_space_cleaner(
     apply: bool = False,
     delete_large_and_old: bool = False,
     export_path: Optional[str] = None,
-) -> None:
+) -> bool:
     """Core workflow for the Space Cleaner:
     1. Scans the directory based on user criteria.
     2. Displays or exports the report.
@@ -363,7 +363,7 @@ def run_space_cleaner(
     """
     if not os.path.isdir(directory):
         print_error(f"Directory '{directory}' does not exist.")
-        return
+        return False
 
     # Track free disk space before and after cleaning.
     free_before = _disk_free(directory)
@@ -381,7 +381,7 @@ def run_space_cleaner(
         print_success("Nothing to clean. Everything looks good!")
         if export_path:
             export_report(report, export_path)
-        return
+        return True
 
     print_report(report)
 
@@ -390,7 +390,7 @@ def run_space_cleaner(
 
     if not apply:
         print_warning("Simulation mode (dry-run). Nothing was deleted.")
-        return
+        return True
 
     # By default, only safe junk/cache is considered for auto-deletion.
     # User must explicitly choose to include large/old files.
@@ -401,7 +401,7 @@ def run_space_cleaner(
 
     if not to_delete:
         print_warning("No items selected for deletion.")
-        return
+        return True
 
     confirm = prompt.confirm(
         f"Delete {len(to_delete)} items ({human_size(sum(i.size for i in to_delete))})?",
@@ -409,7 +409,7 @@ def run_space_cleaner(
     )
     if not confirm:
         print_warning("Cancelled. Nothing was deleted.")
-        return
+        return True
 
     delete_items(to_delete)
 
@@ -422,11 +422,12 @@ def run_space_cleaner(
             f"[bold]after:[/bold] {human_size(free_after)}  "
             f"([green]+{human_size(real_freed)} freed[/green])"
         )
+    return True
 
 
 def main():
     """CLI entry point for standalone use of the Space Cleaner."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Space Cleaner: Detects cache, junk, large, and old files."
     )
     parser.add_argument("directory", help="Directory to scan")
@@ -467,17 +468,21 @@ def main():
     )
     args = parser.parse_args()
 
-    run_space_cleaner(
-        directory=args.directory,
-        large_mb=args.large,
-        old_days=args.old,
-        find_junk=not args.no_junk,
-        find_large=not args.no_large,
-        find_old=not args.no_old,
-        apply=args.apply,
-        delete_large_and_old=args.all,
-        export_path=args.export,
-    )
+    try:
+        result = run_space_cleaner(
+            directory=args.directory,
+            large_mb=args.large,
+            old_days=args.old,
+            find_junk=not args.no_junk,
+            find_large=not args.no_large,
+            find_old=not args.no_old,
+            apply=args.apply,
+            delete_large_and_old=args.all,
+            export_path=args.export,
+        )
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

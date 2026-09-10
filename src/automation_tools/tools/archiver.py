@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser
 import fnmatch
 import os
 import shutil
@@ -432,7 +432,7 @@ def run_archiver(
 
 def main() -> None:
     """CLI entry point for the Backup / Archiver."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Backup / Archiver: bundle files into a zip/tar archive, list it, or extract it."
     )
     sub = parser.add_subparsers(dest="action", required=True)

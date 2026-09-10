@@ -20,8 +20,10 @@ Files · Conversion · AI (8 providers) · Web & Multimedia · Encryption · Uti
 - [Overview](#overview)
 - [Installation](#installation)
 - [Usage](#usage)
+- [CLI cookbook](docs/CLI.md)
 - [Tools](#tools)
 - [Configuration](#configuration)
+- [Dependencies](docs/DEPENDENCIES.md)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
 - [License](#license)
@@ -44,7 +46,8 @@ Files · Conversion · AI (8 providers) · Web & Multimedia · Encryption · Uti
 
 ### Quick install
 
-Provisions a virtual environment and registers a global `automation-tools` launcher:
+Provisions a virtual environment and registers global `automation-tools` and
+`atools` launchers:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kahz12/Automation-Tools/main/install.sh | bash
@@ -69,9 +72,14 @@ python3 -m venv venv && source venv/bin/activate
 pip install -e .            # add ".[dev]" to get pytest and pyflakes too
 ```
 
-Installing the package registers the `automation-tools` command inside the virtual environment.
+Installing the package registers both `automation-tools` (interactive menu)
+and `atools` (scriptable dispatcher) inside the virtual environment.
 
-> **Requires Python 3.10+.** Optional extras: [LibreOffice](https://www.libreoffice.org/) (used by the PDF Builder for full-layout office → PDF when installed; it falls back to a pure-Python text engine otherwise), [ffmpeg](https://ffmpeg.org/) (FLAC Authenticity needs it to decode and measure audio; without it that tool only reads headers) and an **API key for one of the eight AI providers** (AI tools) — see [Configuration](#configuration).
+> **Requires Python 3.10+.** Optional system programs and platform-specific
+> install commands are documented in [Dependencies](docs/DEPENDENCIES.md):
+> LibreOffice, ffmpeg, Poppler and clipboard helpers. AI tools additionally
+> need an **API key for one of the eight providers** — see
+> [Configuration](#configuration).
 
 ---
 
@@ -126,6 +134,9 @@ atools flac_check ~/Music --no-md5 --export flac_report.csv
 # Render a spectrogram per file to eyeball the borderline verdicts
 atools flac_check ~/Music --spectrograms ./spectra
 ```
+
+For one runnable example per utility, JSON automation, aliases and exit-code
+semantics, see the [CLI cookbook](docs/CLI.md).
 
 ---
 
@@ -245,7 +256,7 @@ pip install -e ".[dev]"
 pytest
 pyflakes src/ tests/
 pytest --cov=automation_tools      # coverage, as CI measures it
-mypy src/automation_tools/core/    # the shared foundation stays type-clean
+mypy src/                           # all package modules stay type-clean
 ```
 
 Tests live in `tests/`, exercise temporary directories only (your real files are never touched), and mock all network/API paths (HaveIBeenPwned, the AI providers, yt-dlp) — so the suite runs fully offline. CI runs them on Python 3.10, 3.12 and 3.13 on Linux plus one run each on Windows and macOS, since path handling and file permissions are where "OS independent" usually turns out to be wishful.
@@ -262,6 +273,7 @@ Automation-Tools/
 ├── pytest.ini                          # Test configuration
 ├── productos_a_monitorear.example.json # Price-monitor config template
 ├── README.md  ·  GUIDE_CONFIG.md       # Documentation
+├── docs/CLI.md ·  docs/DEPENDENCIES.md # CLI cookbook and system requirements
 ├── .github/workflows/ci.yml            # pyflakes + pytest on Linux/Windows/macOS, coverage, mypy
 ├── src/automation_tools/
 │   ├── core/                           # logger · config · fs (one directory walk) · report · prompt

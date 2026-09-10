@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser
 import hashlib
 import os
 from dataclasses import dataclass, field
@@ -342,7 +342,7 @@ def run_integrity(
 
 def main() -> None:
     """CLI entry point for the Integrity Checker."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Integrity Checker: create a checksum manifest of a folder and verify it later."
     )
     sub = parser.add_subparsers(dest="action", required=True)

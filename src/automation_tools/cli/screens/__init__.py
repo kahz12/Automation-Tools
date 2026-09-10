@@ -4,7 +4,8 @@ Kept as the single import site the rest of the app already used, so
 splitting the module changed nothing outside this package.
 """
 from automation_tools.cli.screens.base import (
-    ConfirmModal, ExecutionScreen, ProviderFieldMixin, ToolScreen, tui_confirm,
+    ConfirmModal, ExecutionScreen, ProviderFieldMixin, ToolScreen, TuiCancelled,
+    tui_cancelled, tui_check_cancelled, tui_confirm, tui_progress,
 )
 from automation_tools.cli.screens.files import ArchiverScreen, CleanerScreen, DuplicatesScreen, LogAnalyzerScreen, OrganizerScreen, RenamerScreen, SimilarImagesScreen
 from automation_tools.cli.screens.conversion import ConverterScreen, ImageProcessorScreen, PdfConverterScreen, PdfToolkitScreen
@@ -50,6 +51,10 @@ __all__ = [
     "ExecutionScreen",
     "ConfirmModal",
     "tui_confirm",
+    "tui_progress",
+    "tui_cancelled",
+    "tui_check_cancelled",
+    "TuiCancelled",
     "ArchiverScreen",
     "CleanerScreen",
     "ConverterScreen",

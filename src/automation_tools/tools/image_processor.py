@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import os
 from typing import Any, Optional, Tuple
 
@@ -219,7 +219,7 @@ def run_batch_image_processor(
     wm_position: str = "bottom-right",
     wm_opacity: int = 50,
     recursive: bool = False,
-) -> None:
+) -> bool:
     """Core workflow for the batch image processor.
 
     `operation` is one of "resize", "compress" or "watermark", and each one reads
@@ -229,23 +229,23 @@ def run_batch_image_processor(
     """
     if not HAS_PILLOW:
         print_error("Pillow is not installed. Install it with 'pip install Pillow'.")
-        return
+        return False
 
     if operation not in ("resize", "compress", "watermark"):
         print_error(f"Unknown operation: '{operation}'. Use resize, compress or watermark.")
-        return
+        return False
 
     if not os.path.exists(input_path):
         print_error(f"The path '{input_path}' is not valid.")
-        return
+        return False
 
     if operation == "watermark" and not watermark_text:
         print_error("Watermark mode needs a text (use --text).")
-        return
+        return False
 
     if operation == "resize" and not scale_percent and not max_size:
         print_error("Resize mode needs --max-size or --scale.")
-        return
+        return False
 
     # Resolve the destination first so the scan can skip it.
     out_dir = _resolve_output_dir(input_path, output_dir)
@@ -253,7 +253,7 @@ def run_batch_image_processor(
     files = _collect_files(input_path, recursive, exclude_dir=out_dir)
     if not files:
         print_error("No supported images found (.png, .jpg, .webp, .bmp, .tiff, .gif).")
-        return
+        return False
 
     os.makedirs(out_dir, exist_ok=True)
 
@@ -306,7 +306,7 @@ def run_batch_image_processor(
 
     if success == 0:
         print_warning("No images were processed.")
-        return
+        return False
 
     print_success(f"Done. {success}/{len(files)} image(s) processed → {out_dir}")
     if operation == "compress" and total_in:
@@ -316,11 +316,12 @@ def run_batch_image_processor(
             f"[bold]📊 Total:[/bold] {human_size(total_in)} → {human_size(total_out)} "
             f"([green]saved {human_size(max(0, saved))} · {pct:.0f}%[/green])"
         )
+    return True
 
 
 def main() -> None:
     """CLI entry point for the Batch Image Processor."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Batch image processor: resize, compress or watermark images."
     )
     parser.add_argument("input_path", help="Image file or folder of images.")
@@ -346,18 +347,22 @@ def main() -> None:
                         help="Watermark opacity 0-100 (default: 50).")
     args = parser.parse_args()
 
-    run_batch_image_processor(
-        input_path=args.input_path,
-        operation=args.op,
-        output_dir=args.out_dir,
-        max_size=args.max_size,
-        scale_percent=args.scale,
-        quality=args.quality,
-        watermark_text=args.text,
-        wm_position=args.position,
-        wm_opacity=args.opacity,
-        recursive=args.recursive,
-    )
+    try:
+        result = run_batch_image_processor(
+            input_path=args.input_path,
+            operation=args.op,
+            output_dir=args.out_dir,
+            max_size=args.max_size,
+            scale_percent=args.scale,
+            quality=args.quality,
+            watermark_text=args.text,
+            wm_position=args.position,
+            wm_opacity=args.opacity,
+            recursive=args.recursive,
+        )
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

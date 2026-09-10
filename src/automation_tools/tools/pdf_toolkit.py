@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import os
 from typing import List, Optional
 
@@ -92,10 +92,10 @@ def _write(writer: "PdfWriter", output_path: str) -> bool:
 
 
 # ── operations ───────────────────────────────────────────────────────────────
-def run_pdf_merge(inputs: str, output_path: str) -> None:
+def run_pdf_merge(inputs: str, output_path: str) -> bool:
     """Merge several PDFs into one. `inputs` is a folder or a comma-separated list."""
     if not _require_pypdf():
-        return
+        return False
     if os.path.isdir(inputs):
         files = sorted(
             os.path.join(inputs, f)
@@ -107,37 +107,39 @@ def run_pdf_merge(inputs: str, output_path: str) -> None:
 
     if len(files) < 2:
         print_error("Provide at least two PDF files (or a folder containing them).")
-        return
+        return False
     if not output_path:
         print_error("An output path is required for merging.")
-        return
+        return False
     if not output_path.lower().endswith(".pdf"):
         output_path += ".pdf"
     if not _confirm_overwrite(output_path):
         print_warning("Cancelled.")
-        return
+        return False
 
     writer = PdfWriter()
     merged = 0
     for path in files:
         reader = _open_reader(path)
         if reader is None:
-            return
+            return False
         writer.append(reader)
         merged += 1
         print_step(f"Added '{path}' ({len(reader.pages)} pages)")
 
     if _write(writer, output_path):
         print_success(f"Merged {merged} files → '{output_path}'")
+        return True
+    return False
 
 
-def run_pdf_split(input_path: str, output_dir: Optional[str] = None) -> None:
+def run_pdf_split(input_path: str, output_dir: Optional[str] = None) -> bool:
     """Split a PDF into one file per page inside an output folder."""
     if not _require_pypdf():
-        return
+        return False
     reader = _open_reader(input_path)
     if reader is None:
-        return
+        return False
 
     out_dir = output_dir or (os.path.splitext(input_path)[0] + "_pages")
     os.makedirs(out_dir, exist_ok=True)
@@ -155,32 +157,36 @@ def run_pdf_split(input_path: str, output_dir: Optional[str] = None) -> None:
             written += 1
 
     print_success(f"{written}/{total} page(s) written to '{out_dir}'")
+    return written == total
+    return written == total
 
 
-def run_pdf_extract(input_path: str, pages: str, output_path: Optional[str] = None) -> None:
+def run_pdf_extract(input_path: str, pages: str, output_path: Optional[str] = None) -> bool:
     """Build a new PDF from selected pages (1-based spec, e.g. '1-3,5,8-10')."""
     if not _require_pypdf():
-        return
+        return False
     reader = _open_reader(input_path)
     if reader is None:
-        return
+        return False
 
     try:
         indices = _parse_pages(pages, len(reader.pages))
     except ValueError as e:
         print_error(f"Invalid page selection: {e}")
-        return
+        return False
 
     out = output_path or _resolve_out(input_path, "extract")
     if not _confirm_overwrite(out):
         print_warning("Cancelled.")
-        return
+        return False
 
     writer = PdfWriter()
     for idx in indices:
         writer.add_page(reader.pages[idx])
     if _write(writer, out):
         print_success(f"Extracted {len(indices)} page(s) → '{out}'")
+        return True
+    return False
 
 
 def run_pdf_rotate(
@@ -188,16 +194,16 @@ def run_pdf_rotate(
     angle: int,
     pages: Optional[str] = None,
     output_path: Optional[str] = None,
-) -> None:
+) -> bool:
     """Rotate pages clockwise by 90/180/270 degrees (all pages, or a 1-based spec)."""
     if not _require_pypdf():
-        return
+        return False
     if angle % 90 != 0:
         print_error("Angle must be a multiple of 90 (90, 180 or 270).")
-        return
+        return False
     reader = _open_reader(input_path)
     if reader is None:
-        return
+        return False
 
     total = len(reader.pages)
     if pages:
@@ -205,14 +211,14 @@ def run_pdf_rotate(
             targets = set(_parse_pages(pages, total))
         except ValueError as e:
             print_error(f"Invalid page selection: {e}")
-            return
+            return False
     else:
         targets = set(range(total))
 
     out = output_path or _resolve_out(input_path, "rotated")
     if not _confirm_overwrite(out):
         print_warning("Cancelled.")
-        return
+        return False
 
     writer = PdfWriter()
     for i, page in enumerate(reader.pages):
@@ -221,23 +227,25 @@ def run_pdf_rotate(
         writer.add_page(page)
     if _write(writer, out):
         print_success(f"Rotated {len(targets)} page(s) by {angle}° → '{out}'")
+        return True
+    return False
 
 
-def run_pdf_encrypt(input_path: str, password: str, output_path: Optional[str] = None) -> None:
+def run_pdf_encrypt(input_path: str, password: str, output_path: Optional[str] = None) -> bool:
     """Password-protect a PDF (AES-256 when available)."""
     if not _require_pypdf():
-        return
+        return False
     if not password:
         print_error("A password is required to encrypt.")
-        return
+        return False
     reader = _open_reader(input_path)
     if reader is None:
-        return
+        return False
 
     out = output_path or _resolve_out(input_path, "encrypted")
     if not _confirm_overwrite(out):
         print_warning("Cancelled.")
-        return
+        return False
 
     writer = PdfWriter()
     writer.append(reader)
@@ -249,43 +257,47 @@ def run_pdf_encrypt(input_path: str, password: str, output_path: Optional[str] =
     if _write(writer, out):
         print_success(f"Encrypted → '{out}'")
         print_warning("Keep the password safe — there is no way to recover it.")
+        return True
+    return False
 
 
-def run_pdf_decrypt(input_path: str, password: str, output_path: Optional[str] = None) -> None:
+def run_pdf_decrypt(input_path: str, password: str, output_path: Optional[str] = None) -> bool:
     """Remove protection from a PDF given its current password."""
     if not _require_pypdf():
-        return
+        return False
     if not os.path.isfile(input_path):
         print_error(f"Not a file: '{input_path}'")
-        return
+        return False
     try:
         reader = PdfReader(input_path)
     except Exception as e:
         print_error(f"Could not read '{input_path}': {e}")
-        return
+        return False
 
     if not reader.is_encrypted:
         print_warning("This PDF is not encrypted — nothing to do.")
-        return
+        return False
     if not reader.decrypt(password or ""):
         print_error("Wrong password — could not unlock the PDF.")
-        return
+        return False
 
     out = output_path or _resolve_out(input_path, "decrypted")
     if not _confirm_overwrite(out):
         print_warning("Cancelled.")
-        return
+        return False
 
     writer = PdfWriter()
     writer.append(reader)
     if _write(writer, out):
         print_success(f"Decrypted → '{out}'")
+        return True
+    return False
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 def main() -> None:
     """Standalone entry point for the PDF Toolkit."""
-    parser = argparse.ArgumentParser(description="Merge, split, extract, rotate, encrypt or decrypt PDFs.")
+    parser = ArgumentParser(description="Merge, split, extract, rotate, encrypt or decrypt PDFs.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_merge = sub.add_parser("merge", help="Merge several PDFs into one.")
@@ -318,18 +330,22 @@ def main() -> None:
     p_dec.add_argument("--out", help="Output PDF path.")
 
     args = parser.parse_args()
-    if args.command == "merge":
-        run_pdf_merge(args.inputs, args.output)
-    elif args.command == "split":
-        run_pdf_split(args.input, output_dir=args.out_dir)
-    elif args.command == "extract":
-        run_pdf_extract(args.input, args.pages, output_path=args.out)
-    elif args.command == "rotate":
-        run_pdf_rotate(args.input, args.angle, pages=args.pages, output_path=args.out)
-    elif args.command == "encrypt":
-        run_pdf_encrypt(args.input, args.password, output_path=args.out)
-    elif args.command == "decrypt":
-        run_pdf_decrypt(args.input, args.password, output_path=args.out)
+    try:
+        if args.command == "merge":
+            result = run_pdf_merge(args.inputs, args.output)
+        elif args.command == "split":
+            result = run_pdf_split(args.input, output_dir=args.out_dir)
+        elif args.command == "extract":
+            result = run_pdf_extract(args.input, args.pages, output_path=args.out)
+        elif args.command == "rotate":
+            result = run_pdf_rotate(args.input, args.angle, pages=args.pages, output_path=args.out)
+        elif args.command == "encrypt":
+            result = run_pdf_encrypt(args.input, args.password, output_path=args.out)
+        else:
+            result = run_pdf_decrypt(args.input, args.password, output_path=args.out)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

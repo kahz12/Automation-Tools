@@ -1,5 +1,5 @@
 import os
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import datetime
 from typing import Dict, Any, Optional
 
@@ -178,11 +178,11 @@ def clean_image_exif(filepath: str, out_path: Optional[str] = None) -> Optional[
         return None
 
 
-def run_metadata_extractor(filepath: str, export_path: Optional[str] = None, clean_exif: bool = False) -> None:
+def run_metadata_extractor(filepath: str, export_path: Optional[str] = None, clean_exif: bool = False) -> bool:
     """Extracts and displays a file's metadata, optionally exporting it or writing an EXIF-free copy."""
     if not os.path.exists(filepath):
         print_error(f"The file '{filepath}' does not exist.")
-        return
+        return False
 
     filename = os.path.basename(filepath)
     ext = os.path.splitext(filename)[1].lower()
@@ -210,18 +210,23 @@ def run_metadata_extractor(filepath: str, export_path: Optional[str] = None, cle
             clean_image_exif(filepath)
         else:
             print_warning("EXIF cleaning only applies to image files.")
+    return True
 
 
 def main():
     """Main entry point for the metadata extractor CLI.
     """
-    parser = argparse.ArgumentParser(description="File Metadata Extractor (PDF, Images)")
+    parser = ArgumentParser(description="File Metadata Extractor (PDF, Images)")
     parser.add_argument("filepath", help="Path to the file to analyze")
     parser.add_argument("--export", help="Export metadata to JSON or CSV")
     parser.add_argument("--clean-exif", action="store_true", help="Create a copy without EXIF (images only)")
     args = parser.parse_args()
 
-    run_metadata_extractor(args.filepath, export_path=args.export, clean_exif=args.clean_exif)
+    try:
+        result = run_metadata_extractor(args.filepath, export_path=args.export, clean_exif=args.clean_exif)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

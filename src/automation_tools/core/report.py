@@ -8,7 +8,7 @@ from automation_tools.core.logger import print_error, print_success
 # Writing a CSV report was copied into four tools, each with its own idea of
 # which errors to catch and what to say afterwards. One of them caught bare
 # Exception, the others OSError; the messages had drifted apart. This is the
-# one that gets fixed when the next thing goes wrong with it.
+# one shared implementation that can be evolved without divergent behavior.
 
 
 def export_rows(out_path: str, header: Sequence[str], rows: Iterable[Sequence[Any]]) -> bool:

@@ -1,4 +1,4 @@
-import argparse
+from automation_tools.core.cli import ArgumentParser
 import os
 import zipfile
 from dataclasses import dataclass
@@ -351,7 +351,7 @@ def run_file_type_check(
 
 def main() -> None:
     """CLI entry point for the File Type Verifier."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Check that files really are what their extension claims."
     )
     parser.add_argument("path", help="File or folder to check.")

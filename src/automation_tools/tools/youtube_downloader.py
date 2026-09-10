@@ -1,5 +1,5 @@
 import os
-import argparse
+from automation_tools.core.cli import ArgumentParser, exit_code
 import subprocess
 import sys
 
@@ -20,7 +20,7 @@ def run_youtube_downloader(
     mode: str = 'video',
     playlist: bool = False,
     resume: bool = True,
-) -> None:
+) -> bool:
     """Core download function:
     - Sets up the output directory (defaults to system Downloads).
     - Configures yt-dlp commands for video (MP4) or audio (MP3).
@@ -84,27 +84,34 @@ def run_youtube_downloader(
         subprocess.run(cmd, check=True)
         console.print(f"[cyan]{'-' * 50}[/cyan]")
         print_success("Download completed successfully!")
+        return True
     except subprocess.CalledProcessError as e:
         console.print(f"[cyan]{'-' * 50}[/cyan]")
         print_error(f"Error during download (code {e.returncode})")
         if resume:
             console.print("[dim]💡 If the download was interrupted, run it again: "
                           "it will automatically resume where it left off.[/dim]")
+        return False
     except FileNotFoundError:
         console.print(f"[cyan]{'-' * 50}[/cyan]")
         print_error("'yt-dlp' not found. Please ensure it is installed (pip install yt-dlp).")
+        return False
 
 
 def main():
     """CLI entry point for the YouTube Downloader."""
-    parser = argparse.ArgumentParser(description="YouTube Downloader (Video/Audio)")
+    parser = ArgumentParser(description="YouTube Downloader (Video/Audio)")
     parser.add_argument("url", help="URL of the video or playlist")
     parser.add_argument("--mode", choices=['video', 'audio'], default='video', help="Download format")
     parser.add_argument("--playlist", action="store_true", help="Force playlist mode")
     parser.add_argument("--no-resume", action="store_true", help="Disable resume/archive skip")
     args = parser.parse_args()
 
-    run_youtube_downloader(args.url, args.mode, playlist=args.playlist, resume=not args.no_resume)
+    try:
+        result = run_youtube_downloader(args.url, args.mode, playlist=args.playlist, resume=not args.no_resume)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    raise SystemExit(exit_code(result))
 
 
 if __name__ == "__main__":

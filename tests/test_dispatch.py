@@ -4,6 +4,7 @@ The point of this entry point is that a tool is reachable after `pip install`,
 which is exactly what running the module file by path never was.
 """
 import sys
+import json
 
 import pytest
 
@@ -60,6 +61,15 @@ def test_arguments_reach_the_tool_and_the_program_name_reads_right(monkeypatch):
     assert seen["argv"] == ["atools vault", "/tmp/x", "encrypt", "--shred"]
 
 
+def test_returning_false_becomes_a_nonzero_exit(monkeypatch):
+    from automation_tools.tools import vault
+    monkeypatch.setattr(vault, "main", lambda: False)
+
+    with pytest.raises(SystemExit) as excinfo:
+        dispatch.main(["vault"])
+    assert excinfo.value.code == 1
+
+
 def test_interrupting_a_tool_exits_the_conventional_way(monkeypatch):
     def fake_main():
         raise KeyboardInterrupt
@@ -70,3 +80,45 @@ def test_interrupting_a_tool_exits_the_conventional_way(monkeypatch):
     with pytest.raises(SystemExit) as excinfo:
         dispatch.main(["vault"])
     assert excinfo.value.code == 130
+
+
+def test_json_mode_wraps_tool_output_and_exit_code(monkeypatch, capsys):
+    def fake_main():
+        print("done")
+        raise SystemExit(0)
+
+    from automation_tools.tools import vault
+    monkeypatch.setattr(vault, "main", fake_main)
+
+    with pytest.raises(SystemExit) as excinfo:
+        dispatch.main(["vault", "--json"])
+    assert excinfo.value.code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["tool"] == "vault"
+    assert payload["ok"] is True
+    assert payload["exit_code"] == 0
+    assert payload["output"] == "done\n"
+
+
+def test_json_mode_keeps_failures_machine_readable(monkeypatch, capsys):
+    def fake_main():
+        raise SystemExit(2)
+
+    from automation_tools.tools import vault
+    monkeypatch.setattr(vault, "main", fake_main)
+
+    with pytest.raises(SystemExit) as excinfo:
+        dispatch.main(["--json", "vault"])
+    assert excinfo.value.code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert payload["exit_code"] == 2
+
+
+def test_json_unknown_tool_has_no_human_noise(capsys):
+    with pytest.raises(SystemExit) as excinfo:
+        dispatch.main(["--json", "vaul"])
+    assert excinfo.value.code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert "vault" in payload["error"]
