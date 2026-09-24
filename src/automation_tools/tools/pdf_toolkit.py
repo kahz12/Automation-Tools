@@ -158,7 +158,6 @@ def run_pdf_split(input_path: str, output_dir: Optional[str] = None) -> bool:
 
     print_success(f"{written}/{total} page(s) written to '{out_dir}'")
     return written == total
-    return written == total
 
 
 def run_pdf_extract(input_path: str, pages: str, output_path: Optional[str] = None) -> bool:

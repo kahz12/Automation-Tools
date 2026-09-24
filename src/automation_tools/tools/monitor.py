@@ -450,7 +450,6 @@ def run_continuous_monitor(interval_minutes: int = 60) -> int:
     except KeyboardInterrupt:
         console.print("\n[yellow]Monitor stopped by user.[/yellow]")
         return 130
-    return 0
 
 
 def main():
