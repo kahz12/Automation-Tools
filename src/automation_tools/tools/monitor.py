@@ -3,8 +3,9 @@ import random
 import sqlite3
 import re
 from automation_tools.core.cli import ArgumentParser, exit_code
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, Iterator, List, Tuple
 from urllib.parse import urlparse
 
 import requests
@@ -45,79 +46,96 @@ USER_AGENTS = [
 
 # ─── Database (SQLite) ───
 
+@contextmanager
+def _db() -> Iterator[sqlite3.Connection]:
+    """Opens the price database, committing on success and always closing it.
+
+    `sqlite3.connect` is itself a context manager, but it only wraps the
+    transaction: it commits or rolls back and leaves the connection open, so
+    `with sqlite3.connect(...)` is not the fix it looks like. Every query here
+    used to close by hand after the call that could raise, which leaked the
+    handle whenever one did — on a long-running `--interval` monitor those
+    accumulate for as long as the process lives.
+
+    Reads commit too. That is a no-op when no write is pending, and it keeps
+    every caller down to one line.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    try:
+        yield conn
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def init_db() -> None:
     """Initializes the database and creates the tables if they do not exist.
     """
-    conn = sqlite3.connect(DB_FILE)
-    # Price history table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS historial (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre      TEXT    NOT NULL,
-            url         TEXT    NOT NULL,
-            precio      REAL    NOT NULL,
-            moneda      TEXT,
-            fecha       TEXT    NOT NULL
+    with _db() as conn:
+        # Price history table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS historial (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre      TEXT    NOT NULL,
+                url         TEXT    NOT NULL,
+                precio      REAL    NOT NULL,
+                moneda      TEXT,
+                fecha       TEXT    NOT NULL
+            )
+        """)
+        # Stock status table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS stock (
+                url         TEXT    PRIMARY KEY,
+                disponible  INTEGER NOT NULL,
+                fecha       TEXT    NOT NULL
+            )
+        """)
+        # Price lookups are always by URL and newest timestamp.  Without this
+        # index each monitoring round scans the complete history table per product.
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_historial_url_fecha "
+            "ON historial (url, fecha DESC, id DESC)"
         )
-    """)
-    # Stock status table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS stock (
-            url         TEXT    PRIMARY KEY,
-            disponible  INTEGER NOT NULL,
-            fecha       TEXT    NOT NULL
-        )
-    """)
-    # Price lookups are always by URL and newest timestamp.  Without this
-    # index each monitoring round scans the complete history table per product.
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_historial_url_fecha "
-        "ON historial (url, fecha DESC, id DESC)"
-    )
-    conn.commit()
-    conn.close()
 
 
 def get_last_stock(url: str) -> Optional[bool]:
     """Last known stock state for `url`. None when there is no record yet."""
-    conn = sqlite3.connect(DB_FILE)
-    row = conn.execute("SELECT disponible FROM stock WHERE url = ?", (url,)).fetchone()
-    conn.close()
+    with _db() as conn:
+        row = conn.execute("SELECT disponible FROM stock WHERE url = ?", (url,)).fetchone()
     return bool(row[0]) if row else None
 
 
 def save_stock(url: str, available: bool) -> None:
     """Records the current stock state for `url`."""
-    conn = sqlite3.connect(DB_FILE)
-    conn.execute(
-        "INSERT OR REPLACE INTO stock (url, disponible, fecha) VALUES (?, ?, ?)",
-        (url, 1 if available else 0, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-    )
-    conn.commit()
-    conn.close()
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO stock (url, disponible, fecha) VALUES (?, ?, ?)",
+            (url, 1 if available else 0, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        )
 
 
 def guardar_precio(nombre: str, url: str, precio: float, moneda: str) -> None:
     """Saves a price reading into the history table."""
-    conn = sqlite3.connect(DB_FILE)
-    conn.execute(
-        "INSERT INTO historial (nombre, url, precio, moneda, fecha) VALUES (?, ?, ?, ?, ?)",
-        (nombre, url, precio, moneda, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    )
-    conn.commit()
-    conn.close()
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO historial (nombre, url, precio, moneda, fecha) VALUES (?, ?, ?, ?, ?)",
+            (nombre, url, precio, moneda, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
     logger.info(f"Price saved: {nombre} → {precio} {moneda}")
 
 
 def obtener_ultimo_precio(url: str) -> Optional[float]:
     """Most recent price recorded for `url`, or None."""
-    conn = sqlite3.connect(DB_FILE)
-    row = conn.execute(
-        "SELECT precio FROM historial WHERE url = ? "
-        "ORDER BY fecha DESC, id DESC LIMIT 1",
-        (url,)
-    ).fetchone()
-    conn.close()
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT precio FROM historial WHERE url = ? "
+            "ORDER BY fecha DESC, id DESC LIMIT 1",
+            (url,)
+        ).fetchone()
     return row[0] if row else None
 
 
@@ -125,11 +143,10 @@ def mostrar_historial() -> None:
     """Prints the complete price history (last 50 entries) to the console.
     """
     init_db()
-    conn = sqlite3.connect(DB_FILE)
-    rows = conn.execute(
-        "SELECT nombre, precio, moneda, fecha FROM historial ORDER BY fecha DESC LIMIT 50"
-    ).fetchall()
-    conn.close()
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT nombre, precio, moneda, fecha FROM historial ORDER BY fecha DESC LIMIT 50"
+        ).fetchall()
 
     if not rows:
         print_warning("No history recorded yet.")

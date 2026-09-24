@@ -1,3 +1,4 @@
+import pytest
 from bs4 import BeautifulSoup
 
 from automation_tools.tools import monitor
@@ -74,3 +75,46 @@ def test_latest_price_is_stable_when_timestamps_match(monkeypatch, tmp_path):
     conn.close()
 
     assert monitor.obtener_ultimo_precio(url) == 80.0
+
+
+def test_db_connection_closes_even_when_a_query_raises(monkeypatch, tmp_path):
+    """The handle must not leak when a statement fails inside the context."""
+    monkeypatch.setattr(monitor, "DB_FILE", str(tmp_path / "hist.db"))
+    monitor.init_db()
+
+    opened = []
+    real_connect = monitor.sqlite3.connect
+
+    def spy(*args, **kwargs):
+        conn = real_connect(*args, **kwargs)
+        opened.append(conn)
+        return conn
+
+    monkeypatch.setattr(monitor.sqlite3, "connect", spy)
+
+    with pytest.raises(monitor.sqlite3.OperationalError):
+        with monitor._db() as conn:
+            conn.execute("SELECT * FROM no_such_table")
+
+    assert len(opened) == 1
+    # Using a closed connection is the only way to observe that it is closed.
+    with pytest.raises(monitor.sqlite3.ProgrammingError):
+        opened[0].execute("SELECT 1")
+
+
+def test_db_rolls_back_a_write_when_the_block_raises(monkeypatch, tmp_path):
+    """A half-finished round must not leave a partial row behind."""
+    monkeypatch.setattr(monitor, "DB_FILE", str(tmp_path / "hist.db"))
+    monitor.init_db()
+    url = "https://x/ghost"
+
+    with pytest.raises(RuntimeError):
+        with monitor._db() as conn:
+            conn.execute(
+                "INSERT INTO historial (nombre, url, precio, moneda, fecha) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ("Ghost", url, 1.0, "USD", "2026-01-01 00:00:00"),
+            )
+            raise RuntimeError("interrupted mid-round")
+
+    assert monitor.obtener_ultimo_precio(url) is None
