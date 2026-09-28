@@ -10,7 +10,7 @@ from automation_tools.cli.screens.base import (
 from automation_tools.cli.screens.files import ArchiverScreen, CleanerScreen, DuplicatesScreen, LogAnalyzerScreen, OrganizerScreen, RenamerScreen, SimilarImagesScreen
 from automation_tools.cli.screens.conversion import ConverterScreen, ImageProcessorScreen, PdfConverterScreen, PdfToolkitScreen
 from automation_tools.cli.screens.ai import OcrScreen, ReadmeScreen, SummarizerScreen, TranscriberScreen, TranslatorScreen
-from automation_tools.cli.screens.web import MonitorScreen, WebClipperScreen, YoutubeScreen
+from automation_tools.cli.screens.web import InstagramScreen, MonitorScreen, WebClipperScreen, YoutubeScreen
 from automation_tools.cli.screens.security import EnvManagerScreen, FileTypeScreen, FlacCheckScreen, IntegrityScreen, MetadataScreen, PasswordScreen, VaultScreen
 
 
@@ -33,6 +33,7 @@ SCREEN_MAP: dict[str, type[ToolScreen]] = {
     "🎤  A/V Transcriber":      TranscriberScreen,
     "💰  Price Monitor":        MonitorScreen,
     "📺  YouTube Downloader":   YoutubeScreen,
+    "📸  Instagram Downloader": InstagramScreen,
     "📰  Web Clipper":          WebClipperScreen,
     "🔎  Metadata Extractor":   MetadataScreen,
     "🔐  Password Manager":     PasswordScreen,
@@ -63,6 +64,7 @@ __all__ = [
     "FileTypeScreen",
     "FlacCheckScreen",
     "ImageProcessorScreen",
+    "InstagramScreen",
     "IntegrityScreen",
     "LogAnalyzerScreen",
     "MetadataScreen",

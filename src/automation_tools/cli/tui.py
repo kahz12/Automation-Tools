@@ -91,6 +91,10 @@ TOOL_INFO: dict[str, tuple[str, str, str]] = {
         "📺", "YouTube Downloader",
         "Download videos (MP4) or audio (MP3)\nfrom YouTube. Playlist support.",
     ),
+    "📸  Instagram Downloader": (
+        "📸", "Instagram Downloader",
+        "Download photos, videos and reels from\nposts, profiles, stories and highlights.",
+    ),
     "📰  Web Clipper": (
         "📰", "Web Clipper",
         "Save a web page's main article as clean\nMarkdown or text. Feeds the AI tools.",

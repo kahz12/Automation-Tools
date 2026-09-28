@@ -9,7 +9,7 @@ Development tools are available with `pip install -e ".[dev]"`.
 
 | Program | Used by | Behaviour when absent |
 |---|---|---|
-| `ffmpeg` | `flac_check`, `youtube_downloader` post-processing | FLAC checks can inspect headers but cannot analyse audio; YouTube downloads may not merge separate audio/video streams. |
+| `ffmpeg` | `flac_check`, `youtube_downloader` and `instagram_downloader` post-processing | FLAC checks can inspect headers but cannot analyse audio; YouTube and Instagram downloads may not merge separate audio/video streams. |
 | `libreoffice`/`soffice` | `pdf_builder` document conversion | The pure-Python fallback extracts text but cannot preserve full office layout. |
 | Poppler (`pdftoppm` or `pdftocairo`) | `converter --from-pdf` through `pdf2image` | PDF rendering is unavailable until Poppler is installed. |
 | `xclip`, `xsel`, `wl-copy`, `pbcopy`, `clip` or Termux API | `password_generator copy` | The password is printed/generated but cannot be copied automatically. |
@@ -37,9 +37,12 @@ it prints hints for optional programs without failing the installation.
 
 AI tools need a key for the selected provider (`.env.example` lists the
 supported variables). `monitor` may contact MercadoLibre/Amazon and Telegram;
-`web_clipper` and `youtube_downloader` need network access; password breach
-checking uses HaveIBeenPwned's k-anonymity API. Tests mock these services and
-run offline.
+`web_clipper`, `youtube_downloader` and `instagram_downloader` need network
+access. The Instagram downloader reads stories, highlights and private
+accounts only with a logged-in session: a cookies file named by
+`INSTAGRAM_COOKIES` or `--cookies`, or `--browser`. Password breach checking
+uses HaveIBeenPwned's k-anonymity API. Tests mock these services and run
+offline.
 
 Keep `.env`, provider keys and password files outside version control. Use
 `atools env_manager scan .` to find accidentally exposed dotenv files.

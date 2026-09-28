@@ -37,6 +37,10 @@ SCREEN_WIDGETS = {
         "ids": ['back-btn', 'error-msg', 'max-size', 'op', 'out-dir', 'path', 'quality', 'rb-bl', 'rb-br', 'rb-center', 'rb-compress', 'rb-resize', 'rb-tl', 'rb-tr', 'rb-watermark', 'recursive', 'run-btn', 'scale', 'sec-compress', 'sec-resize', 'sec-watermark', 'wm-opacity', 'wm-pos', 'wm-text'],
         "classes": ['btn-row', 'error-msg', 'field-label', 'sub-section', 'tool-body', 'tool-panel'],
     },
+    'InstagramScreen': {
+        "ids": ['back-btn', 'cookies', 'error-msg', 'limit', 'media', 'rb-all', 'rb-images', 'rb-videos', 'run-btn', 'url'],
+        "classes": ['btn-row', 'error-msg', 'field-label', 'tool-body', 'tool-panel'],
+    },
     'IntegrityScreen': {
         "ids": ['action', 'algorithm', 'back-btn', 'dir', 'error-msg', 'excludes', 'extra', 'hidden', 'manifest', 'output', 'rb-create', 'rb-md5', 'rb-sha256', 'rb-sha512', 'rb-verify', 'run-btn', 'sec-create', 'sec-verify'],
         "classes": ['btn-row', 'error-msg', 'field-label', 'section-sep', 'sub-section', 'tool-body', 'tool-panel'],

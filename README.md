@@ -2,7 +2,7 @@
 
 # Automation Tools
 
-**A unified command-line toolkit of twenty-six Python utilities for everyday automation.**
+**A unified command-line toolkit of twenty-seven Python utilities for everyday automation.**
 
 Files · Conversion · AI (8 providers) · Web & Multimedia · Encryption · Utilities
 
@@ -32,7 +32,7 @@ Files · Conversion · AI (8 providers) · Web & Multimedia · Encryption · Uti
 
 ## Overview
 
-**Automation Tools** bundles twenty-six standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
+**Automation Tools** bundles twenty-seven standalone Python utilities behind a single interactive [Textual](https://textual.textualize.io/) menu. Launch the guided dashboard, or call any tool directly from the terminal. It favors pure-Python implementations, so the same code runs on **Linux, Windows, and Termux/Android**.
 
 - **Unified launcher** — one `automation-tools` command, arrow-key navigation, a recent-tools list
 - **Standalone scripts** — every tool also works on its own with a conventional CLI (`--help` everywhere)
@@ -182,6 +182,7 @@ All modules live in `src/automation_tools/tools/`. Run any of them as `atools <n
 |------|--------|-------------|
 | Price Monitor | `monitor.py` | Track MercadoLibre & Amazon prices with target/drop alerts (optional Telegram). |
 | YouTube Downloader | `youtube_downloader.py` | Download video (MP4) or audio (MP3); playlist support. Powered by `yt-dlp`. |
+| Instagram Downloader | `instagram_downloader.py` | Download photos, videos, reels and carousels from a post link, or a whole profile, its stories and highlights. Photos or videos only on request. Public content needs no login. Powered by `yt-dlp` and `gallery-dl`. |
 | Web Clipper | `web_clipper.py` | Save a page's main article as clean Markdown or plain text. |
 
 ### Utilities
@@ -243,6 +244,20 @@ atools translator notes.md --lang Spanish \
 cp productos_a_monitorear.example.json productos_a_monitorear.json
 ```
 
+**Instagram Downloader** — public posts, reels and profiles download without
+logging in. Stories, highlights and private accounts need a logged-in session:
+export your instagram.com cookies to a `cookies.txt` file (Netscape format; any
+"cookies.txt" browser extension does it) and pass it with `--cookies`, or set
+it once in `.env`. On a computer, `--browser firefox` reads the cookies
+straight from the browser instead.
+
+```bash
+INSTAGRAM_COOKIES=/path/to/instagram_cookies.txt
+```
+
+Files land in `Downloads/Instagram/<account>/<post>_<n>.<ext>`, so running the
+same post or profile again skips what is already there.
+
 **Encryption Vault** — keys are derived with PBKDF2-HMAC-SHA256 and files are sealed with Fernet (AES-128-CBC + HMAC), so tampering and wrong passwords are detected. There is **no password recovery** — keep yours safe.
 
 ---
@@ -259,7 +274,7 @@ pytest --cov=automation_tools      # coverage, as CI measures it
 mypy src/                           # all package modules stay type-clean
 ```
 
-Tests live in `tests/`, exercise temporary directories only (your real files are never touched), and mock all network/API paths (HaveIBeenPwned, the AI providers, yt-dlp) — so the suite runs fully offline. CI runs them on Python 3.10, 3.12 and 3.13 on Linux plus one run each on Windows and macOS, since path handling and file permissions are where "OS independent" usually turns out to be wishful.
+Tests live in `tests/`, exercise temporary directories only (your real files are never touched), and mock all network/API paths (HaveIBeenPwned, the AI providers, yt-dlp, gallery-dl) — so the suite runs fully offline. CI runs them on Python 3.10, 3.12 and 3.13 on Linux plus one run each on Windows and macOS, since path handling and file permissions are where "OS independent" usually turns out to be wishful.
 
 ---
 
@@ -278,7 +293,7 @@ Automation-Tools/
 ├── src/automation_tools/
 │   ├── core/                           # logger · config · fs (one directory walk) · report · prompt
 │   ├── cli/                            # menu · tui (Textual dashboard) · dispatch (atools) · screens/
-│   └── tools/                          # 26 tool modules (one per utility)
+│   └── tools/                          # 27 tool modules (one per utility)
 └── tests/                              # pytest suite (one file per module)
 ```
 

@@ -45,6 +45,8 @@ dependencies = [
     "python-dotenv>=1,<2",
     "Pillow>=10,<13",
     "yt-dlp>=2024.1",
+    # Instagram profiles, stories and highlights (instagram_downloader).
+    "gallery-dl>=1.30,<2",
     "cryptography>=42,<51",
 ]
 

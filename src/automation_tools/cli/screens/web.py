@@ -78,6 +78,62 @@ class YoutubeScreen(ToolScreen):
                              url=url, mode=mode, playlist=playlist)
 
 
+# ── Instagram Downloader ───────────────────────────────────────────────────
+class InstagramScreen(ToolScreen):
+    TOOL_TITLE = "📸  Instagram Downloader"
+    TOOL_DESC = "Download photos, videos and reels from posts, profiles and stories"
+
+    def compose_fields(self) -> ComposeResult:
+        from automation_tools.core.config import get_env_var
+        from automation_tools.tools.instagram_downloader import COOKIES_ENV
+
+        yield Label("Post, reel, profile or stories link — or a @username:",
+                    classes="field-label")
+        yield Input(placeholder="https://www.instagram.com/p/...", id="url")
+        yield Label("What to download:", classes="field-label")
+        with RadioSet(id="media"):
+            yield RadioButton("🖼️  Photos and videos", id="rb-all", value=True)
+            yield RadioButton("📷  Photos only", id="rb-images")
+            yield RadioButton("🎬  Videos only", id="rb-videos")
+        yield Label("Profiles only — newest posts to fetch (empty = all):",
+                    classes="field-label")
+        yield Input(placeholder="e.g. 20", id="limit", type="integer")
+        yield Label("Cookies file, for stories, highlights and private accounts "
+                    "(optional):", classes="field-label")
+        # Prefilled from INSTAGRAM_COOKIES; clearing it means no login.
+        yield Input(value=get_env_var(COOKIES_ENV, "") or "",
+                    placeholder="~/instagram_cookies.txt", id="cookies")
+
+    async def action_do_run(self) -> None:
+        from automation_tools.tools import instagram_downloader
+        url = self._ival(self.query_one("#url", Input))
+        if not url:
+            self._err("A link or @username is required.")
+            return
+        if not instagram_downloader.classify_url(url)[0]:
+            self._err("That is not an Instagram link or username.")
+            return
+        limit_text = self._ival(self.query_one("#limit", Input))
+        limit = None
+        if limit_text:
+            try:
+                limit = int(limit_text)
+            except ValueError:
+                limit = 0
+            if limit < 1:
+                self._err("The post limit must be a whole number of 1 or more.")
+                return
+        cookies = self._ival(self.query_one("#cookies", Input)) or None
+        if cookies and not os.path.isfile(os.path.expanduser(cookies)):
+            from rich.markup import escape
+            self._err(f"Cookies file not found: {escape(cookies)}")
+            return
+        media_map = {"rb-all": "all", "rb-images": "images", "rb-videos": "videos"}
+        media = media_map.get(self._rval(self.query_one("#media", RadioSet)) or "rb-all", "all")
+        await self._run_tool(instagram_downloader.run_instagram_downloader,
+                             url=url, media=media, limit=limit, cookies=cookies)
+
+
 # ── 15. Web Clipper ────────────────────────────────────────────────────────
 class WebClipperScreen(ToolScreen):
     TOOL_TITLE = "📰  Web Clipper"

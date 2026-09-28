@@ -57,6 +57,7 @@ MENU_ENTRIES = [
     ("🌐  Web & Multimedia", [
         ("💰  Price Monitor",       None),
         ("📺  YouTube Downloader",  None),
+        ("📸  Instagram Downloader", None),
         ("📰  Web Clipper",         None),
     ]),
     ("🔧  Utilities", [

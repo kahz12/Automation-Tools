@@ -27,6 +27,9 @@ atools env_manager scan .
 atools file_type ./downloads --show-unknown
 atools flac_check ~/Music --no-md5 --export flac.csv
 atools image_processor ./photos --op resize --max-size 1600
+atools instagram_downloader "https://www.instagram.com/p/POST_ID/"
+atools instagram_downloader @account --limit 20 --media images
+atools instagram_downloader "https://www.instagram.com/stories/account/" --cookies ~/ig_cookies.txt
 atools integrity create ./backups --algorithm sha256
 atools log_analyzer ./logs --keywords "ERROR,CRITICAL"
 atools metadata photo.jpg --export metadata.json
