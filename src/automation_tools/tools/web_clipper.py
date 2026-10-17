@@ -38,18 +38,39 @@ _JUNK_HINT = re.compile(
 )
 
 
+MAX_RESPONSE_BYTES = 10 * 1024 * 1024  # 10 MiB max HTML download
+
+
 # ── fetching ─────────────────────────────────────────────────────────────────
-def _fetch(url: str, timeout: int) -> str:
-    """Download a page as text, with a browser-like UA and sane encoding."""
-    resp = requests.get(
+def _fetch(url: str, timeout: int, max_bytes: int = MAX_RESPONSE_BYTES) -> str:
+    """Download a page as text, with a browser-like UA, scheme check, and size cap."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+        raise ValueError(f"Unsupported or invalid URL: {url}")
+
+    with requests.get(
         url,
         headers={"User-Agent": USER_AGENT, "Accept-Language": "en,es;q=0.8"},
         timeout=timeout,
-    )
-    resp.raise_for_status()
-    if not resp.encoding or resp.encoding.lower() == "iso-8859-1":
-        resp.encoding = resp.apparent_encoding or resp.encoding
-    return resp.text
+        stream=True,
+    ) as resp:
+        resp.raise_for_status()
+        chunks = []
+        total = 0
+        for chunk in resp.iter_content(chunk_size=65536):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError(f"Page exceeds maximum allowed size ({max_bytes} bytes)")
+            chunks.append(chunk)
+        raw = b"".join(chunks)
+        encoding = resp.encoding
+        if not encoding or encoding.lower() == "iso-8859-1":
+            encoding = resp.apparent_encoding or encoding or "utf-8"
+        return raw.decode(encoding, errors="replace")
 
 
 # ── content isolation ────────────────────────────────────────────────────────

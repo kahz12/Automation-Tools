@@ -152,7 +152,7 @@ Strict Rules:
     console.print(f"\n[cyan]{'=' * 40}[/cyan]")
     console.print("[bold]GENERATED TRANSLATION[/bold]")
     console.print(f"[cyan]{'=' * 40}[/cyan]\n")
-    console.print(translation[:4000])
+    console.print(translation[:4000], markup=False)
     if len(translation) > 4000:
         console.print(f"[dim]... (preview truncated · total {len(translation)} characters)[/dim]")
 

@@ -11,6 +11,16 @@ from automation_tools.core.logger import print_error, print_success
 # one shared implementation that can be evolved without divergent behavior.
 
 
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _sanitize_csv_cell(value: Any) -> Any:
+    """Prevents CSV formula injection in spreadsheet applications when a text cell starts with a formula trigger."""
+    if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
+        return f"'{value}"
+    return value
+
+
 def export_rows(out_path: str, header: Sequence[str], rows: Iterable[Sequence[Any]]) -> bool:
     """Writes a report as CSV. Returns whether it actually got there.
 
@@ -23,7 +33,7 @@ def export_rows(out_path: str, header: Sequence[str], rows: Iterable[Sequence[An
             writer = csv.writer(handle)
             writer.writerow(list(header))
             for row in rows:
-                writer.writerow(list(row))
+                writer.writerow([_sanitize_csv_cell(cell) for cell in row])
     except OSError as e:
         print_error(f"Could not export report: {e}")
         return False

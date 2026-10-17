@@ -260,3 +260,18 @@ def test_non_office_formats_never_reach_libreoffice(tmp_path, monkeypatch):
     out = tmp_path / "n.pdf"
     assert pb.run_pdf_builder("document", [str(src)], output=str(out))
     assert "hola" in pdf_text(out)
+
+
+def test_read_docx_rejects_xml_entity_expansion(tmp_path):
+    src = tmp_path / "xmlbomb.docx"
+    xml_bomb = (
+        '<?xml version="1.0"?>'
+        '<!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;">]>'
+        f'<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>&lol2;</w:t></w:r></w:p></w:body></w:document>'
+    )
+    with zipfile.ZipFile(str(src), "w") as archive:
+        archive.writestr("word/document.xml", xml_bomb)
+    with pytest.raises(ValueError, match="Unsafe XML declaration"):
+        pb.read_docx(str(src))
+    assert pb.run_pdf_builder("document", [str(src)], use_libreoffice=False) is False
+

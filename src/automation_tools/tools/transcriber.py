@@ -46,7 +46,7 @@ def run_transcriber(
     console.print(f"\n[cyan]{'=' * 40}[/cyan]")
     console.print("[bold]TRANSCRIPTION[/bold]")
     console.print(f"[cyan]{'=' * 40}[/cyan]\n")
-    console.print(response_text)
+    console.print(response_text, markup=False)
 
     if not out_path:
         ext = ".srt" if mode == "srt" else ".txt"

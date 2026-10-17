@@ -165,7 +165,7 @@ def run_ocr(
         console.print(f"\n[cyan]{'=' * 40}[/cyan]")
         console.print("[bold]EXTRACTED TEXT[/bold]")
         console.print(f"[cyan]{'=' * 40}[/cyan]\n")
-        console.print(text)
+        console.print(text, markup=False)
         if out_path:
             if _write_text(text, out_path):
                 print_success(f"Text saved to: {out_path}")

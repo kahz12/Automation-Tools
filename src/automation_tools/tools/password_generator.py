@@ -544,12 +544,12 @@ def main() -> None:
     phrase.add_argument("--special", action="store_true", help="Append a symbol.")
 
     check = sub.add_parser("check", help="Score a password and look it up in HIBP.")
-    check.add_argument("password")
+    check.add_argument("password", nargs="?", help="Password to check (prompted hidden if omitted).")
     check.add_argument("--offline", action="store_true",
                        help="Skip the HaveIBeenPwned lookup.")
 
     copy = sub.add_parser("copy", help="Put a password on the clipboard.")
-    copy.add_argument("password")
+    copy.add_argument("password", nargs="?", help="Password to copy (prompted hidden if omitted).")
 
     args = parser.parse_args()
 
@@ -573,9 +573,13 @@ def main() -> None:
                 count=args.count,
             )
         elif args.action == "check":
-            result = run_evaluate_strength(args.password, check_breach=not args.offline)
+            import getpass
+            pw = args.password if args.password is not None else getpass.getpass("Password to check: ")
+            result = run_evaluate_strength(pw, check_breach=not args.offline)
         else:
-            result = run_copy_password(args.password)
+            import getpass
+            pw = args.password if args.password is not None else getpass.getpass("Password to copy: ")
+            result = run_copy_password(pw)
     except KeyboardInterrupt:
         raise SystemExit(130)
     raise SystemExit(exit_code(result))

@@ -1,3 +1,4 @@
+import html
 import time
 import random
 import sqlite3
@@ -10,6 +11,7 @@ from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from rich.markup import escape
 
 from automation_tools.core.logger import get_logger, console, print_success, print_warning
 from automation_tools.core.config import load_json_config, state_path
@@ -177,8 +179,8 @@ def send_telegram(token: str, chat_id: str, message: str) -> None:
 
 def send_notification(title: str, message: str, settings: Dict[str, Any]) -> None:
     """Prints the notification and, if `settings` has Telegram credentials, sends it too."""
-    full_msg = f"<b>{title}</b>\n{message}"
-    console.print(f"\n[bold yellow]🔔 {title}:[/bold yellow] {message}")
+    full_msg = f"<b>{html.escape(str(title))}</b>\n{html.escape(str(message))}"
+    console.print(f"\n[bold yellow]🔔 {escape(str(title))}:[/bold yellow] {escape(str(message))}")
 
     token   = settings.get("telegram_token", "")
     chat_id = settings.get("telegram_chat_id", "")

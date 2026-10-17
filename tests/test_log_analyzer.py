@@ -158,3 +158,10 @@ def test_memory_does_not_grow_with_the_number_of_matches(tmp_path):
     assert peak < 1_000_000, f"peak memory was {peak} bytes — matches are still being buffered"
     # …and streaming must not lose anything.
     assert "Total matches found: 50000" in out.read_text(encoding="utf-8")
+
+
+def test_handles_unbalanced_rich_markup_brackets_in_log_lines(tmp_path):
+    log = tmp_path / "brackets.log"
+    log.write_text("ERROR [/] [bold red][unclosed tag in log line\n", encoding="utf-8")
+    assert log_analyzer.run_log_analyzer(str(log), keywords="ERROR") is True
+

@@ -118,3 +118,21 @@ def test_db_rolls_back_a_write_when_the_block_raises(monkeypatch, tmp_path):
             raise RuntimeError("interrupted mid-round")
 
     assert monitor.obtener_ultimo_precio(url) is None
+
+
+def test_send_notification_escapes_html_and_markup(monkeypatch):
+    sent = {}
+
+    def fake_send_telegram(token, chat_id, msg):
+        sent["msg"] = msg
+
+    monkeypatch.setattr(monitor, "send_telegram", fake_send_telegram)
+    monitor.send_notification(
+        "Alert <script>",
+        "Item [/] & <b onclick=evil()>link</b>",
+        {"telegram_token": "tok", "telegram_chat_id": "123"},
+    )
+    assert "<script>" not in sent["msg"]
+    assert "&lt;script&gt;" in sent["msg"]
+    assert "&amp;" in sent["msg"]
+

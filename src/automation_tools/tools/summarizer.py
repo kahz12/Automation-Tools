@@ -159,7 +159,7 @@ def run_summarizer(filepath: str, api_key: Optional[str] = None,
         console.print(f"\n[cyan]{'='*40}[/cyan]")
         console.print("[bold]GENERATED SUMMARY[/bold]")
         console.print(f"[cyan]{'='*40}[/cyan]\n")
-        console.print(summary)
+        console.print(summary, markup=False)
 
         # Optionally save to file.
         if out_path:

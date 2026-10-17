@@ -121,10 +121,37 @@ def _heading_level(style: Optional[str]) -> Optional[str]:
     return None
 
 
+MAX_OFFICE_XML_BYTES = 32 * 1024 * 1024  # 32 MiB per XML member
+_UNSAFE_XML_DECL = re.compile(rb"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
+
+def _read_xml_from_zip(
+    archive: zipfile.ZipFile,
+    member_name: str,
+    max_bytes: int = MAX_OFFICE_XML_BYTES,
+) -> ET.Element:
+    """Safely reads and parses an XML entry from an Office zip container.
+
+    Enforces an uncompressed size cap (Zip bomb defense) and rejects XML
+    DOCTYPE/ENTITY declarations (Billion Laughs / XXE defense) while relying
+    solely on the Python standard library.
+    """
+    info = archive.getinfo(member_name)
+    if info.file_size > max_bytes:
+        raise ValueError(f"XML member '{member_name}' exceeds maximum allowed size ({max_bytes} bytes)")
+    with archive.open(info) as stream:
+        raw = stream.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        raise ValueError(f"XML member '{member_name}' exceeds maximum allowed size ({max_bytes} bytes)")
+    if _UNSAFE_XML_DECL.search(raw):
+        raise ValueError(f"Unsafe XML declaration (DOCTYPE/ENTITY) in '{member_name}'")
+    return ET.fromstring(raw)
+
+
 def read_docx(path: str) -> List[Block]:
     """Paragraphs, headings, list items and tables out of a .docx."""
     with zipfile.ZipFile(path) as archive:
-        root = ET.fromstring(archive.read("word/document.xml"))
+        root = _read_xml_from_zip(archive, "word/document.xml")
 
     body = root.find(_q(_W, "body"))
     if body is None:
@@ -168,7 +195,7 @@ def read_docx(path: str) -> List[Block]:
 def read_odt(path: str) -> List[Block]:
     """Headings, paragraphs, list items and tables out of an .odt."""
     with zipfile.ZipFile(path) as archive:
-        root = ET.fromstring(archive.read("content.xml"))
+        root = _read_xml_from_zip(archive, "content.xml")
 
     blocks: List[Block] = []
     seen_in_list: set = set()
@@ -225,7 +252,7 @@ def read_pptx(path: str) -> List[Block]:
 
         blocks: List[Block] = []
         for index, name in enumerate(names):
-            root = ET.fromstring(archive.read(name))
+            root = _read_xml_from_zip(archive, name)
             lines = []
             for paragraph in root.iter(_q(_A, "p")):
                 text = "".join(t.text or "" for t in paragraph.iter(_q(_A, "t"))).strip()

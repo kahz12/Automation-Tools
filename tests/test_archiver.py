@@ -189,3 +189,17 @@ def test_run_archiver_unknown_action(tmp_path):
 
 def test_run_archiver_missing_source(tmp_path):
     assert ar.run_archiver("create", sources=[str(tmp_path / "nope")], apply=True) is False
+
+
+def test_extract_enforces_max_bytes_limit(tmp_path):
+    bomb = str(tmp_path / "bomb.zip")
+    with zipfile.ZipFile(bomb, "w") as zf:
+        zf.writestr("small.txt", "ok")
+        zf.writestr("huge.txt", "x" * 1024)
+
+    dest = tmp_path / "out"
+    written, skipped = ar.extract_archive(bomb, str(dest), max_bytes=100)
+    assert written == ["small.txt"]
+    assert any(name == "huge.txt" and "limit" in reason for name, reason in skipped)
+    assert not (dest / "huge.txt").exists()
+

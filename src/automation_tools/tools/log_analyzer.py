@@ -3,6 +3,8 @@ from automation_tools.core.cli import ArgumentParser
 import re
 from typing import Optional
 
+from rich.markup import escape
+
 from automation_tools.core import fs
 from automation_tools.core.logger import console, print_error, print_step, print_warning
 
@@ -25,7 +27,7 @@ def run_log_analyzer(
     invalid regex, nothing to scan, or an unwritable report destination.
     """
     if not os.path.exists(path):
-        print_error(f"Path '{path}' does not exist.")
+        print_error(f"Path '{escape(path)}' does not exist.")
         return False
 
     if not keywords:
@@ -48,14 +50,14 @@ def run_log_analyzer(
             else:
                 compiled_regexes.append(re.compile(re.escape(pat), flags))
         except re.error as e:
-            print_error(f"Invalid regex '{pat}': {e}")
+            print_error(f"Invalid regex '{escape(pat)}': {escape(str(e))}")
             return False
 
     # Gather files
     if os.path.isfile(path):
         files_to_scan = [path]
     else:
-        print_step(f"Scanning directory '{path}' for .log files...")
+        print_step(f"Scanning directory '{escape(path)}' for .log files...")
         files_to_scan = list(fs.walk_files(path, extensions=(".log",)))
     
     if not files_to_scan:
@@ -71,7 +73,7 @@ def run_log_analyzer(
         try:
             report = open(out_path, "w", encoding="utf-8")
         except OSError as e:
-            print_error(f"Error saving report to {out_path}: {e}")
+            print_error(f"Error saving report to {escape(out_path)}: {escape(str(e))}")
             return False
 
     console.print(f"\n[cyan]{'='*50}[/cyan]")
@@ -95,14 +97,14 @@ def run_log_analyzer(
                             continue
 
                         if file_matches == 0:
-                            console.print(f"[bold #a78bfa]📄 {file_path}[/]")
+                            console.print(f"[bold #a78bfa]📄 {escape(file_path)}[/]")
                             if report:
                                 report.write(f"--- {file_path} ---\n")
                         file_matches += 1
                         total_matches += 1
 
                         if shown < MAX_CONSOLE_MATCHES:
-                            console.print(f"  [dim]Line {line_num}:[/] {line[:200]}")
+                            console.print(f"  [dim]Line {line_num}:[/] {escape(line[:200])}")
                             shown += 1
                         elif shown == MAX_CONSOLE_MATCHES:
                             console.print("  [dim]... more matches hidden here; see the full report.[/]")
@@ -111,7 +113,7 @@ def run_log_analyzer(
                         if report:
                             report.write(f"Line {line_num}: {line}\n")
             except OSError as e:
-                print_warning(f"Could not read {file_path}: {e}")
+                print_warning(f"Could not read {escape(file_path)}: {escape(str(e))}")
                 continue
 
             if file_matches:

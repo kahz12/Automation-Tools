@@ -2,12 +2,35 @@ import os
 from automation_tools.core.cli import ArgumentParser, exit_code
 import subprocess
 import sys
+from typing import Optional
+from urllib.parse import urlparse
+
+from rich.markup import escape
 
 from automation_tools.core.logger import console, print_error, print_step, print_success
 from automation_tools.core.config import get_downloads_folder
 
 # Wraps yt-dlp: single videos or whole playlists, video or audio-only, and it
 # picks up interrupted downloads where they stopped.
+
+def normalize_youtube_url(url: str) -> Optional[str]:
+    """Validates and normalizes a video URL for yt-dlp.
+
+    Allows any http/https domain supported by yt-dlp while blocking CLI option
+    injection (leading '-') and non-web schemes (such as file://).
+    """
+    raw = (url or "").strip()
+    if not raw or raw.startswith("-"):
+        return None
+    if "://" not in raw:
+        raw = f"https://{raw}"
+    parsed = urlparse(raw)
+    if parsed.scheme.lower() not in ("http", "https"):
+        return None
+    host = (parsed.hostname or "").strip()
+    if not host or "." not in host:
+        return None
+    return raw
 
 
 def _is_playlist(url: str) -> bool:
@@ -27,14 +50,19 @@ def run_youtube_downloader(
     - Handles playlist organization into subfolders.
     - Implements an archive file to skip previously downloaded content.
     """
+    clean_url = normalize_youtube_url(url)
+    if not clean_url:
+        print_error(f"Invalid video URL: {escape(str(url))}")
+        return False
+
     output_dir = get_downloads_folder()
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    is_playlist = playlist or _is_playlist(url)
+    is_playlist = playlist or _is_playlist(clean_url)
 
-    print_step(f"Preparing download in: [bold]{output_dir}[/bold]")
+    print_step(f"Preparing download in: [bold]{escape(output_dir)}[/bold]")
     if is_playlist:
         print_step("📚 Playlist mode activated.")
 
@@ -76,7 +104,7 @@ def run_youtube_downloader(
             '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         ])
 
-    cmd.extend(['-o', output_template, url])
+    cmd.extend(['-o', output_template, '--', clean_url])
 
     console.print(f"[cyan]{'-' * 50}[/cyan]")
     try:

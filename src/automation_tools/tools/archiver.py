@@ -212,17 +212,39 @@ def _is_within(base: str, target: str) -> bool:
         return False
 
 
-def _write_zip_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo, target: str) -> None:
+MAX_EXTRACT_TOTAL_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB default extraction cap
+_COPY_CHUNK = 64 * 1024
+
+
+def _copy_bounded(src, out, remaining: int) -> int:
+    """Copies from ``src`` to ``out`` up to ``remaining`` bytes, raising ValueError if exceeded."""
+    written = 0
+    while True:
+        chunk = src.read(_COPY_CHUNK)
+        if not chunk:
+            break
+        written += len(chunk)
+        if written > remaining:
+            raise ValueError("archive exceeds maximum allowed extraction size")
+        out.write(chunk)
+    return written
+
+
+def _write_zip_member(
+    zf: zipfile.ZipFile, info: zipfile.ZipInfo, target: str, remaining: int = MAX_EXTRACT_TOTAL_BYTES
+) -> int:
     with zf.open(info) as src, open(target, "wb") as out:
-        shutil.copyfileobj(src, out)
+        return _copy_bounded(src, out, remaining)
 
 
-def _write_tar_member(tf: tarfile.TarFile, member: tarfile.TarInfo, target: str) -> None:
+def _write_tar_member(
+    tf: tarfile.TarFile, member: tarfile.TarInfo, target: str, remaining: int = MAX_EXTRACT_TOTAL_BYTES
+) -> int:
     src = tf.extractfile(member)
     if src is None:
-        return
+        return 0
     with src, open(target, "wb") as out:
-        shutil.copyfileobj(src, out)
+        return _copy_bounded(src, out, remaining)
 
 
 def extract_archive(
@@ -230,11 +252,13 @@ def extract_archive(
     dest: str,
     overwrite: bool = False,
     dry_run: bool = False,
+    max_bytes: int = MAX_EXTRACT_TOTAL_BYTES,
 ) -> Tuple[List[str], List[Tuple[str, str]]]:
     """Extracts an archive into `dest`, returning (written, skipped) where each
     skipped entry is (name, reason). Guards against path traversal, refuses to
-    follow archived symlinks, and (unless overwrite) leaves existing files
-    untouched. In dry_run mode nothing is written to disk.
+    follow archived symlinks, enforces a total extracted byte limit (`max_bytes`),
+    and (unless overwrite) leaves existing files untouched. In dry_run mode
+    nothing is written to disk.
     """
     kind = _detect_format(archive_path)
     if kind is None:
@@ -242,8 +266,10 @@ def extract_archive(
 
     written: List[str] = []
     skipped: List[Tuple[str, str]] = []
+    total_extracted = 0
 
-    def _plan(name: str, is_dir: bool, extract_fn: Callable[[str], None]) -> None:
+    def _plan(name: str, is_dir: bool, declared_size: int, extract_fn: Callable[[str, int], int]) -> None:
+        nonlocal total_extracted
         target = os.path.normpath(os.path.join(dest, name))
         if not _is_within(dest, target):
             skipped.append((name, "unsafe path outside destination"))
@@ -255,28 +281,42 @@ def extract_archive(
         if os.path.exists(target) and not overwrite:
             skipped.append((name, "already exists"))
             return
+        remaining = max_bytes - total_extracted
+        if declared_size > remaining:
+            skipped.append((name, "exceeds maximum extraction size limit"))
+            return
         if not dry_run:
             os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
-            extract_fn(target)
+            try:
+                total_extracted += extract_fn(target, remaining)
+            except ValueError:
+                try:
+                    os.remove(target)
+                except OSError:
+                    pass
+                skipped.append((name, "exceeds maximum extraction size limit"))
+                return
+        else:
+            total_extracted += max(declared_size, 0)
         written.append(name)
 
     if kind == "zip":
         with zipfile.ZipFile(archive_path) as zf:
             for info in zf.infolist():
-                def write_zip_member(target: str, member: zipfile.ZipInfo = info) -> None:
-                    _write_zip_member(zf, member, target)
+                def write_zip_member(target: str, rem: int, member: zipfile.ZipInfo = info) -> int:
+                    return _write_zip_member(zf, member, target, rem)
 
-                _plan(info.filename, info.is_dir(), write_zip_member)
+                _plan(info.filename, info.is_dir(), info.file_size, write_zip_member)
     else:
         with tarfile.open(archive_path) as tf:
             for m in tf.getmembers():
                 if not (m.isfile() or m.isdir()):
                     skipped.append((m.name, "special member (link/device)"))
                     continue
-                def write_tar_member(target: str, member: tarfile.TarInfo = m) -> None:
-                    _write_tar_member(tf, member, target)
+                def write_tar_member(target: str, rem: int, member: tarfile.TarInfo = m) -> int:
+                    return _write_tar_member(tf, member, target, rem)
 
-                _plan(m.name, m.isdir(), write_tar_member)
+                _plan(m.name, m.isdir(), m.size, write_tar_member)
 
     return written, skipped
 

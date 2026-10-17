@@ -71,11 +71,15 @@ class YoutubeScreen(ToolScreen):
         if not url:
             self._err("URL is required.")
             return
+        clean_url = youtube_downloader.normalize_youtube_url(url)
+        if not clean_url:
+            self._err("That is not a valid http(s) link.")
+            return
         mode_map = {"rb-video": "video", "rb-audio": "audio"}
         mode = mode_map.get(self._rval(self.query_one("#mode", RadioSet)) or "rb-video", "video")
         playlist = self._bval(self.query_one("#playlist", Switch))
         await self._run_tool(youtube_downloader.run_youtube_downloader,
-                             url=url, mode=mode, playlist=playlist)
+                             url=clean_url, mode=mode, playlist=playlist)
 
 
 # ── Instagram Downloader ───────────────────────────────────────────────────

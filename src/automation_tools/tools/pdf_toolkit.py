@@ -320,12 +320,12 @@ def main() -> None:
 
     p_enc = sub.add_parser("encrypt", help="Password-protect a PDF.")
     p_enc.add_argument("input", help="Input PDF path.")
-    p_enc.add_argument("password", help="Password to set.")
+    p_enc.add_argument("password", nargs="?", help="Password to set (prompted hidden if omitted).")
     p_enc.add_argument("--out", help="Output PDF path.")
 
     p_dec = sub.add_parser("decrypt", help="Remove protection from a PDF.")
     p_dec.add_argument("input", help="Input PDF path.")
-    p_dec.add_argument("password", help="Current password.")
+    p_dec.add_argument("password", nargs="?", help="Current password (prompted hidden if omitted).")
     p_dec.add_argument("--out", help="Output PDF path.")
 
     args = parser.parse_args()
@@ -339,9 +339,13 @@ def main() -> None:
         elif args.command == "rotate":
             result = run_pdf_rotate(args.input, args.angle, pages=args.pages, output_path=args.out)
         elif args.command == "encrypt":
-            result = run_pdf_encrypt(args.input, args.password, output_path=args.out)
+            import getpass
+            pw = args.password if args.password is not None else getpass.getpass("Password to set: ")
+            result = run_pdf_encrypt(args.input, pw, output_path=args.out)
         else:
-            result = run_pdf_decrypt(args.input, args.password, output_path=args.out)
+            import getpass
+            pw = args.password if args.password is not None else getpass.getpass("PDF password: ")
+            result = run_pdf_decrypt(args.input, pw, output_path=args.out)
     except KeyboardInterrupt:
         raise SystemExit(130)
     raise SystemExit(exit_code(result))

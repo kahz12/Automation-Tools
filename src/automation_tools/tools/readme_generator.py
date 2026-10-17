@@ -76,16 +76,39 @@ def detect_primary_language(directory: str) -> Optional[str]:
     return None
 
 
+_SENSITIVE_FILE_PATTERNS = re.compile(
+    r"(^|\.)("
+    r"env(\..+)?|netrc|npmrc|pypirc|pgpass|htpasswd|"
+    r"credentials?(\..+)?|secrets?(\..+)?|tokens?(\..+)?|"
+    r"service[-_]?account.*\.json|productos_a_monitorear\.json|"
+    r"id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|.*\.pem|.*\.key|.*\.p12|.*\.pfx"
+    r")$",
+    re.IGNORECASE,
+)
+
+
+def _is_sensitive_filename(filename: str) -> bool:
+    """Returns True if a file name matches known secret or credential patterns."""
+    name = os.path.basename(filename)
+    if name.startswith(".env"):
+        return True
+    return bool(_SENSITIVE_FILE_PATTERNS.search(name))
+
+
 def get_project_tree(directory: str, ignore_dirs: Optional[List[str]] = None) -> str:
     """Text tree of the directory structure."""
     if ignore_dirs is None:
         ignore_dirs = ['.git', '__pycache__', 'venv', 'env', 'node_modules', '.idea', '.vscode', '.venv']
+    ignore_set = set(ignore_dirs)
 
     tree_str = f"{os.path.basename(os.path.abspath(directory))}/\n"
 
-    for root, dirs, files in os.walk(directory):
-        # Filter out ignored directories
-        dirs[:] = [d for d in dirs if d not in ignore_dirs]
+    for root, dirs, files in os.walk(directory, followlinks=False):
+        # Filter out ignored directories and symlinked directories
+        dirs[:] = [
+            d for d in dirs
+            if d not in ignore_set and not os.path.islink(os.path.join(root, d))
+        ]
         level = root.replace(directory, '').count(os.sep)
         indent = '│   ' * level
         subindent = '│   ' * (level + 1)
@@ -103,16 +126,25 @@ def read_key_files(directory: str, max_files: int = 10) -> str:
     """Concatenates the most telling project files, capped at `max_files` so the prompt stays within token limits."""
     key_extensions = ['.py', '.js', '.html', '.md', '.json', '.txt', '.sh', '.yml', '.yaml', '.ts', '.go', '.rs', '.cpp', '.h', '.java']
     important_files = ['requirements.txt', 'package.json', 'Dockerfile', 'main.py', 'app.py', 'index.js', 'cargo.toml', 'go.mod']
+    ignored_dirs = {'.git', 'venv', 'env', 'node_modules', '__pycache__', '.venv', '.idea', '.vscode'}
 
     content = ""
     files_read = 0
 
-    for root, dirs, files in os.walk(directory):
-        if any(ignored in root for ignored in ['.git', 'venv', 'node_modules', '__pycache__', '.venv']):
-            continue
+    for root, dirs, files in os.walk(directory, followlinks=False):
+        dirs[:] = [
+            d for d in dirs
+            if d not in ignored_dirs and not os.path.islink(os.path.join(root, d))
+        ]
 
         for f in files:
+            if _is_sensitive_filename(f):
+                continue
+
             filepath = os.path.join(root, f)
+            if os.path.islink(filepath):
+                continue
+
             ext = os.path.splitext(f)[1].lower()
 
             if f in important_files or ext in key_extensions:

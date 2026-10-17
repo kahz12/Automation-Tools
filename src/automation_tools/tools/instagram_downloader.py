@@ -374,7 +374,7 @@ def build_gallery_dl_command(url: str, media: str, out_root: str,
         cmd += ["--cookies", cookie_file]
     if browser:
         cmd += ["--cookies-from-browser", browser]
-    cmd.append(url)
+    cmd.extend(["--", url])
     return cmd
 
 
