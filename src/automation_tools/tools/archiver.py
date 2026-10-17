@@ -1,7 +1,6 @@
 from automation_tools.core.cli import ArgumentParser
 import fnmatch
 import os
-import shutil
 import tarfile
 import zipfile
 from dataclasses import dataclass
