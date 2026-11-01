@@ -1,5 +1,6 @@
 import os
 import hashlib
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser, exit_code
 from typing import Dict, List, Optional
 from collections import defaultdict
@@ -20,6 +21,7 @@ def hash_file(filepath: str, chunk_size: int = 8192) -> Optional[str]:
     try:
         with open(filepath, 'rb') as f:
             for chunk in iter(lambda: f.read(chunk_size), b""):
+                cancel.check()
                 hasher.update(chunk)
         return hasher.hexdigest()
     except Exception as e:
@@ -144,6 +146,7 @@ def run_duplicate_finder(
         for h, paths in duplicates.items():
             # Skip the first one (original), delete the rest
             for p in paths[1:]:
+                cancel.check()
                 try:
                     os.remove(p)
                     deleted += 1

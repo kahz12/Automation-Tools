@@ -37,3 +37,8 @@ def test_plain_text():
     soup = BeautifulSoup("<div><p>one</p><p>two</p></div>", "html.parser")
     text = wc._plain_text(soup.find("div"))
     assert "one" in text and "two" in text
+
+
+def test_a_url_it_cannot_parse_is_a_normal_failure(capsys):
+    assert wc.run_web_clipper("https://[x") is False
+    assert "Could not fetch" in capsys.readouterr().out

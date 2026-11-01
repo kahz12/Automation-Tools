@@ -21,7 +21,7 @@ class RenamerScreen(ToolScreen):
         yield Input(placeholder="/path/to/folder", id="dir")
         yield Label("Mode:", classes="field-label")
         with RadioSet(id="mode"):
-            yield RadioButton("Pattern  (e.g. photo_{:03d}.jpg)", id="rb-patron", value=True)
+            yield RadioButton("Pattern  (e.g. photo_{:03d}, the extension is kept)", id="rb-patron", value=True)
             yield RadioButton("Date  (e.g. 2024-01-01_file.jpg)", id="rb-fecha")
             yield RadioButton("Text replacement  (find → replace)", id="rb-replace")
         # Pattern section
@@ -77,11 +77,13 @@ class RenamerScreen(ToolScreen):
         elif mode == "fecha":
             keep = self._bval(self.query_one("#keep-name", Switch))
         elif mode == "reemplazo":
-            old_text = self._ival(self.query_one("#old-text", Input))
+            # Not stripped: "replace spaces with underscores" and the reverse
+            # are the commonest renames there are, and a stripped " " is "".
+            old_text = self.query_one("#old-text", Input).value
             if not old_text:
                 self._err("Text to find is required.")
                 return
-            new_text = self._ival(self.query_one("#new-text", Input))
+            new_text = self.query_one("#new-text", Input).value
         ext = self._ival(self.query_one("#ext", Input)) or None
         apply_changes = self._bval(self.query_one("#apply", Switch))
         preview = self._bval(self.query_one("#preview", Switch)) if apply_changes else False

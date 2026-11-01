@@ -1,6 +1,7 @@
 import os
 import re
 import datetime
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser, exit_code
 from typing import Optional, List, Tuple
 
@@ -233,6 +234,10 @@ def run_massive_rename(
         print_warning("No files found to process.")
         return True
 
+    if mode == 'reemplazo' and not old_text:
+        print_error("Replace mode needs the text to find (--old-text).")
+        return False
+
     count_start = 1
     if mode == 'patron':
         if not pattern:
@@ -249,6 +254,15 @@ def run_massive_rename(
                     "Tip: use a placeholder like 'photo_{:03d}' (no extension)."
                 )
                 return False
+
+        try:
+            pattern.format(1)
+        except (ValueError, KeyError, IndexError, AttributeError, TypeError):
+            print_error(
+                f"Invalid pattern: '{pattern}'. "
+                "Use a placeholder like 'photo_{:03d}' (no extension)."
+            )
+            return False
 
         matching, pending, max_index = _split_pattern_files(files, pattern)
         if matching:
@@ -280,6 +294,7 @@ def run_massive_rename(
     reserved: set = set()
     count = count_start
     for filename in files:
+        cancel.check()
         new_name = generate_new_name(
             filename=filename,
             directory=directory,
@@ -331,16 +346,23 @@ def run_massive_rename(
     # Apply renames
     if apply_changes:
         applied = 0
-        for src_name, dst_name in plan:
-            try:
-                os.rename(os.path.join(directory, src_name), os.path.join(directory, dst_name))
-                applied += 1
-            except Exception as e:
-                print_error(f"Error renaming '{src_name}': {e}")
+        try:
+            for src_name, dst_name in plan:
+                cancel.check()
+                try:
+                    os.rename(os.path.join(directory, src_name), os.path.join(directory, dst_name))
+                    applied += 1
+                except Exception as e:
+                    print_error(f"Error renaming '{src_name}': {e}")
+        except cancel.Cancelled:
+            # Nothing printed per file here, and renames cannot be undone, so
+            # this is the only record of where it stopped.
+            print_warning(f"Stopped: {applied}/{len(plan)} files had already been renamed.")
+            raise
         print_success(f"Renaming complete. {applied}/{len(plan)} files processed.")
         return applied == len(plan)
     else:
-        console.print("\n[dim]To apply these changes, run with apply_changes=True[/dim]")
+        console.print("\n[dim]To apply these changes, add --apply (or turn on Apply in the menu).[/dim]")
         return True
 
 

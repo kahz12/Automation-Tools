@@ -1,5 +1,6 @@
 import argparse
 
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser
 import base64
 import getpass
@@ -339,6 +340,9 @@ def encrypt_file(input_path: str, master_key: bytes, kdf_salt: bytes,
         counter = 0
         chunk = source.read(chunk_size)
         while True:
+            # _atomic_write throws the partial output away, and the original
+            # is only ever deleted after a file finishes.
+            cancel.check()
             # Read ahead so each chunk knows whether it is the last one, which
             # is what makes a truncated file detectable. An empty input still
             # produces one frame, so a file with no frames is never valid.
@@ -395,6 +399,7 @@ def _decrypt_v2(handle: BinaryIO, header: bytes, password: str,
 
     counter = 0
     while True:
+        cancel.check()
         following = _read_frame(handle, max_frame)
         final = following is None
         # Each chunk is authenticated before a byte of it reaches the file, and
@@ -609,6 +614,7 @@ def run_vault(
     done = 0
     failed = 0
     for src in files:
+        cancel.check()
         out = _out_path(src, action, output_dir)
         rel = os.path.basename(src)
         try:

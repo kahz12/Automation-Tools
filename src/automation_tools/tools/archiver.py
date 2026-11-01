@@ -1,6 +1,8 @@
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser
 import fnmatch
 import os
+import shutil
 import tarfile
 import zipfile
 from dataclasses import dataclass
@@ -160,16 +162,59 @@ def _default_output(sources: List[str], fmt: str) -> str:
     return f"{base}_{_timestamp()}{ARCHIVE_FORMATS[fmt]}"
 
 
+def _partial_path(path: str) -> str:
+    """A name to build `path` under, with the process id so two runs cannot meet."""
+    return f"{path}.{os.getpid()}.part"
+
+
+def _remove_quietly(path: str) -> None:
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def _add_to_zip(zf: zipfile.ZipFile, entry: ArchiveEntry) -> None:
+    """ZipFile.write, with a cancellation point in every read of a large file."""
+    info = zipfile.ZipInfo.from_file(entry.src, entry.arcname)
+    info.compress_type = zf.compression
+    with open(entry.src, "rb") as source, zf.open(info, "w") as sink:
+        shutil.copyfileobj(cancel.checked(source), sink)
+
+
+def _add_to_tar(tf: tarfile.TarFile, entry: ArchiveEntry) -> None:
+    """TarFile.add for one file, with the same cancellation points."""
+    info = tf.gettarinfo(entry.src, arcname=entry.arcname)
+    if info is None:  # A socket or the like: tar has no way to store it.
+        return
+    if not info.isreg():
+        tf.addfile(info)
+        return
+    with open(entry.src, "rb") as source:
+        tf.addfile(info, cancel.checked(source))
+
+
 def create_archive(entries: List[ArchiveEntry], output: str, fmt: str) -> None:
-    """Writes the staged entries into a zip or tar archive at `output`."""
-    if fmt == "zip":
-        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zf:
-            for e in entries:
-                zf.write(e.src, e.arcname)
-    else:
-        with tarfile.open(output, _TAR_MODES[fmt]) as tf:
-            for e in entries:
-                tf.add(e.src, arcname=e.arcname, recursive=False)
+    """Writes the staged entries into a zip or tar archive at `output`.
+
+    Through a temporary name, because opening an archive for writing empties
+    it: a run that failed or was cancelled halfway would otherwise cost the
+    backup already at that path and leave half of one in its place.
+    """
+    partial = _partial_path(output)
+    try:
+        if fmt == "zip":
+            with zipfile.ZipFile(partial, "w", zipfile.ZIP_DEFLATED) as zf:
+                for e in entries:
+                    _add_to_zip(zf, e)
+        else:
+            with tarfile.open(partial, _TAR_MODES[fmt]) as tf:
+                for e in entries:
+                    _add_to_tar(tf, e)
+        os.replace(partial, output)
+    except BaseException:
+        _remove_quietly(partial)
+        raise
 
 
 def _detect_format(path: str) -> Optional[str]:
@@ -219,6 +264,7 @@ def _copy_bounded(src, out, remaining: int) -> int:
     """Copies from ``src`` to ``out`` up to ``remaining`` bytes, raising ValueError if exceeded."""
     written = 0
     while True:
+        cancel.check()
         chunk = src.read(_COPY_CHUNK)
         if not chunk:
             break
@@ -269,6 +315,7 @@ def extract_archive(
 
     def _plan(name: str, is_dir: bool, declared_size: int, extract_fn: Callable[[str, int], int]) -> None:
         nonlocal total_extracted
+        cancel.check()
         target = os.path.normpath(os.path.join(dest, name))
         if not _is_within(dest, target):
             skipped.append((name, "unsafe path outside destination"))
@@ -286,36 +333,46 @@ def extract_archive(
             return
         if not dry_run:
             os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+            # Built aside and moved in whole: with --overwrite a file cut short
+            # here would have replaced a good one.
+            partial = _partial_path(target)
             try:
-                total_extracted += extract_fn(target, remaining)
+                total_extracted += extract_fn(partial, remaining)
+                os.replace(partial, target)
             except ValueError:
-                try:
-                    os.remove(target)
-                except OSError:
-                    pass
+                _remove_quietly(partial)
                 skipped.append((name, "exceeds maximum extraction size limit"))
                 return
+            except BaseException:
+                _remove_quietly(partial)
+                raise
         else:
             total_extracted += max(declared_size, 0)
         written.append(name)
 
-    if kind == "zip":
-        with zipfile.ZipFile(archive_path) as zf:
-            for info in zf.infolist():
-                def write_zip_member(target: str, rem: int, member: zipfile.ZipInfo = info) -> int:
-                    return _write_zip_member(zf, member, target, rem)
+    try:
+        if kind == "zip":
+            with zipfile.ZipFile(archive_path) as zf:
+                for info in zf.infolist():
+                    def write_zip_member(target: str, rem: int, member: zipfile.ZipInfo = info) -> int:
+                        return _write_zip_member(zf, member, target, rem)
 
-                _plan(info.filename, info.is_dir(), info.file_size, write_zip_member)
-    else:
-        with tarfile.open(archive_path) as tf:
-            for m in tf.getmembers():
-                if not (m.isfile() or m.isdir()):
-                    skipped.append((m.name, "special member (link/device)"))
-                    continue
-                def write_tar_member(target: str, rem: int, member: tarfile.TarInfo = m) -> int:
-                    return _write_tar_member(tf, member, target, rem)
+                    _plan(info.filename, info.is_dir(), info.file_size, write_zip_member)
+        else:
+            with tarfile.open(archive_path) as tf:
+                for m in tf.getmembers():
+                    if not (m.isfile() or m.isdir()):
+                        skipped.append((m.name, "special member (link/device)"))
+                        continue
+                    def write_tar_member(target: str, rem: int, member: tarfile.TarInfo = m) -> int:
+                        return _write_tar_member(tf, member, target, rem)
 
-                _plan(m.name, m.isdir(), m.size, write_tar_member)
+                    _plan(m.name, m.isdir(), m.size, write_tar_member)
+    except cancel.Cancelled:
+        # The list is otherwise only printed at the end, which is not coming.
+        if not dry_run:
+            print_warning(f"Stopped: {len(written)} file(s) had already been extracted into '{dest}'.")
+        raise
 
     return written, skipped
 

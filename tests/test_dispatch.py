@@ -122,3 +122,67 @@ def test_json_unknown_tool_has_no_human_noise(capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is False
     assert "vault" in payload["error"]
+
+
+def test_a_tool_sees_the_keys_in_dotenv(tmp_path, monkeypatch, data_dir):
+    """The README promises .env works; only the menu used to read it."""
+    import os
+
+    monkeypatch.setenv("AT_DISPATCH_PROBE", "")
+    monkeypatch.delenv("AT_DISPATCH_PROBE")
+    (tmp_path / ".env").write_text("AT_DISPATCH_PROBE=loaded\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    seen = {}
+
+    def fake_main():
+        seen["value"] = os.environ.get("AT_DISPATCH_PROBE")
+
+    from automation_tools.tools import vault
+    monkeypatch.setattr(vault, "main", fake_main)
+
+    with pytest.raises(SystemExit):
+        dispatch.main(["vault"])
+    assert seen["value"] == "loaded"
+
+
+def test_json_mode_answers_no_instead_of_waiting_on_a_hidden_prompt(monkeypatch, capsys):
+    from automation_tools.core import prompt
+    from automation_tools.tools import vault
+
+    def must_not_ask(*_args, **_kwargs):
+        raise AssertionError("a prompt was shown while stdout is captured")
+
+    def fake_main():
+        print("answer:", prompt.confirm("Delete everything?", default=True))
+
+    monkeypatch.setattr(prompt.questionary, "confirm", must_not_ask)
+    monkeypatch.setattr(vault, "main", fake_main)
+
+    with pytest.raises(SystemExit) as excinfo:
+        dispatch.main(["--json", "vault"])
+    assert excinfo.value.code == 0
+    assert json.loads(capsys.readouterr().out)["output"] == "answer: False\n"
+
+
+@pytest.mark.parametrize("flags", [[], ["--json"]])
+def test_output_for_other_programs_is_not_hard_wrapped(flags, monkeypatch, capsys):
+    from automation_tools.core.logger import console
+    from automation_tools.tools import vault
+
+    long_path = "/data/" + "x" * 200 + "/file.txt"
+    monkeypatch.setattr(vault, "main", lambda: console.print(long_path))
+    before = console.soft_wrap
+
+    with pytest.raises(SystemExit):
+        dispatch.main([*flags, "vault"])
+
+    out = capsys.readouterr().out
+    assert long_path in (json.loads(out)["output"] if flags else out)
+    assert console.soft_wrap == before
+
+
+def test_a_path_that_looks_like_markup_is_an_ordinary_error(tmp_path, capsys):
+    with pytest.raises(SystemExit) as excinfo:
+        dispatch.main(["metadata", str(tmp_path / "[" / "x].jpg")])
+    assert excinfo.value.code == 1
+    assert "[/x].jpg" in capsys.readouterr().out

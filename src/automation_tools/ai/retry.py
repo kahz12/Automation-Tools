@@ -5,9 +5,9 @@ the same treatment Gemini already had.
 """
 from __future__ import annotations
 
-import time
 from typing import Any, Callable, Optional
 
+from automation_tools.core import cancel
 from automation_tools.core.logger import print_error, print_warning, get_logger
 
 logger = get_logger()
@@ -35,19 +35,23 @@ def with_retry(
     label: str,
     max_retries: int = MAX_RETRIES,
     base_backoff: float = BASE_BACKOFF,
-    sleep: Callable[[float], None] = time.sleep,
+    sleep: Callable[[float], None] = cancel.sleep,
 ) -> Optional[Any]:
     """Runs `call()`, retrying transient failures with exponential backoff.
 
     Returns the call's result, or None once every attempt failed, having
     already printed the error. `sleep` is injected so tests never wait.
+
+    Every provider request passes through here, so this one line of
+    `interruptible` is what lets a cancel stop all five AI tools, in the middle
+    of a request and before the next paid one starts.
     """
     backoff = base_backoff
     last_err: Optional[Exception] = None
 
     for attempt in range(1, max_retries + 1):
         try:
-            return call()
+            return cancel.interruptible(call)
         except Exception as e:
             last_err = e
             if is_rate_limit(e) and attempt < max_retries:

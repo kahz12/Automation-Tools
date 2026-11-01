@@ -14,6 +14,15 @@ atools <tool> --json ...      # equivalent spelling
 The interactive dashboard remains available as `automation-tools`; use
 `atools` in cron jobs, shell scripts and CI. Destructive commands are dry-run
 by default and require an explicit `--apply`, `--aplicar` or `--delete` flag.
+`atools organizer` is the exception: it moves files as soon as it runs, because
+every move is recorded and `atools organizer --undo` puts them back.
+
+API keys are read from the environment or from a `.env` file, looked for in the
+working directory, then the data directory, then the checkout. Variables that
+are already set win.
+
+A confirmation with nobody to answer it (cron, stdin from `/dev/null`, or any
+`--json` run) counts as "no": the tool says what it skipped and exits normally.
 
 ## One working example per tool
 
@@ -35,7 +44,8 @@ atools log_analyzer ./logs --keywords "ERROR,CRITICAL"
 atools metadata photo.jpg --export metadata.json
 atools monitor --now
 atools ocr scan.png --out scan.txt
-atools organizer
+atools organizer --policy skip
+atools organizer --undo
 atools password_generator generate --length 24 --count 3
 atools pdf_builder images ./scans --output scans.pdf
 atools pdf_toolkit merge "one.pdf,two.pdf" merged.pdf
@@ -68,7 +78,9 @@ fi
 
 The envelope contains `tool`, `ok`, `exit_code`, and `output`; failures may
 also include `error`. Human-readable output is kept as a string so scripts do
-not need to parse terminal formatting. Exit code `0` means success, `1` means
-the tool completed but reported a failed check, `2` means invalid CLI usage or
-an unknown tool, and `130` means the operation was cancelled with Ctrl-C.
+not need to parse terminal formatting, and output that is piped or captured is
+never hard-wrapped. Exit code `0` means success, `1` means the tool completed
+but reported a failed check or could not finish its work, `2` means invalid CLI
+usage or an unknown tool, and `130` means the operation was cancelled with
+Ctrl-C.
 

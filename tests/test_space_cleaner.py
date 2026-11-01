@@ -60,3 +60,17 @@ def test_delete_items_deduplicates_large_and_old_match(tmp_path):
 
     assert sc.delete_items(items) == 1
     assert not path.exists()
+
+
+def test_a_deletion_that_fails_is_a_failed_run(tmp_path, monkeypatch):
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "__pycache__" / "x.pyc").write_text("x")
+
+    def refuse(*_args, **_kwargs):
+        raise OSError("read-only")
+
+    monkeypatch.setattr(sc.shutil, "rmtree", refuse)
+    monkeypatch.setattr(sc.prompt, "confirm", lambda *_a, **_k: True)
+
+    assert sc.run_space_cleaner(str(tmp_path), find_large=False, find_old=False,
+                                apply=True) is False

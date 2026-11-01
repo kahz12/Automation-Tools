@@ -78,3 +78,17 @@ def test_the_console_is_restored_even_when_the_tool_blows_up():
         with logger.redirect_console(io.StringIO()):
             raise ValueError("boom")
     assert logger.console.file is original
+
+
+def test_nobody_to_answer_is_a_no_even_when_the_default_is_yes(monkeypatch):
+    """Under cron or with stdin from /dev/null, prompt_toolkit raises EOFError."""
+
+    class NoTerminal:
+        def __init__(self, message, default):
+            pass
+
+        def ask(self):
+            raise EOFError
+
+    monkeypatch.setattr(prompt.questionary, "confirm", NoTerminal)
+    assert prompt.confirm("Apply these renames?", default=True) is False

@@ -208,3 +208,16 @@ def test_run_succeeds_when_nothing_is_similar(tmp_path, photo):
     Image.new("RGB", (600, 400), (10, 200, 90)).save(str(other))
     assert si.run_similar_images(str(tmp_path)) is True
     assert sorted(p.name for p in tmp_path.iterdir()) == ["original.png", "other.png"]
+
+
+def test_a_copy_that_cannot_be_deleted_is_a_failed_run(tmp_path, photo, accept_confirm, monkeypatch):
+    _path, img = photo
+    img.save(tmp_path / "copy.png")
+    accept_confirm(True)
+
+    def refuse(_path):
+        raise OSError("read-only")
+
+    monkeypatch.setattr(si.os, "remove", refuse)
+
+    assert si.run_similar_images(str(tmp_path), apply=True) is False

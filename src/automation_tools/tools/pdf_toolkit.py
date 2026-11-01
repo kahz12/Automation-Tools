@@ -1,3 +1,4 @@
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser, exit_code
 import os
 from typing import List, Optional
@@ -120,6 +121,7 @@ def run_pdf_merge(inputs: str, output_path: str) -> bool:
     writer = PdfWriter()
     merged = 0
     for path in files:
+        cancel.check()
         reader = _open_reader(path)
         if reader is None:
             return False
@@ -149,6 +151,7 @@ def run_pdf_split(input_path: str, output_dir: Optional[str] = None) -> bool:
     print_step(f"Splitting {total} pages into '{out_dir}'…")
     written = 0
     for i, page in enumerate(reader.pages, 1):
+        cancel.check()
         writer = PdfWriter()
         writer.add_page(page)
         out = os.path.join(out_dir, f"page_{i:0{pad}d}.pdf")
@@ -181,6 +184,7 @@ def run_pdf_extract(input_path: str, pages: str, output_path: Optional[str] = No
 
     writer = PdfWriter()
     for idx in indices:
+        cancel.check()
         writer.add_page(reader.pages[idx])
     if _write(writer, out):
         print_success(f"Extracted {len(indices)} page(s) → '{out}'")
@@ -221,6 +225,7 @@ def run_pdf_rotate(
 
     writer = PdfWriter()
     for i, page in enumerate(reader.pages):
+        cancel.check()
         if i in targets:
             page.rotate(angle)
         writer.add_page(page)

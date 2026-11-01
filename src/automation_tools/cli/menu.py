@@ -11,9 +11,14 @@ HISTORY_MAX = 5
 def _load_history() -> list:
     try:
         with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            history = json.load(f)
     except Exception:
         return []
+    # Valid JSON is not necessarily our JSON, and anything else here would
+    # stop the menu from opening at all.
+    if not isinstance(history, list):
+        return []
+    return [name for name in history if isinstance(name, str)]
 
 
 def _save_history(names: list) -> None:

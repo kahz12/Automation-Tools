@@ -1,4 +1,5 @@
-from automation_tools.core.cli import ArgumentParser, exit_code
+from automation_tools.core import cancel
+from automation_tools.core.cli import ArgumentParser, exit_code, int_range
 import os
 from typing import Any, Optional, Tuple
 
@@ -264,6 +265,7 @@ def run_batch_image_processor(
     total_in = 0
     total_out = 0
     for filepath in files:
+        cancel.check()
         filename = os.path.basename(filepath)
         # Keep recursive batches in the same relative directory structure as
         # the input.  A flat destination would make e.g. ``a/photo.png`` and
@@ -332,18 +334,18 @@ def main() -> None:
     parser.add_argument("--out-dir", help="Output folder (default: <input>/processed).")
     parser.add_argument("--recursive", action="store_true", help="Recurse into subfolders.")
     # resize
-    parser.add_argument("--max-size", type=int, default=1920,
+    parser.add_argument("--max-size", type=int_range(1), default=1920,
                         help="Longest-side cap in px for resize (default: 1920).")
-    parser.add_argument("--scale", type=int, default=None,
+    parser.add_argument("--scale", type=int_range(1, 1000), default=None,
                         help="Resize by this percentage instead of --max-size.")
     # compress / save
-    parser.add_argument("--quality", type=int, default=80,
+    parser.add_argument("--quality", type=int_range(1, 100), default=80,
                         help="JPEG/WebP quality 1-100 (default: 80).")
     # watermark
     parser.add_argument("--text", default="", help="Watermark text.")
     parser.add_argument("--position", choices=list(WATERMARK_POSITIONS), default="bottom-right",
                         help="Watermark anchor (default: bottom-right).")
-    parser.add_argument("--opacity", type=int, default=50,
+    parser.add_argument("--opacity", type=int_range(0, 100), default=50,
                         help="Watermark opacity 0-100 (default: 50).")
     args = parser.parse_args()
 

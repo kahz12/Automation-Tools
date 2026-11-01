@@ -120,3 +120,41 @@ def test_config_is_also_found_in_the_data_directory(monkeypatch, tmp_path, data_
     (data_dir / "cfg.json").write_text(
         json.dumps({"settings": {"currency_code": "GBP"}}), encoding="utf-8")
     assert config.load_json_config("cfg.json")["settings"]["currency_code"] == "GBP"
+
+
+def _clean(monkeypatch, name):
+    # setenv first so monkeypatch remembers to remove what load_dotenv adds.
+    monkeypatch.setenv(name, "")
+    monkeypatch.delenv(name)
+
+
+def test_dotenv_is_found_in_the_working_directory(tmp_path, monkeypatch, data_dir):
+    _clean(monkeypatch, "AT_DOTENV_PROBE")
+    (tmp_path / ".env").write_text("AT_DOTENV_PROBE=from-cwd\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    config.load_environment()
+    assert os.environ["AT_DOTENV_PROBE"] == "from-cwd"
+
+
+def test_dotenv_in_the_data_directory_fills_what_the_project_lacks(tmp_path, monkeypatch, data_dir):
+    """A project's unrelated .env must not hide the keys kept for this tool."""
+    _clean(monkeypatch, "AT_DOTENV_PROBE")
+    _clean(monkeypatch, "AT_DOTENV_OTHER")
+    (tmp_path / ".env").write_text("AT_DOTENV_PROBE=from-cwd\n", encoding="utf-8")
+    (data_dir / ".env").write_text(
+        "AT_DOTENV_PROBE=from-data\nAT_DOTENV_OTHER=from-data\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    config.load_environment()
+    assert os.environ["AT_DOTENV_PROBE"] == "from-cwd"
+    assert os.environ["AT_DOTENV_OTHER"] == "from-data"
+
+
+def test_dotenv_does_not_override_a_variable_already_set(tmp_path, monkeypatch, data_dir):
+    monkeypatch.setenv("AT_DOTENV_PROBE", "from-shell")
+    (tmp_path / ".env").write_text("AT_DOTENV_PROBE=from-cwd\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    config.load_environment()
+    assert os.environ["AT_DOTENV_PROBE"] == "from-shell"

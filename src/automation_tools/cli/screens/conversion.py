@@ -446,7 +446,7 @@ class PdfToolkitScreen(ToolScreen):
 
         elif op == "encrypt":
             inp = self._ival(self.query_one("#encrypt-input", Input))
-            pwd = self._ival(self.query_one("#encrypt-pwd", Input))
+            pwd = self.query_one("#encrypt-pwd", Input).value
             if not inp:
                 self._err("PDF file is required.")
                 return
@@ -459,7 +459,7 @@ class PdfToolkitScreen(ToolScreen):
 
         else:  # decrypt
             inp = self._ival(self.query_one("#decrypt-input", Input))
-            pwd = self._ival(self.query_one("#decrypt-pwd", Input))
+            pwd = self.query_one("#decrypt-pwd", Input).value
             if not inp:
                 self._err("PDF file is required.")
                 return

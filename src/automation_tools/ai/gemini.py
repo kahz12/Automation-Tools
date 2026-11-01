@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 from automation_tools.ai.base import Capability, ProviderSpec
 from automation_tools.ai.retry import with_retry
+from automation_tools.core import cancel
 from automation_tools.core.logger import console, print_error, print_warning, get_logger
 
 logger = get_logger()
@@ -87,7 +88,11 @@ class GeminiProvider:
         The remote upload is always deleted, including on failure.
         """
         try:
-            uploaded = self._client.files.upload(file=filepath)
+            uploaded = cancel.interruptible(
+                lambda: self._client.files.upload(file=filepath),
+                # Abandoned mid-upload, it may still land. Delete it if it does.
+                on_abandoned=lambda landed: self._client.files.delete(name=landed.name),
+            )
         except Exception as e:
             print_error(f"Failed to upload file: {e}")
             return None
@@ -129,7 +134,7 @@ class GeminiProvider:
                     return False
             except Exception as e:
                 print_warning(f"Error checking file state: {e}")
-            time.sleep(poll_interval)
+            cancel.sleep(poll_interval)
 
         print_error(f"Gave up waiting for Gemini to process the file after {timeout:.0f}s.")
         return False

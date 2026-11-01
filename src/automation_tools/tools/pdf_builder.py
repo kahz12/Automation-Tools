@@ -1,3 +1,4 @@
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser
 import csv
 import os
@@ -449,6 +450,7 @@ def render_pdf(blocks: List[Block], out_path: str, title: Optional[str] = None,
         pdf.ln(4)
 
     for block in blocks:
+        cancel.check()
         if block.kind == "break":
             pdf.add_page()
             continue
@@ -495,6 +497,7 @@ def images_to_pdf(paths: List[str], out_path: str, page_size: str = "a4",
 
     pages = []
     for path in paths:
+        cancel.check()
         try:
             with Image.open(path) as source_img:
                 img: Any = source_img
@@ -562,7 +565,7 @@ def convert_with_libreoffice(binary: str, src: str, out_path: str,
             "--outdir", staging, os.path.abspath(src),
         ]
         try:
-            subprocess.run(
+            cancel.run(
                 command, check=True, timeout=timeout,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
@@ -643,6 +646,7 @@ def merge_to_pdf(paths: List[str], out_path: str, use_libreoffice: bool = True,
     added = 0
     with tempfile.TemporaryDirectory() as staging:
         for index, src in enumerate(paths, 1):
+            cancel.check()
             name = os.path.basename(src)
             console.print(f"  [dim]• {name}…[/dim]")
             part = os.path.join(staging, f"{index:04d}.pdf")

@@ -9,7 +9,7 @@ exposing a predictable English/Spanish alias for new scripts.
 from __future__ import annotations
 
 import argparse
-from typing import Any
+from typing import Any, Callable, Iterable, List, Optional
 
 
 # Aliases are intentionally option-only.  Positional arguments and subcommand
@@ -106,26 +106,66 @@ _OPTION_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 
+def _with_aliases(option_strings: Iterable[str]) -> List[str]:
+    """The given spellings of an option plus every alias they have."""
+    expanded = list(option_strings)
+    known = set(expanded)
+    for option in list(expanded):
+        aliases = list(_OPTION_ALIASES.get(option, ()))
+        # Also expand a historical/translated spelling when it is the
+        # spelling declared by a tool (e.g. renamer's --aplicar).
+        aliases.extend(
+            canonical
+            for canonical, names in _OPTION_ALIASES.items()
+            if option in names
+        )
+        for alias in aliases:
+            if alias not in known:
+                expanded.append(alias)
+                known.add(alias)
+    return expanded
+
+
 class ArgumentParser(argparse.ArgumentParser):
     """Argument parser that registers compatible bilingual option aliases."""
 
     def add_argument(self, *option_strings: str, **kwargs: Any) -> argparse.Action:
-        expanded = list(option_strings)
-        known = set(expanded)
-        for option in option_strings:
-            aliases = list(_OPTION_ALIASES.get(option, ()))
-            # Also expand a historical/translated spelling when it is the
-            # spelling declared by a tool (e.g. renamer's --aplicar).
-            aliases.extend(
-                canonical
-                for canonical, names in _OPTION_ALIASES.items()
-                if option in names
-            )
-            for alias in aliases:
-                if alias not in known:
-                    expanded.append(alias)
-                    known.add(alias)
-        return super().add_argument(*expanded, **kwargs)
+        return super().add_argument(*_with_aliases(option_strings), **kwargs)
+
+    def add_mutually_exclusive_group(self, **kwargs: Any) -> Any:
+        # A group has its own add_argument, which never passes through the
+        # override above, so options declared on one would lose their aliases.
+        group = super().add_mutually_exclusive_group(**kwargs)
+        add_argument = group.add_argument
+
+        def add_with_aliases(*option_strings: str, **options: Any) -> argparse.Action:
+            return add_argument(*_with_aliases(option_strings), **options)
+
+        group.add_argument = add_with_aliases  # type: ignore[method-assign,assignment]
+        return group
+
+
+def int_range(
+    minimum: Optional[int] = None,
+    maximum: Optional[int] = None,
+) -> Callable[[str], int]:
+    """An argparse `type=` for a whole number within bounds.
+
+    An out-of-range value is a usage error, exit code 2, instead of something
+    each tool has to survive further down: `--interval -1` used to run one
+    full check before dying in time.sleep.
+    """
+    def parse(text: str) -> int:
+        try:
+            value = int(text)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"'{text}' is not a whole number") from None
+        if minimum is not None and value < minimum:
+            raise argparse.ArgumentTypeError(f"must be at least {minimum}, got {value}")
+        if maximum is not None and value > maximum:
+            raise argparse.ArgumentTypeError(f"must be at most {maximum}, got {value}")
+        return value
+    return parse
 
 
 def exit_code(result: Any) -> int:
@@ -135,4 +175,4 @@ def exit_code(result: Any) -> int:
     return 0 if result is not False else 1
 
 
-__all__ = ["ArgumentParser", "exit_code"]
+__all__ = ["ArgumentParser", "exit_code", "int_range"]

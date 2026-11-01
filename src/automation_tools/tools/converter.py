@@ -1,9 +1,10 @@
-from automation_tools.core.cli import ArgumentParser, exit_code
+from automation_tools.core import cancel
+from automation_tools.core.cli import ArgumentParser, exit_code, int_range
 import os
 import tempfile
 from typing import Any
 
-from automation_tools.core.logger import console, print_error, print_step, print_success
+from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
 
 try:
     from PIL import Image
@@ -107,6 +108,10 @@ def run_image_converter(input_path: str, output_format: str, quality: int = 85) 
         print_error(f"The path '{input_path}' is not valid.")
         return False
 
+    if output_format.lower() not in FORMAT_MAP:
+        print_error(f"Unsupported output format: {output_format}")
+        return False
+
     if os.path.isdir(input_path):
         print_step(f"Processing directory: {input_path}")
         supported_extensions = ('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.gif')
@@ -118,11 +123,13 @@ def run_image_converter(input_path: str, output_format: str, quality: int = 85) 
 
         success_count = 0
         for file in files:
+            cancel.check()
             full_path = os.path.join(input_path, file)
             if convert_single_file(full_path, output_format, quality=quality):
                 success_count += 1
 
-        print_success(f"Process completed. {success_count}/{len(files)} images converted.")
+        report = print_success if success_count == len(files) else print_warning
+        report(f"Process completed. {success_count}/{len(files)} images converted.")
         return success_count == len(files)
 
     elif os.path.isfile(input_path):
@@ -160,12 +167,15 @@ def run_pdf_to_image(input_path: str, output_format: str = "png", dpi: int = 200
         os.makedirs(out_dir, exist_ok=True)
         # Ask pdf2image for temporary paths instead of retaining every raster
         # page in memory.  A 300-page PDF can otherwise consume gigabytes.
-        with tempfile.TemporaryDirectory(prefix="pdf-pages-") as staging:
-            page_paths = convert_from_path(
+        # ignore_cleanup_errors: after a cancel poppler may still be writing here,
+        # and a failed cleanup must not replace the cancellation with an error.
+        with tempfile.TemporaryDirectory(prefix="pdf-pages-", ignore_cleanup_errors=True) as staging:
+            page_paths = cancel.interruptible(lambda: convert_from_path(
                 input_path, dpi=dpi, output_folder=staging,
                 paths_only=True, fmt=fmt,
-            )
+            ))
             for i, page_path in enumerate(page_paths, 1):
+                cancel.check()
                 out = os.path.join(out_dir, f"page_{i:03d}.{fmt}")
                 with Image.open(page_path) as page:
                     image: PillowImage = page
@@ -188,9 +198,9 @@ def main():
     parser = ArgumentParser(description="Converts an image or directory to a different format.")
     parser.add_argument("input_path", help="Path to the input file or directory.")
     parser.add_argument("output_format", help="Output format (png, jpg, webp, ...).")
-    parser.add_argument("--quality", type=int, default=85, help="JPEG/WebP quality (1-100, default 85).")
+    parser.add_argument("--quality", type=int_range(1, 100), default=85, help="JPEG/WebP quality (1-100, default 85).")
     parser.add_argument("--from-pdf", action="store_true", help="Render PDF to images (requires pdf2image).")
-    parser.add_argument("--dpi", type=int, default=200, help="DPI when rendering PDF (default 200).")
+    parser.add_argument("--dpi", type=int_range(1), default=200, help="DPI when rendering PDF (default 200).")
     args = parser.parse_args()
 
     try:

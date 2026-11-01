@@ -351,7 +351,9 @@ Footer {
         self.focus_first_card()
 
     def on_resize(self, event: events.Resize) -> None:
-        self._relayout()
+        # event.size, not self.size: this handler runs before Textual's own,
+        # so self.size still holds the previous dimensions here.
+        self._relayout(event.size.width)
 
     # ── rendering helpers ────────────────────────────────────────────────
     def _set_stats(self) -> None:
@@ -363,14 +365,17 @@ Footer {
             f"[#64748b]{when}[/]"
         )
 
-    def _relayout(self) -> None:
+    def _relayout(self, width: Optional[int] = None) -> None:
         # A Resize can arrive before compose finishes (or during teardown);
         # bail out quietly if the widgets aren't in the DOM yet.
+        # The home screen sits at the bottom of the stack; `self.query` only
+        # sees the screen on top, so a resize during a tool went unnoticed.
         try:
-            hero = self.query_one("#hero", Static)
+            home = self.screen_stack[0]
+            hero = home.query_one("#hero", Static)
         except Exception:
             return
-        width = self.size.width or 80
+        width = width or self.size.width or 80
         # Hero banner: full ASCII art when wide, compact title when narrow.
         if width < self._COMPACT_WIDTH:
             hero.update(Text("⚡  AUTOMATION TOOLS",
@@ -380,7 +385,7 @@ Footer {
         # Responsive columns, keeping each card at roughly 24 cells or wider.
         available = max(20, width - 6)
         columns = max(1, available // 24)
-        for grid in self.query(".card-grid"):
+        for grid in home.query(".card-grid"):
             grid.styles.grid_size_columns = columns
 
     # ── navigation / focus ────────────────────────────────────────────────

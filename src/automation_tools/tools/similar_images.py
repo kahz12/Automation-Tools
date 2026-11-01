@@ -1,3 +1,4 @@
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser
 import os
 from dataclasses import dataclass
@@ -216,6 +217,7 @@ def group_similar(images: List[ImageInfo], threshold: int = DEFAULT_THRESHOLD) -
 
         insert(images[representatives[0]].hash, representatives[0])
         for representative in representatives[1:]:
+            cancel.check()
             value = images[representative].hash
             for match in query(value):
                 union(representative, match)
@@ -311,7 +313,8 @@ def run_similar_images(
     Nothing is removed unless `apply` is on and the confirmation is accepted;
     the best version of each group is always kept.
 
-    Returns True when the scan completed, whether or not it found anything.
+    Returns True when the scan completed, whether or not it found anything,
+    unless a copy that was meant to be deleted could not be.
     """
     if not HAS_PILLOW:
         print_error("Pillow is not installed. Install it with 'pip install Pillow'.")
@@ -370,6 +373,7 @@ def run_similar_images(
     deleted = 0
     freed = 0
     for image in doomed:
+        cancel.check()
         try:
             os.remove(image.path)
             deleted += 1
@@ -379,7 +383,7 @@ def run_similar_images(
             print_error(f"Could not delete {image.path}: {e}")
 
     print_success(f"Deleted {deleted}/{len(doomed)} file(s). Space freed: {human_size(freed)}")
-    return True
+    return deleted == len(doomed)
 
 
 def main() -> None:

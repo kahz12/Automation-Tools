@@ -1,4 +1,5 @@
-from automation_tools.core.cli import ArgumentParser
+from automation_tools.core import cancel
+from automation_tools.core.cli import ArgumentParser, int_range
 import hashlib
 import os
 import re
@@ -281,7 +282,7 @@ def band_energies(path: str, edges: Sequence[int], ffmpeg: str,
         command += ["-map", f"[o{index}]", "-f", "null", "-"]
 
     try:
-        finished = subprocess.run(
+        finished = cancel.run(
             command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
             timeout=_FFMPEG_TIMEOUT,
         )
@@ -349,6 +350,7 @@ def verify_md5(path: str, stream: StreamInfo, ffmpeg: str) -> Tuple[Optional[boo
         reader.start()
         deadline = time.monotonic() + _FFMPEG_TIMEOUT
         while True:
+            cancel.check()
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 process.kill()
@@ -382,6 +384,10 @@ def verify_md5(path: str, stream: StreamInfo, ffmpeg: str) -> Tuple[Optional[boo
         except (NameError, OSError, subprocess.SubprocessError):
             pass
         return None, 0
+    except cancel.Cancelled:
+        process.kill()
+        process.wait()
+        raise
 
     dead = 0
     if stride > 1:
@@ -402,7 +408,7 @@ def write_spectrogram(path: str, out_png: str, ffmpeg: str) -> bool:
         out_png,
     ]
     try:
-        finished = subprocess.run(
+        finished = cancel.run(
             command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             timeout=_FFMPEG_TIMEOUT,
         )
@@ -825,7 +831,7 @@ def main() -> None:
                         help="Render a spectrum PNG per file into this folder.")
     parser.add_argument("--no-md5", action="store_true",
                         help="Skip checksum verification (much faster).")
-    parser.add_argument("--seconds", type=int, default=_ANALYSIS_SECONDS,
+    parser.add_argument("--seconds", type=int_range(1), default=_ANALYSIS_SECONDS,
                         help="Seconds of audio to analyse per file.")
     parser.add_argument("--all", action="store_true",
                         help="Also list the files that passed.")

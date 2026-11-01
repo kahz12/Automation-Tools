@@ -1,4 +1,5 @@
-from automation_tools.core.cli import ArgumentParser, exit_code
+from automation_tools.core import cancel
+from automation_tools.core.cli import ArgumentParser, exit_code, int_range
 import os
 import re
 from datetime import datetime
@@ -310,11 +311,12 @@ def run_web_clipper(
 
     print_step(f"Fetching {url} …")
     try:
-        html = _fetch(url, timeout)
+        html = cancel.interruptible(lambda: _fetch(url, timeout))
     except requests.exceptions.Timeout:
         print_error(f"The request timed out after {timeout}s.")
         return False
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, ValueError) as e:
+        # ValueError is _fetch rejecting the URL, or urlparse choking on it.
         print_error(f"Could not fetch the page: {e}")
         return False
 
@@ -374,7 +376,7 @@ def main() -> None:
     parser.add_argument("--no-images", action="store_true", help="Drop image references (Markdown only).")
     parser.add_argument("--out", help="Output file path.")
     parser.add_argument("--save", action="store_true", help="Save with an auto-generated filename.")
-    parser.add_argument("--timeout", type=int, default=20, help="Network timeout in seconds (default 20).")
+    parser.add_argument("--timeout", type=int_range(1), default=20, help="Network timeout in seconds (default 20).")
     args = parser.parse_args()
 
     try:

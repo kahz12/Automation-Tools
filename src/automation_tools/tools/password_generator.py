@@ -1,4 +1,4 @@
-from automation_tools.core.cli import ArgumentParser, exit_code
+from automation_tools.core.cli import ArgumentParser, exit_code, int_range
 import hashlib
 import shutil
 import string
@@ -10,6 +10,7 @@ from typing import Optional, List, Dict, Any
 
 from rich.table import Table
 from rich.panel import Panel
+from rich.text import Text
 
 from automation_tools.core.logger import console, print_error, print_success, print_warning
 
@@ -408,7 +409,9 @@ def display_passwords(passwords: List[str], title: str = "Generated Passwords") 
     for i, pwd in enumerate(passwords, 1):
         result = evaluate_strength(pwd)
         label = f"[{result['color']}]{result['level']}[/{result['color']}]"
-        table.add_row(str(i), pwd, label, f"{result['entropy']:.0f} bits")
+        # A Text so markup never touches it: symbols include "[" and "]", and
+        # "ab[d]cd" would otherwise print as "abcd", a password that is not yours.
+        table.add_row(str(i), Text(pwd), label, f"{result['entropy']:.0f} bits")
 
     console.print()
     console.print(table)
@@ -527,8 +530,8 @@ def main() -> None:
     sub = parser.add_subparsers(dest="action", required=True)
 
     gen = sub.add_parser("generate", help="Random character passwords.")
-    gen.add_argument("-l", "--length", type=int, default=16)
-    gen.add_argument("-n", "--count", type=int, default=5)
+    gen.add_argument("-l", "--length", type=int_range(4), default=16)
+    gen.add_argument("-n", "--count", type=int_range(1), default=5)
     gen.add_argument("--no-upper", action="store_true", help="Leave out A-Z.")
     gen.add_argument("--no-digits", action="store_true", help="Leave out 0-9.")
     gen.add_argument("--no-special", action="store_true", help="Leave out symbols.")
@@ -536,8 +539,8 @@ def main() -> None:
                      help="Leave out characters that read alike (l, 1, O, 0).")
 
     phrase = sub.add_parser("passphrase", help="Word-based passphrases.")
-    phrase.add_argument("-w", "--words", type=int, default=4)
-    phrase.add_argument("-n", "--count", type=int, default=5)
+    phrase.add_argument("-w", "--words", type=int_range(1), default=4)
+    phrase.add_argument("-n", "--count", type=int_range(1), default=5)
     phrase.add_argument("-s", "--separator", default="-")
     phrase.add_argument("--no-capitalize", action="store_true")
     phrase.add_argument("--no-number", action="store_true")

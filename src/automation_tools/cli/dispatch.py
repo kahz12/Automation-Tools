@@ -10,7 +10,9 @@ from typing import List, Optional
 from rich.markup import escape
 
 from automation_tools import tools as tools_package
+from automation_tools.core import prompt
 from automation_tools.core.cli import exit_code
+from automation_tools.core.config import load_environment
 from automation_tools.core.logger import console, print_error, setup_logger
 
 # One command that reaches every tool: `atools vault ./docs encrypt`.
@@ -58,6 +60,15 @@ def _print_json(payload: dict[str, object], code: int) -> None:
     raise SystemExit(code)
 
 
+def _decline(_message: str, _default: bool) -> bool:
+    """Answers every question in JSON mode.
+
+    Stdout is being captured there, so a prompt would sit waiting for a reply
+    to a question nobody can see.
+    """
+    return False
+
+
 def _run_json(name: str, entry: object, rest: List[str]) -> None:
     """Run a tool while keeping stdout a single valid JSON document."""
     output = io.StringIO()
@@ -67,7 +78,7 @@ def _run_json(name: str, entry: object, rest: List[str]) -> None:
     code = 0
     error: Optional[str] = None
     try:
-        with redirect_stdout(output), redirect_stderr(errors):
+        with redirect_stdout(output), redirect_stderr(errors), prompt.confirm_backend(_decline):
             assert callable(entry)
             result = entry()
             code = exit_code(result)
@@ -126,20 +137,25 @@ def main(argv: Optional[List[str]] = None) -> None:
         raise SystemExit(2)
 
     setup_logger()
+    load_environment()
     module = importlib.import_module(f"automation_tools.tools.{name}")
     entry = getattr(module, "main", None)
     if entry is None:
         print_error(f"'{name}' has no command line of its own; use the menu instead.")
         raise SystemExit(2)
 
-    if json_mode:
-        _run_json(name, entry, rest)
+    # Output headed for another program should not be hard-wrapped at rich's
+    # default 80 columns: it cuts long paths in two.
+    old_soft_wrap = console.soft_wrap
+    console.soft_wrap = json_mode or not console.is_terminal
 
     # The tool parses sys.argv itself, so the program name has to read like the
     # command the user actually typed for its --help to make sense.
     old_argv = sys.argv
     sys.argv = [f"atools {name}"] + rest
     try:
+        if json_mode:
+            _run_json(name, entry, rest)
         result = entry()
         # A tool may either retain the historical ``raise SystemExit`` style
         # or return a bool/int.  Normalize both forms at the dispatcher
@@ -150,6 +166,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         raise SystemExit(130)
     finally:
         sys.argv = old_argv
+        console.soft_wrap = old_soft_wrap
 
 
 if __name__ == "__main__":

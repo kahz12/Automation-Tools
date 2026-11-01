@@ -4,7 +4,8 @@ import shutil
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from automation_tools.core.cli import exit_code
+from automation_tools.core import cancel
+from automation_tools.core.cli import ArgumentParser, exit_code
 from automation_tools.core.logger import console, print_error, print_step, print_success, print_warning
 from automation_tools.core.config import get_downloads_folder, state_path
 
@@ -81,7 +82,10 @@ def _save_history(moves: List[Dict[str, str]], root_path: str) -> Optional[str]:
 
 
 def run_download_organizer(collision_policy: str = "rename") -> bool:
-    """Sorts the downloads folder into category subfolders."""
+    """Sorts the downloads folder into category subfolders.
+
+    Returns True only if nothing that should have moved failed to.
+    """
     downloads_path = get_downloads_folder()
 
     print_step(f"Organizing folder: [bold]{downloads_path}[/bold]")
@@ -94,39 +98,46 @@ def run_download_organizer(collision_policy: str = "rename") -> bool:
 
     moved_count = 0
     skipped_count = 0
+    failed_count = 0
     moves: List[Dict[str, str]] = []
 
-    for filename in os.listdir(downloads_path):
-        source_path = os.path.join(downloads_path, filename)
+    try:
+        for filename in os.listdir(downloads_path):
+            cancel.check()
+            source_path = os.path.join(downloads_path, filename)
 
-        # Skip directories to avoid recursive organization
-        if os.path.isdir(source_path):
-            continue
+            # Skip directories to avoid recursive organization
+            if os.path.isdir(source_path):
+                continue
 
-        category = get_target_category(filename)
-        raw_dst = os.path.join(downloads_path, category, filename)
-        final_dst = _resolve_collision(raw_dst, collision_policy)
+            category = get_target_category(filename)
+            raw_dst = os.path.join(downloads_path, category, filename)
+            final_dst = _resolve_collision(raw_dst, collision_policy)
 
-        if final_dst is None:
-            console.print(f"[yellow]Skipped (already exists):[/yellow] '{filename}'")
-            skipped_count += 1
-            continue
+            if final_dst is None:
+                console.print(f"[yellow]Skipped (already exists):[/yellow] '{filename}'")
+                skipped_count += 1
+                continue
 
-        try:
-            shutil.move(source_path, final_dst)
-            renamed = " [dim](renamed)[/dim]" if final_dst != raw_dst else ""
-            console.print(f"Moved: '{filename}' to '[green]{category}[/green]'{renamed}")
-            moves.append({"from": source_path, "to": final_dst})
-            moved_count += 1
-        except Exception as e:
-            print_error(f"Error moving '{filename}': {e}")
+            try:
+                shutil.move(source_path, final_dst)
+                renamed = " [dim](renamed)[/dim]" if final_dst != raw_dst else ""
+                console.print(f"Moved: '{filename}' to '[green]{category}[/green]'{renamed}")
+                moves.append({"from": source_path, "to": final_dst})
+                moved_count += 1
+            except Exception as e:
+                print_error(f"Error moving '{filename}': {e}")
+                failed_count += 1
+    finally:
+        # In a finally because a run stopped halfway, by Cancel or by Ctrl+C,
+        # is exactly the one somebody will want to undo.
+        history_path = _save_history(moves, downloads_path)
+        if history_path:
+            console.print(f"[dim]📝 History: {history_path}[/dim]")
+            console.print("[dim]   To revert: atools organizer --undo, or Undo in the menu.[/dim]")
 
-    history_path = _save_history(moves, downloads_path)
     print_success(f"Files moved: {moved_count}. Skipped: {skipped_count}.")
-    if history_path:
-        console.print(f"[dim]📝 History: {history_path}[/dim]")
-        console.print("[dim]   To revert: use organizer.undo_last() or from the menu.[/dim]")
-    return True
+    return failed_count == 0
 
 
 def list_history() -> List[str]:
@@ -138,28 +149,32 @@ def list_history() -> List[str]:
     return files
 
 
-def undo_from_file(history_path: str) -> None:
-    """Puts every file recorded in a history file back where it came from."""
+def undo_from_file(history_path: str) -> bool:
+    """Puts every file recorded in a history file back where it came from.
+
+    Returns True only if all of them made it back.
+    """
     if not os.path.isfile(history_path):
         print_error(f"History file not found: {history_path}")
-        return
+        return False
     try:
         with open(history_path, "r", encoding="utf-8") as f:
             payload = json.load(f)
     except Exception as e:
         print_error(f"Corrupt history file: {e}")
-        return
+        return False
 
     moves = payload.get("moves", [])
     if not moves:
         print_warning("History contains no moves.")
-        return
+        return True
 
     print_step(f"Reverting {len(moves)} movement(s) from {payload.get('timestamp', '?')}...")
 
     reverted = 0
     # Revert in reverse order to ensure consistency
     for m in reversed(moves):
+        cancel.check()
         src, dst = m["to"], m["from"]
         if not os.path.exists(src):
             console.print(f"[yellow]Not found:[/yellow] {src}")
@@ -185,23 +200,33 @@ def undo_from_file(history_path: str) -> None:
         except OSError:
             pass
     print_success(f"Successfully reverted {reverted}/{len(moves)} movements.")
+    return reverted == len(moves)
 
 
-def undo_last() -> None:
+def undo_last() -> bool:
     """Reverts the most recent reorganization run.
     """
     files = list_history()
     if not files:
         print_warning("No history found to revert.")
-        return
-    undo_from_file(files[0])
+        return True
+    return undo_from_file(files[0])
 
 
 def main():
     """Main entry point for the organizer tool.
     """
+    # Unlike a tool with required arguments, this one would otherwise act on
+    # no input at all, so `--help` or a typo must never get as far as moving
+    # anything.
+    parser = ArgumentParser(description="Sort the Downloads folder into category subfolders.")
+    parser.add_argument("--policy", choices=["rename", "skip", "overwrite"], default="rename",
+                        help="What to do when a file of that name is already there (default: rename).")
+    parser.add_argument("--undo", action="store_true", help="Put the files from the last run back.")
+    args = parser.parse_args()
+
     try:
-        result = run_download_organizer()
+        result = undo_last() if args.undo else run_download_organizer(args.policy)
     except KeyboardInterrupt:
         raise SystemExit(130)
     raise SystemExit(exit_code(result))

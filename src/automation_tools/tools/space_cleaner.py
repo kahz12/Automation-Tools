@@ -1,5 +1,6 @@
 import os
-from automation_tools.core.cli import ArgumentParser, exit_code
+from automation_tools.core import cancel
+from automation_tools.core.cli import ArgumentParser, exit_code, int_range
 import csv
 import json
 import shutil
@@ -192,6 +193,7 @@ def scan(
     print_step(f"Scanning: [bold]{directory}[/bold]")
 
     for root, dirs, files in os.walk(directory, topdown=True, onerror=lambda _: None):
+        cancel.check()
         # Prevent descending into protected system or configuration directories.
         dirs[:] = [d for d in dirs if d not in PROTECTED_NAMES]
 
@@ -301,6 +303,7 @@ def delete_items(items: Iterable[CleanItem]) -> int:
     deleted = 0
     freed = 0
     for item in _unique_items(items):
+        cancel.check()
         ok, err = _delete_item(item)
         if ok:
             deleted += 1
@@ -411,7 +414,7 @@ def run_space_cleaner(
         print_warning("Cancelled. Nothing was deleted.")
         return True
 
-    delete_items(to_delete)
+    deleted = delete_items(to_delete)
 
     # Final summary of space saved.
     free_after = _disk_free(directory)
@@ -422,7 +425,7 @@ def run_space_cleaner(
             f"[bold]after:[/bold] {human_size(free_after)}  "
             f"([green]+{human_size(real_freed)} freed[/green])"
         )
-    return True
+    return deleted == len(to_delete)
 
 
 def main():
@@ -433,13 +436,13 @@ def main():
     parser.add_argument("directory", help="Directory to scan")
     parser.add_argument(
         "--large",
-        type=int,
+        type=int_range(1),
         default=DEFAULT_LARGE_MB,
         help=f"Large file threshold in MB (default: {DEFAULT_LARGE_MB})",
     )
     parser.add_argument(
         "--old",
-        type=int,
+        type=int_range(1),
         default=DEFAULT_OLD_DAYS,
         help=f"Old file threshold in days (default: {DEFAULT_OLD_DAYS})",
     )

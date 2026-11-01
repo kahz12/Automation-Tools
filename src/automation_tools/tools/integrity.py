@@ -1,3 +1,4 @@
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser
 import hashlib
 import os
@@ -59,6 +60,7 @@ def hash_file(filepath: str, algorithm: str = DEFAULT_ALGORITHM,
     try:
         with open(filepath, "rb") as f:
             for chunk in iter(lambda: f.read(chunk_size), b""):
+                cancel.check()
                 hasher.update(chunk)
         return hasher.hexdigest()
     except OSError:

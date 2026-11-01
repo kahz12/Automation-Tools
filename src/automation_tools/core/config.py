@@ -14,9 +14,17 @@ except ImportError:
 from automation_tools.core.logger import print_error
 
 def load_environment() -> None:
-    """Loads a .env file into the environment, if python-dotenv is installed."""
+    """Loads .env files into the environment, if python-dotenv is installed.
+
+    Same places as every other config file, working directory first. A bare
+    `load_dotenv()` searches upward from this source file, not from where the
+    command runs, so an installed copy never found one. Variables that are
+    already set win, and so do files earlier in the list: a project's own
+    unrelated .env does not hide the keys kept in the data directory.
+    """
     if HAS_DOTENV:
-        load_dotenv()
+        for candidate in config_search_paths(".env"):
+            load_dotenv(candidate)
 
 def get_env_var(key: str, default: Optional[str] = None) -> Optional[str]:
     """Reads an environment variable, or `default` when it is not set."""

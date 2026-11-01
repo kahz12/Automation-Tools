@@ -1,4 +1,5 @@
 import os
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser
 import re
 from typing import Optional
@@ -91,6 +92,7 @@ def run_log_analyzer(
             try:
                 with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                     for line_num, line in enumerate(f, 1):
+                        cancel.check()
                         line = line.strip()
                         # One hit per line, no matter how many patterns match it.
                         if not any(regex.search(line) for regex in compiled_regexes):
@@ -128,6 +130,11 @@ def run_log_analyzer(
         console.print(f"[dim]Total matches found: {total_matches}[/dim]")
         if report:
             report.write(f"Total matches found: {total_matches}\n")
+    except cancel.Cancelled:
+        # What was written is real, but it must not pass for a whole scan.
+        if report:
+            report.write("Scan cancelled: this report is incomplete.\n")
+        raise
     finally:
         if report:
             report.close()

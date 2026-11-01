@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 from automation_tools.tools import renamer
 
 
@@ -58,3 +60,35 @@ def test_run_massive_rename_apply(tmp_path):
     renamer.run_massive_rename(str(tmp_path), mode="patron", pattern="f_{:03d}", apply_changes=True)
     names = set(os.listdir(tmp_path))
     assert {"f_001.txt", "f_002.txt"} <= names
+
+
+@pytest.mark.parametrize("pattern", ["{x}", "{1}", "x_{", "{0.real.nope}", "{0[1]}", "{:s}"])
+def test_a_bad_pattern_is_refused_before_anything_is_renamed(tmp_path, pattern):
+    """`{x}` and `{1}` used to end in a KeyError/IndexError traceback."""
+    (tmp_path / "a.txt").write_text("x")
+
+    ok = renamer.run_massive_rename(str(tmp_path), mode="patron", pattern=pattern,
+                                    apply_changes=True)
+
+    assert ok is False
+    assert sorted(os.listdir(tmp_path)) == ["a.txt"]
+
+
+def test_replace_mode_without_the_text_to_find_is_an_error(tmp_path):
+    (tmp_path / "a.txt").write_text("x")
+    assert renamer.run_massive_rename(str(tmp_path), mode="reemplazo") is False
+
+
+def test_replacing_spaces_works(tmp_path):
+    (tmp_path / "a b.txt").write_text("x")
+    renamer.run_massive_rename(str(tmp_path), mode="reemplazo", old_text=" ", new_text="_",
+                               apply_changes=True)
+    assert sorted(os.listdir(tmp_path)) == ["a_b.txt"]
+
+
+def test_the_dry_run_hint_names_a_flag_that_exists(tmp_path, capsys):
+    (tmp_path / "a.txt").write_text("x")
+    renamer.run_massive_rename(str(tmp_path), mode="patron", pattern="f_{}")
+    out = capsys.readouterr().out
+    assert "--apply" in out
+    assert "apply_changes" not in out

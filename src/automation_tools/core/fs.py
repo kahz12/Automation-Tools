@@ -2,6 +2,8 @@ import fnmatch
 import os
 from typing import Iterator, Optional, Sequence
 
+from automation_tools.core import cancel
+
 # One directory walk for the whole toolkit.
 #
 # Twelve tools had grown their own. Seven of them skipped symlinks and five did
@@ -53,6 +55,9 @@ def walk_files(
 
     Symlinks are skipped unless asked for, and symlinked directories are never
     followed at all, which is what stops a loop from walking forever.
+
+    Yielding is also a cancellation point, which is what makes every tool that
+    scans a tree stoppable, including the ones that do their work as they walk.
     """
     patterns = list(excludes or [])
     suffixes = tuple(e.lower() for e in extensions) if extensions else None
@@ -91,6 +96,7 @@ def walk_files(
         except OSError:
             return
         for name in names:
+            cancel.check()
             full = os.path.join(path, name)
             if os.path.isfile(full) and _wanted(full, name):
                 yield full
@@ -107,6 +113,7 @@ def walk_files(
             and not (not include_hidden and d.startswith("."))
         )
         for name in sorted(names):
+            cancel.check()
             full = os.path.join(root, name)
             if _wanted(full, name):
                 yield full

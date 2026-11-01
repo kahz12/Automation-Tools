@@ -3,7 +3,8 @@ import time
 import random
 import sqlite3
 import re
-from automation_tools.core.cli import ArgumentParser, exit_code
+from automation_tools.core import cancel
+from automation_tools.core.cli import ArgumentParser, exit_code, int_range
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional, Dict, Any, Iterator, List, Tuple
@@ -34,7 +35,7 @@ def _throttle(url: str) -> None:
     last = _LAST_REQUEST.get(host, 0.0)
     wait = MIN_INTERVAL_PER_HOST - (now - last)
     if wait > 0:
-        time.sleep(wait + random.uniform(0.1, 0.5))
+        cancel.sleep(wait + random.uniform(0.1, 0.5))
     _LAST_REQUEST[host] = time.monotonic()
 
 # ─── User-Agents for rotation ───
@@ -392,7 +393,9 @@ def check_price(product: Dict[str, Any], settings: Dict[str, Any]) -> None:
     try:
         _throttle(url)
 
-        response = requests.get(url, headers=get_headers(), timeout=15)
+        response = cancel.interruptible(
+            lambda: requests.get(url, headers=get_headers(), timeout=15)
+        )
         if response.status_code != 200:
             console.print(f"     [yellow]⚠️  HTTP {response.status_code}[/yellow]")
             logger.warning(f"{nombre}: HTTP {response.status_code}")
@@ -451,6 +454,7 @@ def run_price_monitor_job() -> bool:
         return False
 
     for product in products:
+        cancel.check()
         check_price(product, settings)
 
     print_success(f"Check complete — {len(products)} product(s)\n")
@@ -459,12 +463,16 @@ def run_price_monitor_job() -> bool:
 
 def run_continuous_monitor(interval_minutes: int = 60) -> int:
     """Runs the monitor in a continuous loop at the specified interval.
+
+    The loop never ends by itself, so the wait between rounds has to be a
+    cancellation point: without one the TUI could neither leave this screen nor
+    let the process exit.
     """
     console.print(f"[bold green]🟢 Monitor started.[/bold green] Checking every {interval_minutes} minute(s)...")
     try:
         run_price_monitor_job()
         while True:
-            time.sleep(interval_minutes * 60)
+            cancel.sleep(interval_minutes * 60)
             run_price_monitor_job()
     except KeyboardInterrupt:
         console.print("\n[yellow]Monitor stopped by user.[/yellow]")
@@ -477,7 +485,7 @@ def main():
     parser = ArgumentParser(description="Price Monitor v2.0")
     parser.add_argument("--now",       action="store_true", help="Run an immediate check")
     parser.add_argument("--historial", action="store_true", help="View price history")
-    parser.add_argument("--interval",  type=int, default=60, help="Interval in minutes (default: 60)")
+    parser.add_argument("--interval",  type=int_range(1), default=60, help="Interval in minutes (default: 60)")
     args = parser.parse_args()
 
     try:

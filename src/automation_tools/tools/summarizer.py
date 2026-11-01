@@ -1,4 +1,5 @@
 import os
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser, exit_code
 from typing import List, Optional
 import pypdf
@@ -17,7 +18,10 @@ def extract_text_from_pdf(filepath: str) -> Optional[str]:
     """Extracts all text from a PDF file using pypdf."""
     try:
         reader = pypdf.PdfReader(filepath)
-        pages = [(page.extract_text() or "") for page in reader.pages]
+        pages = []
+        for page in reader.pages:
+            cancel.check()
+            pages.append(page.extract_text() or "")
         return "\n".join(pages)
     except Exception as e:
         print_error(f"Error reading PDF: {e}")

@@ -22,6 +22,8 @@ from textual.widgets import (
     Static, Switch,
 )
 from automation_tools.ai.base import Capability
+from automation_tools.core import cancel
+from automation_tools.core.cli import exit_code
 
 
 # ── Shared CSS ─────────────────────────────────────────────────────────────
@@ -343,7 +345,9 @@ class ConfirmModal(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="confirm-dialog"):
-            yield Static(f"[bold #22d3ee]?[/]  {self._message}", id="confirm-msg")
+            # A Text, not markup: the message can carry a file name.
+            yield Static(Text.assemble(("?", "bold #22d3ee"), f"  {self._message}"),
+                         id="confirm-msg")
             with Horizontal(id="confirm-row"):
                 yield Button("✓  Yes", id="yes-btn")
                 yield Button("✗  No", id="no-btn")
@@ -372,28 +376,6 @@ class ConfirmModal(ModalScreen[bool]):
 
 # ── In-flow confirm helper (worker-thread side) ────────────────────────────
 _CURRENT_EXECUTOR: Optional["ExecutionScreen"] = None
-
-
-class TuiCancelled(Exception):
-    """Raised by a cooperative tool when the user cancels its TUI run.
-
-    Tool functions are not required to know about the TUI.  Functions that do
-    accept the optional ``cancel_event`` can either return as soon as it is
-    set, or call :func:`tui_check_cancelled` between file operations.  The
-    latter gives them one common exception to catch when cleanup is needed.
-    """
-
-
-def tui_cancelled() -> bool:
-    """Return whether the current TUI execution has received cancellation."""
-    executor = _CURRENT_EXECUTOR
-    return bool(executor is not None and executor.cancel_event.is_set())
-
-
-def tui_check_cancelled() -> None:
-    """Stop a cooperative TUI task at a safe file-operation boundary."""
-    if tui_cancelled():
-        raise TuiCancelled()
 
 
 def tui_progress(
@@ -435,9 +417,20 @@ class ExecutionScreen(Screen):
         self._fn = fn
         self._kwargs = kwargs
         self._done = False
+        self._failed = False
+        self._stopped = False
         self._cancel_requested = False
         self._cancel_event = threading.Event()
         self._output_lines = 0
+        self._tool_reports_progress = False
+        # Optional hooks are injected only when the callable explicitly
+        # declares them.  This preserves every existing tool signature and
+        # avoids sending internal arguments to wrappers accepting **kwargs.
+        self._fn_params: Any = {}
+        try:
+            self._fn_params = inspect.signature(fn).parameters
+        except (TypeError, ValueError):
+            pass
         self._confirm_event: Optional[threading.Event] = None
         self._confirm_modal: Optional[ConfirmModal] = None
 
@@ -464,7 +457,8 @@ class ExecutionScreen(Screen):
         # Keep the worker alive while cancellation is requested.  Textual's
         # Worker.cancel() would only cancel the coroutine awaiting
         # ``to_thread``; the underlying thread could keep writing files after
-        # the screen had already reported completion.
+        # the screen had already reported completion.  Stopping the tool is
+        # what `core.cancel` is for.
         self._worker = self.run_worker(self._execute(), exclusive=True)
 
     async def _execute(self) -> None:
@@ -484,6 +478,11 @@ class ExecutionScreen(Screen):
             with redirect_console(sink), prompt.confirm_backend(tui_confirm):
                 await asyncio.to_thread(self._run_sync)
         finally:
+            # This also runs when the app quits mid-run. The thread behind
+            # to_thread does not stop with the await, and asyncio waits for it
+            # on the way out, so a tool left running would keep the process
+            # alive after the screen had gone.
+            self._cancel_event.set()
             sink.flush()
             _CURRENT_EXECUTOR = None
             self._done = True
@@ -498,35 +497,37 @@ class ExecutionScreen(Screen):
     def _run_sync(self) -> None:
         from automation_tools.core.logger import console, print_error
         call_kwargs = dict(self._kwargs)
-        # Optional hooks are injected only when the callable explicitly
-        # declares them.  This preserves every existing tool signature and
-        # avoids sending internal arguments to wrappers accepting **kwargs.
-        params: Any = {}
-        try:
-            params = inspect.signature(self._fn).parameters
-        except (TypeError, ValueError):
-            params = {}
-        if "cancel_event" in params:
+        takes_event = "cancel_event" in self._fn_params
+        if takes_event:
             call_kwargs["cancel_event"] = self._cancel_event
-        if "progress_callback" in params:
+        if "progress_callback" in self._fn_params:
             call_kwargs["progress_callback"] = self.update_progress
         try:
-            self._fn(**call_kwargs)
-        except TuiCancelled:
-            console.print("\n[dim #f59e0b]Cancellation acknowledged at a safe boundary.[/]")
+            # Opened here, on the tool's own thread: `_execute` is gone the
+            # moment the app quits, and the tool still has to hear about it.
+            with cancel.scope(self._cancel_event):
+                self._failed = exit_code(self._fn(**call_kwargs)) != 0
+            # A tool handed the event itself returns instead of raising.
+            self._stopped = takes_event and self._cancel_requested
+        except cancel.Cancelled:
+            self._stopped = True
+            console.print("\n[dim #f59e0b]Stopped at a safe point.[/]")
         except KeyboardInterrupt:
             console.print("\n[dim #64748b]Interrupted.[/]")
         except Exception as exc:
             import traceback
+            self._failed = True
             print_error(str(exc))
-            console.print("[dim #4b5563]" + traceback.format_exc().rstrip() + "[/]")
+            # markup=False: a traceback is source code, full of brackets.
+            console.print(traceback.format_exc().rstrip(), style="dim #4b5563",
+                          markup=False, highlight=False)
 
     def _record_output_line(self) -> None:
         """Keep an honest activity indicator when a tool has no callback."""
         self._output_lines += 1
-        if self._cancel_requested:
+        if self._cancel_requested or self._tool_reports_progress:
             return
-        self.update_progress(
+        self._show_progress(
             message=(
                 f"Running… · {self._output_lines} output step(s)"
             )
@@ -539,6 +540,15 @@ class ExecutionScreen(Screen):
         message: Optional[str] = None,
     ) -> None:
         """Thread-safe progress hook for cooperative tool functions."""
+        self._tool_reports_progress = True
+        self._show_progress(current, total, message)
+
+    def _show_progress(
+        self,
+        current: Optional[float] = None,
+        total: Optional[float] = None,
+        message: Optional[str] = None,
+    ) -> None:
         def _update() -> None:
             try:
                 bar = self.query_one("#exec-progress", ProgressBar)
@@ -546,10 +556,12 @@ class ExecutionScreen(Screen):
                     bar.update(total=max(0.0, total))
                 if current is not None:
                     bar.update(progress=max(0.0, current))
-                elif total is None:
+                elif total is None and bar.total is None:
+                    # Only a bar with no known end may simply tick along; on
+                    # one with a total this would count printed lines as work.
                     bar.update(advance=1)
                 if message:
-                    self._set_status(f"[bold #a78bfa]●  {message}[/]")
+                    self._set_status(Text(f"●  {message}", style="bold #a78bfa"))
             except Exception:
                 pass
 
@@ -567,7 +579,7 @@ class ExecutionScreen(Screen):
             # started, and harmless if the screen has already been unmounted.
             _update()
 
-    def _set_status(self, message: str) -> None:
+    def _set_status(self, message: Any) -> None:
         try:
             self.query_one("#exec-status", Static).update(message)
         except Exception:
@@ -580,14 +592,16 @@ class ExecutionScreen(Screen):
         self._cancel_event.set()
         self._set_status(
             "[bold #f59e0b]⚠  Cancellation requested…[/] "
-            "[dim #94a3b8]finishing the current safe step.[/]"
+            "[dim #94a3b8]stopping at the next safe point.[/]"
         )
         try:
             self.query_one("#exec-cancel-btn", Button).disabled = True
         except Exception:
             pass
-        # A tool can be blocked waiting for a confirmation modal.  Dismiss it
-        # so its worker can observe the event and unwind instead of hanging.
+        self._close_confirm()
+
+    def _close_confirm(self) -> None:
+        """Dismisses an open confirmation so its worker can unwind."""
         modal = self._confirm_modal
         if modal is not None:
             try:
@@ -600,10 +614,20 @@ class ExecutionScreen(Screen):
 
     def _mark_done(self) -> None:
         try:
-            if self._cancel_requested:
+            if self._stopped:
                 status = (
                     "[bold #f59e0b]■  Canceled safely.[/]  "
                     "[dim #94a3b8]No further writes will be started. Press Esc or ← BACK.[/]"
+                )
+            elif self._failed:
+                status = (
+                    "[bold #ef4444]✗  Finished with errors.[/]  "
+                    "[dim #94a3b8]See the log above. Press Esc or ← BACK to return.[/]"
+                )
+            elif self._cancel_requested:
+                status = (
+                    "[bold #22c55e]✓  Done.[/]  "
+                    "[dim #94a3b8]It finished before the cancel could stop it. Press Esc or ← BACK.[/]"
                 )
             else:
                 status = (
@@ -635,12 +659,17 @@ class ExecutionScreen(Screen):
 
     # ── confirm bridge (called from worker thread) ─────────────────────
     def confirm_blocking(self, message: str, default: bool = False) -> bool:
+        # A cancel ends the run rather than answering the question. `default`
+        # only picks the button the modal opens on, so a yes would go ahead with
+        # what was being asked; and even a no is not enough, because "keep the
+        # originals?" being declined does not stop the vault from encrypting.
+        self._raise_if_cancelled()
         event = threading.Event()
-        result = [default]
+        result = [False]
 
         def _show() -> None:
             def _on_dismiss(answer: Optional[bool]) -> None:
-                result[0] = bool(answer) if answer is not None else default
+                result[0] = bool(answer)
                 event.set()
                 self._confirm_modal = None
                 self._confirm_event = None
@@ -651,11 +680,21 @@ class ExecutionScreen(Screen):
         try:
             self.app.call_from_thread(_show)
         except Exception:
-            return default
+            return False
         while not event.wait(0.1):
             if self._cancel_event.is_set():
-                return default
+                # Left up, the modal would keep the keyboard after the tool ended.
+                try:
+                    self.app.call_from_thread(self._close_confirm)
+                except Exception:
+                    pass
+                break
+        self._raise_if_cancelled()
         return result[0]
+
+    def _raise_if_cancelled(self) -> None:
+        if self._cancel_event.is_set():
+            raise cancel.Cancelled()
 
 
 # ── Base tool screen ───────────────────────────────────────────────────────
@@ -714,7 +753,7 @@ class ToolScreen(Screen):
     def _err(self, msg: str) -> None:
         try:
             slot = self.query_one("#error-msg", Static)
-            slot.update(f"[bold #ef4444]✗  {msg}[/]")
+            slot.update(Text(f"✗  {msg}", style="bold #ef4444"))
             # The slot sits at the bottom of a scrolling body, so on a long
             # form in a short terminal it lands below the fold and pressing RUN
             # looks like nothing happened. Bring it into view.

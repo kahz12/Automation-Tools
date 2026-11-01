@@ -152,7 +152,7 @@ class PasswordScreen(ToolScreen):
             )
 
         else:  # strength
-            pwd = self._ival(self.query_one("#check-pwd", Input))
+            pwd = self.query_one("#check-pwd", Input).value
             if not pwd:
                 self._err("Enter the password to evaluate.")
                 return
@@ -237,15 +237,18 @@ class VaultScreen(ToolScreen):
                           + ". Press RUN again to use it anyway.")
                 return
 
+        remove = self._bval(self.query_one("#remove", Switch))
         await self._run_tool(
             vault.run_vault,
             path=path,
             action=action,
             password=password,
             output_dir=self._ival(self.query_one("#out-dir", Input)) or None,
-            remove_originals=self._bval(self.query_one("#remove", Switch)),
+            remove_originals=remove,
             recursive=self._bval(self.query_one("#recursive", Switch)),
-            shred=self._bval(self.query_one("#shred", Switch)),
+            # The shred switch hides with "delete originals" but keeps its
+            # value, and to the tool shredding implies deleting.
+            shred=remove and self._bval(self.query_one("#shred", Switch)),
         )
 
 

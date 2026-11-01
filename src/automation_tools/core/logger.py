@@ -1,11 +1,62 @@
 import logging
 import os
+import re
 from contextlib import contextmanager
+from typing import Any
 
 from rich.console import Console
+from rich.errors import MarkupError, StyleError
 from rich.text import Text
 
-console = Console()
+# What rich's parser takes for a tag, including any backslashes escaping it.
+_TAG_RE = re.compile(r"(\\*)\[([a-z#/@][^\[]*?)\]")
+
+
+class SafeConsole(Console):
+    """A console where text from the outside world cannot act as markup.
+
+    Nearly every message here is an f-string with a path, a URL or an exception
+    dropped into it, and rich parses the finished string. A file called
+    "a [copy].txt" was printed as "a .txt", right before asking whether to
+    delete it, and a stray "[/x]" raised MarkupError and took the tool down
+    with it. Escaping every value at every call site is what nobody remembers
+    to do, so it happens here instead: a bracketed word that is not a real
+    style is shown as written.
+
+    A value that happens to spell a style, like "[red]", still reads as one.
+    Anything that must be shown exactly, such as a password, has to be passed
+    as a `Text`.
+    """
+
+    def _is_style(self, tag: str) -> bool:
+        name = tag[1:] if tag.startswith("/") else tag
+        if not name:  # "[/]" closes whatever is open.
+            return True
+        try:
+            self.get_style(name)
+        except StyleError:
+            return False
+        return True
+
+    def _escape_foreign_tags(self, text: str) -> str:
+        def fix(match: "re.Match[str]") -> str:
+            slashes, tag = match.groups()
+            if len(slashes) % 2 or self._is_style(tag):
+                return match.group(0)
+            return f"{slashes}\\[{tag}]"
+        return _TAG_RE.sub(fix, text)
+
+    def render_str(self, text: str, **kwargs: Any) -> Text:
+        if kwargs.get("markup") is False:
+            return super().render_str(text, **kwargs)
+        try:
+            return super().render_str(self._escape_foreign_tags(text), **kwargs)
+        except MarkupError:
+            # A real style word closing nothing, such as a lone "[/bold]".
+            return super().render_str(text, **{**kwargs, "markup": False})
+
+
+console = SafeConsole()
 
 
 @contextmanager

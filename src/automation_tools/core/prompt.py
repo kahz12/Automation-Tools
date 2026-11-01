@@ -25,7 +25,12 @@ def confirm(message: str, default: bool = False) -> bool:
     """
     if _backend is not None:
         return bool(_backend(message, default))
-    return bool(questionary.confirm(message, default=default).ask())
+    try:
+        return bool(questionary.confirm(message, default=default).ask())
+    except EOFError:
+        # Nobody there to answer: cron, CI, stdin from /dev/null. A question
+        # that was never answered is a no, whatever `default` says.
+        return False
 
 
 @contextmanager

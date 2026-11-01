@@ -25,15 +25,18 @@ class MonitorScreen(ToolScreen):
 
     async def action_do_run(self) -> None:
         from automation_tools.tools import monitor
-        from automation_tools.core.config import get_project_root
+        from automation_tools.core.config import config_search_paths, find_config_file
         action = self._rval(self.query_one("#action", RadioSet)) or "rb-now"
         if action == "rb-config":
-            cfg = os.path.join(get_project_root(), "productos_a_monitorear.json")
+            name = "productos_a_monitorear.json"
 
             def _show_config() -> None:
                 from automation_tools.core.logger import console
-                console.print(f"[bold #22d3ee]Config file:[/] {cfg}")
-                if os.path.exists(cfg):
+                # The same lookup the monitor itself uses, so this names the
+                # file it will actually read.
+                cfg = find_config_file(name)
+                if cfg:
+                    console.print(f"[bold #22d3ee]Config file:[/] {cfg}")
                     console.print("[#22c55e]✓ Path exists on disk.[/]")
                     try:
                         size = os.path.getsize(cfg)
@@ -41,7 +44,10 @@ class MonitorScreen(ToolScreen):
                     except OSError:
                         pass
                 else:
-                    console.print("[#f59e0b]⚠ File does not exist yet — it will be created on first run.[/]")
+                    console.print("[#f59e0b]⚠ No config file yet.[/] Nothing creates one for you: "
+                                  "copy productos_a_monitorear.example.json to any of these:")
+                    for candidate in config_search_paths(name):
+                        console.print(f"  [#a78bfa]•[/] {candidate}")
 
             await self._run_tool(_show_config)
         elif action == "rb-loop":
@@ -129,8 +135,7 @@ class InstagramScreen(ToolScreen):
                 return
         cookies = self._ival(self.query_one("#cookies", Input)) or None
         if cookies and not os.path.isfile(os.path.expanduser(cookies)):
-            from rich.markup import escape
-            self._err(f"Cookies file not found: {escape(cookies)}")
+            self._err(f"Cookies file not found: {cookies}")
             return
         media_map = {"rb-all": "all", "rb-images": "images", "rb-videos": "videos"}
         media = media_map.get(self._rval(self.query_one("#media", RadioSet)) or "rb-all", "all")

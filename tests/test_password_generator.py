@@ -80,3 +80,10 @@ def test_check_pwned_not_found(monkeypatch):
 
     monkeypatch.setattr("requests.get", lambda *a, **k: FakeResp())
     assert pg.check_pwned("whatever") == 0
+
+
+def test_a_generated_password_is_displayed_exactly(capsys):
+    """"[", "]" and "/" are real symbols here, and the table used to parse them."""
+    for password in ("ab[d]cd", "ab[i]cd", "xy[/]zz", "ab[/q]cd"):
+        pg.display_passwords([password])
+        assert password in capsys.readouterr().out

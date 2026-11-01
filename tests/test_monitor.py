@@ -1,6 +1,9 @@
+import threading
+
 import pytest
 from bs4 import BeautifulSoup
 
+from automation_tools.core import cancel
 from automation_tools.tools import monitor
 
 SETTINGS = {"decimal_separator": ".", "thousands_separator": ",", "currency_code": "USD"}
@@ -136,3 +139,55 @@ def test_send_notification_escapes_html_and_markup(monkeypatch):
     assert "&lt;script&gt;" in sent["msg"]
     assert "&amp;" in sent["msg"]
 
+
+def test_continuous_monitor_stops_when_cancelled(monkeypatch):
+    """The TUI has no other way to end this loop, and neither does Python's exit."""
+    event = threading.Event()
+    runs = []
+
+    def one_check():
+        runs.append(1)
+        event.set()
+        return True
+
+    monkeypatch.setattr(monitor, "run_price_monitor_job", one_check)
+
+    with cancel.scope(event), pytest.raises(cancel.Cancelled):
+        monitor.run_continuous_monitor(60)
+    assert len(runs) == 1
+
+
+def test_continuous_monitor_keeps_going_until_told_otherwise(monkeypatch):
+    event = threading.Event()
+    runs = []
+
+    def checks():
+        runs.append(1)
+        if len(runs) == 3:
+            event.set()
+        return True
+
+    monkeypatch.setattr(monitor, "run_price_monitor_job", checks)
+
+    with cancel.scope(event), pytest.raises(cancel.Cancelled):
+        monitor.run_continuous_monitor(0)
+    assert len(runs) == 3
+
+
+def test_a_round_of_checks_stops_between_products(monkeypatch, tmp_path):
+    event = threading.Event()
+    seen = []
+
+    def check_price(product, _settings):
+        seen.append(product["name"])
+        event.set()
+
+    monkeypatch.setattr(monitor, "DB_FILE", str(tmp_path / "prices.db"))
+    monkeypatch.setattr(monitor, "check_price", check_price)
+    monkeypatch.setattr(monitor, "load_json_config", lambda: {
+        "settings": {}, "products": [{"name": "first"}, {"name": "second"}],
+    })
+
+    with cancel.scope(event), pytest.raises(cancel.Cancelled):
+        monitor.run_price_monitor_job()
+    assert seen == ["first"]

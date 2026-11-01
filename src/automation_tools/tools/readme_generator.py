@@ -1,4 +1,5 @@
 import os
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser, exit_code
 import re
 from collections import Counter
@@ -104,6 +105,7 @@ def get_project_tree(directory: str, ignore_dirs: Optional[List[str]] = None) ->
     tree_str = f"{os.path.basename(os.path.abspath(directory))}/\n"
 
     for root, dirs, files in os.walk(directory, followlinks=False):
+        cancel.check()
         # Filter out ignored directories and symlinked directories
         dirs[:] = [
             d for d in dirs
@@ -132,6 +134,7 @@ def read_key_files(directory: str, max_files: int = 10) -> str:
     files_read = 0
 
     for root, dirs, files in os.walk(directory, followlinks=False):
+        cancel.check()
         dirs[:] = [
             d for d in dirs
             if d not in ignored_dirs and not os.path.islink(os.path.join(root, d))

@@ -34,3 +34,9 @@ def test_video_command_uses_no_playlist(monkeypatch, tmp_path):
     cmd = captured["cmd"]
     assert "--no-playlist" in cmd
     assert "-f" in cmd
+
+
+def test_a_malformed_host_is_invalid_rather_than_a_crash():
+    """urlparse raises on these, which used to take the whole TUI down."""
+    assert yt.normalize_youtube_url("https://[x") is None
+    assert yt.normalize_youtube_url("[/x] ' {}") is None

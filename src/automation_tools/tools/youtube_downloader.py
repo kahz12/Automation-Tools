@@ -1,4 +1,5 @@
 import os
+from automation_tools.core import cancel
 from automation_tools.core.cli import ArgumentParser, exit_code
 import subprocess
 import sys
@@ -24,10 +25,14 @@ def normalize_youtube_url(url: str) -> Optional[str]:
         return None
     if "://" not in raw:
         raw = f"https://{raw}"
-    parsed = urlparse(raw)
+    try:
+        parsed = urlparse(raw)
+        host = (parsed.hostname or "").strip()
+    except ValueError:
+        # urlparse raises on malformed hosts such as "https://[x".
+        return None
     if parsed.scheme.lower() not in ("http", "https"):
         return None
-    host = (parsed.hostname or "").strip()
     if not host or "." not in host:
         return None
     return raw
@@ -36,6 +41,10 @@ def normalize_youtube_url(url: str) -> Optional[str]:
 def _is_playlist(url: str) -> bool:
     """Detects if a given URL points to a YouTube playlist."""
     return "playlist" in url.lower() or "list=" in url.lower()
+
+
+def _print_download_line(line: str) -> None:
+    console.print(line, markup=False, highlight=False)
 
 
 def run_youtube_downloader(
@@ -104,12 +113,18 @@ def run_youtube_downloader(
             '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         ])
 
+    if cancel.active():
+        # Its output comes through the app here, one line each, and a progress
+        # bar redrawing itself would be thousands of them.
+        cmd.append('--no-progress')
+
     cmd.extend(['-o', output_template, '--', clean_url])
 
     console.print(f"[cyan]{'-' * 50}[/cyan]")
     try:
-        # Run the command in a subprocess.
-        subprocess.run(cmd, check=True)
+        # Run the command in a subprocess. A cancel kills it, and the partial
+        # file it leaves is what --continue picks up next time.
+        cancel.run(cmd, check=True, on_line=_print_download_line)
         console.print(f"[cyan]{'-' * 50}[/cyan]")
         print_success("Download completed successfully!")
         return True

@@ -57,3 +57,13 @@ def test_conversion_does_not_overwrite_existing_output(tmp_path, make_image):
 
     assert (tmp_path / "pic.bmp").exists()
     assert (tmp_path / "pic_1.bmp").exists()
+
+
+def test_an_unknown_format_is_refused_up_front(tmp_path, make_image, capsys):
+    make_image(tmp_path / "pic.png")
+
+    assert converter.run_image_converter(str(tmp_path), "notaformat") is False
+
+    out = capsys.readouterr().out
+    assert out.count("Unsupported output format") == 1
+    assert "Success" not in out

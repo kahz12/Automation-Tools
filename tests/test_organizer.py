@@ -1,3 +1,5 @@
+import pytest
+
 from automation_tools.tools import organizer
 
 
@@ -68,3 +70,72 @@ def test_partial_undo_keeps_history_for_retry(tmp_path, monkeypatch):
     assert first_src.exists()
     assert second_dst.exists()
     assert organizer.list_history() == [history]
+
+
+def _with_a_full_folder(tmp_path, monkeypatch):
+    downloads = tmp_path / "downloads"
+    downloads.mkdir()
+    (downloads / "report.pdf").write_text("x")
+    monkeypatch.setattr(organizer, "get_downloads_folder", lambda: str(downloads))
+    monkeypatch.setattr(organizer, "HISTORY_DIR", str(tmp_path / "history"))
+    return downloads
+
+
+@pytest.mark.parametrize("flag, code", [("--help", 0), ("--no-such-flag", 2), ("-x", 2)])
+def test_a_flag_it_does_not_run_on_never_moves_anything(tmp_path, monkeypatch, flag, code):
+    """`atools organizer --help` used to reorganize the whole Downloads folder."""
+    downloads = _with_a_full_folder(tmp_path, monkeypatch)
+    monkeypatch.setattr("sys.argv", ["atools organizer", flag])
+
+    with pytest.raises(SystemExit) as excinfo:
+        organizer.main()
+
+    assert excinfo.value.code == code
+    assert sorted(p.name for p in downloads.iterdir()) == ["report.pdf"]
+
+
+def test_the_command_line_can_undo_a_run(tmp_path, monkeypatch):
+    downloads = _with_a_full_folder(tmp_path, monkeypatch)
+
+    monkeypatch.setattr("sys.argv", ["atools organizer"])
+    with pytest.raises(SystemExit) as excinfo:
+        organizer.main()
+    assert excinfo.value.code == 0
+    assert (downloads / "Documentos" / "report.pdf").exists()
+
+    monkeypatch.setattr("sys.argv", ["atools organizer", "--undo"])
+    with pytest.raises(SystemExit) as excinfo:
+        organizer.main()
+    assert excinfo.value.code == 0
+    assert (downloads / "report.pdf").exists()
+
+
+def test_the_policy_flag_reaches_the_tool(tmp_path, monkeypatch):
+    downloads = _with_a_full_folder(tmp_path, monkeypatch)
+    (downloads / "Documentos").mkdir()
+    (downloads / "Documentos" / "report.pdf").write_text("already here")
+
+    monkeypatch.setattr("sys.argv", ["atools organizer", "--policy", "skip"])
+    with pytest.raises(SystemExit):
+        organizer.main()
+
+    assert (downloads / "report.pdf").exists()
+    assert (downloads / "Documentos" / "report.pdf").read_text() == "already here"
+
+
+def test_a_failed_move_is_a_failed_run(tmp_path, monkeypatch):
+    _with_a_full_folder(tmp_path, monkeypatch)
+
+    def refuse(*_args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(organizer.shutil, "move", refuse)
+    assert organizer.run_download_organizer() is False
+
+
+def test_undo_reports_whether_everything_came_back(tmp_path, monkeypatch):
+    downloads = _with_a_full_folder(tmp_path, monkeypatch)
+    assert organizer.run_download_organizer() is True
+    (downloads / "report.pdf").write_text("a new file took the old name")
+
+    assert organizer.undo_last() is False
