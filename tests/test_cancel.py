@@ -80,6 +80,15 @@ def _fires_soon(event, delay=0.1):
     return timer
 
 
+def _fires_once(signal, event):
+    """Cancels as soon as `signal` says the tool has reached the blocking part."""
+    def wait():
+        if signal.wait(30):
+            event.set()
+
+    threading.Thread(target=wait, daemon=True).start()
+
+
 def _quick(started, limit=4.0):
     assert time.monotonic() - started < limit
 
@@ -805,12 +814,14 @@ class _SlowProvider:
     def __init__(self, answers=()):
         self.answers = list(answers)
         self.requests = 0
+        self.stuck = threading.Event()
         self.release = threading.Event()
 
     def _ask(self):
         self.requests += 1
         if self.answers:
             return self.answers.pop(0)
+        self.stuck.set()
         self.release.wait(30)
         return "too late"
 
@@ -852,7 +863,7 @@ def test_a_summary_stops_waiting_on_the_model(tmp_path, monkeypatch, event):
     out = tmp_path / "summary.txt"
     provider = _SlowProvider()
     monkeypatch.setattr(summarizer, "get_provider", lambda *_a, **_k: provider)
-    _fires_soon(event)
+    _fires_once(provider.stuck, event)
     started = time.monotonic()
 
     with cancel.scope(event), pytest.raises(cancel.Cancelled):
@@ -870,7 +881,7 @@ def test_a_translation_keeps_no_half_translated_file(tmp_path, monkeypatch, even
     out = tmp_path / "book_es.txt"
     provider = _SlowProvider(answers=["uno"])
     monkeypatch.setattr(translator, "get_provider", lambda *_a, **_k: provider)
-    _fires_soon(event)
+    _fires_once(provider.stuck, event)
 
     with cancel.scope(event), pytest.raises(cancel.Cancelled):
         translator.run_translator(str(source), "spanish", out_path=str(out))
@@ -884,7 +895,7 @@ def test_ocr_keeps_what_it_finished_and_stops_paying(tmp_path, monkeypatch, even
     folder = _images(tmp_path / "in")
     provider = _SlowProvider(answers=["text of the first"])
     monkeypatch.setattr(ocr, "get_provider", lambda *_a, **_k: provider)
-    _fires_soon(event)
+    _fires_once(provider.stuck, event)
 
     with cancel.scope(event), pytest.raises(cancel.Cancelled):
         ocr.run_ocr(str(folder))
@@ -903,15 +914,19 @@ class _Files:
     def __init__(self):
         self.deleted = []
         self.deleted_late = threading.Event()
+        self.uploading = threading.Event()
+        self.polling = threading.Event()
         self.release = threading.Event()
         self.slow_upload = False
 
     def upload(self, file):
+        self.uploading.set()
         if self.slow_upload:
             self.release.wait(30)
         return _Uploaded()
 
     def get(self, name):
+        self.polling.set()
         return _Uploaded()
 
     def delete(self, name):
@@ -932,7 +947,7 @@ def test_a_cancelled_transcription_still_deletes_the_upload(tmp_path, event):
     media = tmp_path / "talk.mp3"
     media.write_bytes(b"x")
     provider, files = _gemini()
-    _fires_soon(event)
+    _fires_once(files.polling, event)
     started = time.monotonic()
 
     with cancel.scope(event), pytest.raises(cancel.Cancelled):
@@ -947,7 +962,7 @@ def test_an_upload_abandoned_midway_is_deleted_if_it_lands(tmp_path, event):
     media.write_bytes(b"x")
     provider, files = _gemini()
     files.slow_upload = True
-    _fires_soon(event)
+    _fires_once(files.uploading, event)
 
     with cancel.scope(event), pytest.raises(cancel.Cancelled):
         provider.transcribe(str(media))

@@ -181,8 +181,10 @@ def test_output_for_other_programs_is_not_hard_wrapped(flags, monkeypatch, capsy
     assert console.soft_wrap == before
 
 
-def test_a_path_that_looks_like_markup_is_an_ordinary_error(tmp_path, capsys):
+def test_a_path_that_looks_like_markup_is_an_ordinary_error(capsys):
+    # A literal, not built with pathlib: on Windows that would come out as
+    # "[\\x].jpg", which is no closing tag and not what this is here to test.
     with pytest.raises(SystemExit) as excinfo:
-        dispatch.main(["metadata", str(tmp_path / "[" / "x].jpg")])
+        dispatch.main(["metadata", "[/x].jpg"])
     assert excinfo.value.code == 1
     assert "[/x].jpg" in capsys.readouterr().out
